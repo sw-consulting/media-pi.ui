@@ -1,6 +1,27 @@
-// Copyright (c) 2025 sw.consulting
-// Licensed under the MIT License.
-// This file is a part of Mediapi frontend application
+// Copyright (C) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// All rights reserved.
+// This file is a part of Logibooks frontend application
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+// BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 
 import { useAuthStore } from '@/stores/auth.store.js'
 import { apiUrl, enableLog } from '@/helpers/config.js'
@@ -9,7 +30,10 @@ export const fetchWrapper = {
   get: request('GET'),
   post: request('POST'),
   put: request('PUT'),
-  delete: request('DELETE')
+  delete: request('DELETE'),
+  postFile: requestFile('POST'),
+  getFile: requestBlob('GET'),
+  downloadFile: downloadFile
 }
 
 function request(method) {
@@ -23,9 +47,12 @@ function request(method) {
             requestOptions.body = JSON.stringify(body);
         }
         
-        var response;
+        let response;
         try {
-            response = await fetch(url, requestOptions);
+           if (enableLog) {
+            console.log(url, requestOptions)
+           }
+           response = await fetch(url, requestOptions);
         } catch (error) {
             // Customize your error message here
             if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
@@ -38,21 +65,69 @@ function request(method) {
         // Check if the response is ok (status in the range 200-299)
         if (!response.ok) {
             // If server returned an error response, try to parse it
-            const error = await response.text();
+            const errorText = await response.text();
             let errorMessage;
+            let errorObj;
             try {
                 // Try to parse as JSON
-                const errorObj = JSON.parse(error);
+                errorObj = JSON.parse(errorText);
                 errorMessage = errorObj.msg || `Ошибка ${response.status}`;
             } catch {
                 // If not valid JSON, use text as is
-                errorMessage = error || `Ошибка ${response.status}`;
+                errorMessage = errorText || `Ошибка ${response.status}`;
             }
-            
+
+            const error = new Error(errorMessage);
+            error.status = response.status;
+            if (errorObj) error.data = errorObj;
             // Re-throw the error for further handling if needed
-            throw new Error(errorMessage);
+            throw error;
         }
         
+        return handleResponse(response);
+    };
+}
+
+function requestFile(method) {
+    return async (url, body) => {
+        const requestOptions = {
+            method,
+            headers: authHeader(url)
+        };
+        if (body) {
+            requestOptions.body = body;
+        }
+
+        let response;
+        try {
+          if (enableLog) {
+            console.log(url, requestOptions)
+          }
+          response = await fetch(url, requestOptions);
+        } catch (error) {
+            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+                throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
+            } else {
+                throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
+            }
+        }
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            let errorMessage;
+            let errorObj;
+            try {
+                errorObj = JSON.parse(errorText);
+                errorMessage = errorObj.msg || `Ошибка ${response.status}`;
+            } catch {
+                errorMessage = errorText || `Ошибка ${response.status}`;
+            }
+            const error = new Error(errorMessage);
+            error.status = response.status;
+            if (errorObj) error.data = errorObj;
+            throw error;
+        }
+
         return handleResponse(response);
     };
 }
@@ -67,6 +142,90 @@ function authHeader(url) {
     return { Authorization: `Bearer ${user.token}` }
   } else {
     return {}
+  }
+}
+
+function requestBlob(method) {
+    return async (url) => {
+        const requestOptions = {
+            method,
+            headers: authHeader(url)
+        };
+        
+        let response;
+        try {
+           if (enableLog) {
+            console.log(url, requestOptions)
+           }
+           response = await fetch(url, requestOptions);
+        } catch (error) {
+            // Customize your error message here
+            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+                throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
+            } else {
+                throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
+            }           
+        }
+            
+        // Check if the response is ok (status in the range 200-299)
+        if (!response.ok) {
+            // If server returned an error response, try to parse it
+            const errorText = await response.text();
+            let errorMessage;
+            let errorObj;
+            try {
+                // Try to parse as JSON
+                errorObj = JSON.parse(errorText);
+                errorMessage = errorObj.msg || `Ошибка ${response.status}`;
+            } catch {
+                // If not valid JSON, use text as is
+                errorMessage = errorText || `Ошибка ${response.status}`;
+            }
+
+            const error = new Error(errorMessage);
+            error.status = response.status;
+            if (errorObj) error.data = errorObj;
+            // Re-throw the error for further handling if needed
+            throw error;
+        }
+        
+        return response;
+    };
+}
+
+/**
+ * Downloads a file from the server and initiates browser download
+ * @param {string} fileUrl - The URL to download from
+ * @param {string} defaultFilename - Fallback filename if none provided in headers
+ * @returns {Promise<boolean>} - True if download initiated successfully
+ */
+async function downloadFile(fileUrl, defaultFilename) {
+  try {
+    const response = await requestBlob('GET')(fileUrl)
+    
+    let filename = defaultFilename
+    const disposition = response.headers.get('Content-Disposition')
+    if (disposition && disposition.includes('filename=')) {
+      filename = disposition
+        .split('filename=')[1]
+        .replace(/["']/g, '')
+        .trim()
+    }
+    
+    // Process the blob and trigger download
+    const blob = await response.blob()
+    const objectUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(objectUrl)
+    return true
+  } catch (error) {
+    console.error('Error downloading file:', error)
+    throw error
   }
 }
 

@@ -1,6 +1,24 @@
-// Copyright (c) 2025 sw.consulting
-// Licensed under the MIT License.
-// This file is a part of Mediapi frontend application
+// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// This file is a part of Media Pi frontend application
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -10,82 +28,81 @@ import { apiUrl } from '@/helpers/config.js'
 
 const baseUrl = `${apiUrl}/users`
 
-const roleLogist = 'logist'
-const roleAdmin = 'administrator'
+export const useUsersStore = defineStore('users', () => {
+  const users = ref([])
+  const user = ref(null)
+  const loading = ref(false)
+  const error = ref(null)
 
-function translate(param) {
-  const roles = []
-  if (param.isLogist === 'LOGIST' || param.isLogist === true) {
-    roles.push(roleLogist)
+  // getters
+const getUserById = (id) => {
+  if (!users || !Array.isArray(users.value)) {
+    return null
   }
-  if (param.isAdmin === 'ADMIN' || param.isAdmin === true) {
-    roles.push(roleAdmin)
-  }
-  if (!roles.length) {
-    if (param.roles) {
-      roles.push(...param.roles)
-    } else {
-      roles.push(roleLogist)
-    }
-  }
-  const res = { ...param, roles }
-  delete res.isAdmin
-  delete res.isLogist
-  delete res.password2
-  return res
+  return users.value.find(user => user && user.id === id);
 }
 
-export const useUsersStore = defineStore('users', () => {
-  // state
-  const users = ref({})
-  const user = ref({})
-  
-  // getters
-  const getUserById = (id) => {
-    return users.value.find((user) => user.id === id)
-  }
-  
   // actions
-  async function add(userParam, trnslt = false) {
-    if (trnslt) {
-      userParam = translate(userParam)
+  async function add(userParam) {
+    loading.value = true
+    error.value = null
+    try {
+      await fetchWrapper.post(baseUrl, userParam)
+      getAll() 
+    } catch (err) {
+      error.value = err
     }
-    await fetchWrapper.post(baseUrl, userParam)
+    finally {
+      loading.value = false
+    }
   }
 
   async function getAll() {
-    users.value = { loading: true }
+    loading.value = true
+    error.value = null
     try {
-      users.value = await fetchWrapper.get(baseUrl)
-    } catch (error) {
-      users.value = { error }
+      const result = await fetchWrapper.get(baseUrl)
+      users.value = result
+    } catch (err) {
+      error.value = err
+      users.value = []
+    }
+    finally {
+      loading.value = false
     }
   }
 
-  async function getById(id, trnslt = false) {
-    user.value = { loading: true }
+  async function getById(id) {
+    loading.value = true
+    error.value = null
     try {
-      user.value = await fetchWrapper.get(`${baseUrl}/${id}`)
-      if (trnslt) {
-        user.value.isAdmin =
-          user.value.roles && user.value.roles.includes(roleAdmin) ? 'ADMIN' : 'NONE'
-        user.value.isLogist =
-          user.value.roles && user.value.roles.includes(roleLogist) ? 'LOGIST' : 'NONE'
-      }
-    } catch (error) {
-      user.value = { error }
+      const result = await fetchWrapper.get(`${baseUrl}/${id}`)
+      user.value = result
+    } catch (err) {
+      error.value = err
+      user.value = null
+    }
+    finally {
+      loading.value = false
     }
   }
 
-  async function update(id, params, trnslt = false) {
-    if (trnslt) {
-      params = translate(params)
+  async function update(id, params) {
+    loading.value = true
+    error.value = null
+    try {
+      await fetchWrapper.put(`${baseUrl}/${id}`, params)
+      getAll() 
+    } catch (err) {
+      error.value = err
     }
-    await fetchWrapper.put(`${baseUrl}/${id}`, params)
+    finally {
+      loading.value = false
+    }
 
     // update stored user if the logged in user updated their own record
     const authStore = useAuthStore()
-    if (id === authStore.user.id) {
+    if (authStore.user && id === authStore.user.id) {
       // update local storage
       const updatedUser = { ...authStore.user, ...params }
       localStorage.setItem('user', JSON.stringify(updatedUser))
@@ -97,16 +114,28 @@ export const useUsersStore = defineStore('users', () => {
 
   async function deleteUser(id) {
     const authStore = useAuthStore()
-    if (id === authStore.user.id) {
+    if (authStore.user && id === authStore.user.id) {
       authStore.logout()
     }
-    await fetchWrapper.delete(`${baseUrl}/${id}`, {})
+    loading.value = true
+    error.value = null
+    try {
+      await fetchWrapper.delete(`${baseUrl}/${id}`, {})
+      getAll()
+    } catch (err) {
+      error.value = err
+    }
+    finally {
+      loading.value = false
+    }
   }
 
   return {
     // state
     users,
     user,
+    loading,
+    error,
     // getters
     getUserById,
     // actions

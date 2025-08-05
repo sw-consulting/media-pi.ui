@@ -8,17 +8,23 @@ import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
 import { apiUrl } from '@/helpers/config.js'
 import router from '@/router'
 import { useStatusStore } from '@/stores/status.store.js'
+import { isAdministrator as isAdmin } from '@/helpers/user.helpers.js' 
+import { isManager as isMngr } from '@/helpers/user.helpers.js' 
+import { isEngineer as isEng } from '@/helpers/user.helpers.js' 
 
 const baseUrl = `${apiUrl}/auth`
 
 export const useAuthStore = defineStore('auth', () => {
-  // initialize state from local storage to enable user to stay logged in
-  const user = ref(JSON.parse(localStorage.getItem('user')))
-  const isAdmin = computed(() =>
-    user.value?.roles?.includes('administrator')
+  const saved_user = localStorage.getItem('user')
+  const user = ref(saved_user ? JSON.parse(saved_user) : null )
+  const isAdministrator = computed(() =>
+    isAdmin(user.value)
   )
-  const isLogist = computed(() =>
-    user.value?.roles?.includes('logist')
+  const isManager = computed(() =>
+    isMngr(user.value)
+  )
+  const isEngineer = computed(() =>
+    isEng(user.value)
   )
   const users_per_page = ref(10)
   const users_search = ref('')
@@ -120,8 +126,9 @@ export const useAuthStore = defineStore('auth', () => {
     returnUrl,
     re_jwt,
     re_tgt,
-    isAdmin,
-    isLogist,
+    isAdministrator,
+    isManager,
+    isEngineer,
     // actions
     check,
     register,

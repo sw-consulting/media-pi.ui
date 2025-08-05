@@ -1,7 +1,25 @@
-<script setup>
-// Copyright (c) 2025 sw.consulting
-// Licensed under the MIT License.
+// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 // This file is a part of Mediapi frontend application
+
+<script setup>
 
 import { RouterLink, RouterView } from 'vue-router'
 import { version } from '@/../package'
@@ -15,8 +33,8 @@ import { useAuthStore } from '@/stores/auth.store.js'
 const authStore = useAuthStore()
 
 const statusStore = useStatusStore()
+statusStore.fetchStatus().catch(() => {})
  onMounted(() => {
-  statusStore.fetchStatus().catch(() => {})
  })
 
 import { drawer, toggleDrawer } from '@/helpers/drawer.js'
@@ -54,7 +72,7 @@ function getUserName() {
       <template v-slot:prepend>
         <v-app-bar-nav-icon @click.stop="toggleDrawer()" color="blue-darken-2"></v-app-bar-nav-icon>
       </template>
-      <v-app-bar-title class="orange">Mediapi {{ getUserName() }} </v-app-bar-title>
+      <v-app-bar-title class="orange">Media Pi {{ getUserName() }} </v-app-bar-title>
       <v-spacer />
     </v-app-bar>
     <v-navigation-drawer v-model="drawer" elevation="4">
@@ -64,10 +82,10 @@ function getUserName() {
         </div>
       </template>
       <v-list v-if="authStore.user">
-        <v-list-item v-if="!authStore.isAdmin">
+        <v-list-item v-if="!authStore.isAdministrator">
           <RouterLink :to="'/user/edit/' + authStore.user.id" class="link">Настройки</RouterLink>
         </v-list-item>
-        <v-list-item v-if="authStore.isAdmin">
+        <v-list-item v-if="authStore.isAdministrator">
           <RouterLink to="/users" class="link">Пользователи</RouterLink>
         </v-list-item>
         <v-list-item v-if="authStore.isLogist">

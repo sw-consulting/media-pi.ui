@@ -18,38 +18,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// This file is a part of Media Pi frontend application
+// This file is a part of Mediapi frontend application
 
-async function loadConfig() {
-  try {
-    const response = await fetch('/config.json')
-    const runtimeConfig = await response.json()
-    window.RUNTIME_CONFIG = runtimeConfig
-    return runtimeConfig
-  } catch (error) {
-    console.error('Failed to load runtime config:', error)
-    window.RUNTIME_CONFIG = {} // Set empty object as fallback
-    return {}
-  }
+export const UserRoleConstants = {
+  SystemAdministrator: 1,
+  AccountManager: 11,
+  InstallationEngineer: 21
 }
 
-// Initialize the application
-function initializeApplication() {
-  // Import CSS and app modules
-  import('@/assets/main.css')
-  
-  import('./init.app.js').then(({ initializeApp }) => {
-    initializeApp()
-  })
+export function isAdministrator(user) {
+  return user && Array.isArray(user.roles) && user.roles.includes(UserRoleConstants.SystemAdministrator)
 }
 
-// Load config first, then initialize app
-loadConfig()
-  .then(() => {
-    initializeApplication()
-  })
-  .catch((error) => {
-    console.error('Failed to initialize app after config load:', error)
-    // Still try to initialize the app even if config loading failed
-    initializeApplication()
-  })
+export function isManager(user) {
+  return user && Array.isArray(user.roles) && user.roles.includes(UserRoleConstants.AccountManager)
+}
+
+export function isEngineer(user) {
+  return user && Array.isArray(user.roles) && user.roles.includes(UserRoleConstants.InstallationEngineer)
+}

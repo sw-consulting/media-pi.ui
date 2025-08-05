@@ -1,3 +1,25 @@
+// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// This file is a part of Media Pi frontend application
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth.store.js'
@@ -53,8 +75,6 @@ describe('auth store', () => {
       const store = useAuthStore()
       expect(store.user).toBeNull()
       // isAdmin should be falsy when there's no user
-      expect(store.isAdmin).toBeFalsy()
-      expect(store.isLogist).toBeFalsy()
       expect(store.users_per_page).toBe(10)
       expect(store.users_search).toBe('')
       expect(store.users_sort_by).toEqual(['id'])
@@ -69,38 +89,53 @@ describe('auth store', () => {
     })
 
     it('loads user from localStorage if present', () => {
-      const testUser = { id: 1, name: 'Test User', roles: ['administrator'] }
+      const testUser = { id: 1, name: 'Test User', roles: [1] }
       localStorage.setItem('user', JSON.stringify(testUser))
       vi.spyOn(JSON, 'parse').mockImplementation(() => testUser)
       
       const store = useAuthStore()
       expect(store.user).toEqual(testUser)
-      expect(store.isAdmin).toBe(true)
-      expect(store.isLogist).toBeFalsy()
+      expect(store.isAdministrator).toBe(true)
+      expect(store.isManager).toBeFalsy()
+      expect(store.isEngineer).toBeFalsy()
     })
 
     it('correctly identifies admin users', () => {
       const store = useAuthStore()
-      store.user = { id: 1, roles: ['administrator'] }
-      expect(store.isAdmin).toBe(true)
-      
-      store.user = { id: 2, roles: ['logist'] }
-      expect(store.isAdmin).toBe(false)
-      
-      store.user = { id: 3, roles: ['administrator', 'logist'] }
-      expect(store.isAdmin).toBe(true)
+      store.logout()
+
+      store.user = { id: 1, roles: [1] }
+      expect(store.isAdministrator).toBe(true)
+
+      store.user = { id: 2, roles: [11] }
+      expect(store.isAdministrator).toBeFalsy()
+
+      store.user = { id: 3, roles: [1, 11] }
+      expect(store.isAdministrator).toBe(true)
     })
 
-    it('correctly identifies logist users', () => {
+    it('correctly identifies manager users', () => {
       const store = useAuthStore()
-      store.user = { id: 1, roles: ['logist'] }
-      expect(store.isLogist).toBe(true)
-      
-      store.user = { id: 2, roles: ['administrator'] }
-      expect(store.isLogist).toBe(false)
-      
-      store.user = { id: 3, roles: ['administrator', 'logist'] }
-      expect(store.isLogist).toBe(true)
+      store.user = { id: 1, roles: [11] }
+      expect(store.isManager).toBe(true)
+
+      store.user = { id: 2, roles: [21] }
+      expect(store.isManager).toBe(false)
+
+      store.user  = { id: 3, roles: [11, 21] }
+      expect(store.isManager).toBe(true)
+    })
+
+   it('correctly identifies engineer users', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, roles: [21] }
+      expect(store.isEngineer).toBe(true)
+
+      store.user = { id: 2, roles: [1] }
+      expect(store.isEngineer).toBe(false)
+
+      store.user  = { id: 3, roles: [1, 21] }
+      expect(store.isEngineer).toBe(true)
     })
 
     it('handles register view parameters correctly', () => {
@@ -240,7 +275,7 @@ describe('auth store', () => {
       
       const statusStore = useStatusStore()
       const store = useAuthStore()
-      store.user = testUser
+      store.user.value = testUser
       
       store.logout()
       

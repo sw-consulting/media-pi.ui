@@ -4,6 +4,7 @@
 // This file is a part of Mediapi frontend application
 
 import Users from '@/components/Users_List.vue'
+
 </script>
 
 <template>

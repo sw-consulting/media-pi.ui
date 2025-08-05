@@ -13,6 +13,11 @@ import { useUsersStore } from '@/stores/users.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 
+import { useRolesStore } from '@/stores/roles.store.js'
+const rolesStore = useRolesStore()
+rolesStore.ensureLoaded()
+
+
 const props = defineProps({
   register: {
     type: Boolean,
@@ -65,7 +70,7 @@ function isRegister() {
 }
 
 function asAdmin() {
-  return authStore.isAdmin
+  return authStore.isAdministrator
 }
 
 function getTitle() {
@@ -296,7 +301,7 @@ function onSubmit(values, { setErrors }) {
         <label for="isLogist">Логист</label>
       </div>
 
-      <div class="form-group">
+      <div class="form-group mt-5">
         <button class="button" type="submit" :disabled="isSubmitting">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
           {{ getButton() }}

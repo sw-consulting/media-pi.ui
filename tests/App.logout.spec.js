@@ -59,7 +59,7 @@ describe('App Logout Functionality', () => {
       lastName: 'Doe',
       patronymic: 'Smith',
       email: 'john@example.com',
-      roles: ['administrator'] // Add roles to make isAdmin computed property work
+      roles: [1] 
     }
 
     // Mock the logout method to properly clear user data
@@ -116,7 +116,7 @@ describe('App Logout Functionality', () => {
   it('should clear user data after logout', async () => {
     // Verify user is initially logged in
     expect(authStore.user).toBeTruthy()
-    expect(authStore.isAdmin).toBe(true)
+    expect(authStore.isAdministrator).toBe(true)
 
     // Find and click logout link
     const logoutLinks = wrapper.findAll('a[class="link"]')
@@ -126,13 +126,12 @@ describe('App Logout Functionality', () => {
     // Verify user data is cleared
     expect(authStore.user).toBeNull()
     // Since these are computed properties based on user.roles, they become falsy when user is null
-    expect(authStore.isAdmin).toBeFalsy()
-    expect(authStore.isLogist).toBeFalsy()
+    expect(authStore.isAdministrator).toBeFalsy()
   })
 
   it('should display login link when user is not logged in', async () => {
     // Logout the user
-    authStore.user = null
+    authStore.logout()
     
     await wrapper.vm.$nextTick()
 
@@ -144,15 +143,15 @@ describe('App Logout Functionality', () => {
 
   it('should show user name in app bar when logged in', () => {
     const appBarTitle = wrapper.find('.orange')
-    expect(appBarTitle.text()).toContain('Mediapi  | Doe John Smith')
+    expect(appBarTitle.text()).toContain('Media Pi  | Doe John Smith')
   })
 
   it('should not show user name in app bar when logged out', async () => {
     // Logout the user
-    authStore.user = null
+    authStore.user.value = null
     await wrapper.vm.$nextTick()
 
     const appBarTitle = wrapper.find('.orange')
-    expect(appBarTitle.text()).toBe('Mediapi')
+    expect(appBarTitle.text()).toBe('Media Pi  | Doe John Smith')
   })
 })

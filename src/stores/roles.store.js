@@ -20,36 +20,52 @@
 //
 // This file is a part of Media Pi frontend application
 
-async function loadConfig() {
-  try {
-    const response = await fetch('/config.json')
-    const runtimeConfig = await response.json()
-    window.RUNTIME_CONFIG = runtimeConfig
-    return runtimeConfig
-  } catch (error) {
-    console.error('Failed to load runtime config:', error)
-    window.RUNTIME_CONFIG = {} // Set empty object as fallback
-    return {}
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
+import { apiUrl } from '@/helpers/config.js'
+
+const baseUrl = `${apiUrl}/roles`
+
+export const useRolesStore = defineStore('roles', () => {
+  const roles = ref([])
+  const loading = ref(false)
+  const error = ref(null)
+
+  const roleMap = ref(new Map())
+  let initialized = false
+
+  async function getAll() {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await fetchWrapper.get(baseUrl)
+      roles.value = res || []
+      roleMap.value = new Map(roles.value.map(t => [t.id, t]))
+    } catch (err) {
+      error.value = err
+    } finally {
+      loading.value = false
+    }
   }
-}
-
-// Initialize the application
-function initializeApplication() {
-  // Import CSS and app modules
-  import('@/assets/main.css')
   
-  import('./init.app.js').then(({ initializeApp }) => {
-    initializeApp()
-  })
-}
+  async function ensureLoaded() {
+    if (!initialized  && !loading.value) {
+      initialized = true
+      await getAll()
+    }
+  }
 
-// Load config first, then initialize app
-loadConfig()
-  .then(() => {
-    initializeApplication()
-  })
-  .catch((error) => {
-    console.error('Failed to initialize app after config load:', error)
-    // Still try to initialize the app even if config loading failed
-    initializeApplication()
-  })
+  function getName(id) {
+    const role = roleMap.value.get(id)
+    return role ? role.name : `Роль ${id}`
+  }
+
+  return { 
+    roles, 
+    loading, 
+    error, 
+    getAll, 
+    ensureLoaded, 
+    getName }
+})

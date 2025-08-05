@@ -8,7 +8,6 @@ import { useAlertStore } from '@/stores/alert.store.js'
 
 const publicPages = ['/recover', '/register']
 const loginPages = ['/login']
-const logistPages = ['/registers']
 
 function routeToLogin(to, auth) {
   if (loginPages.includes(to.path)) {
@@ -30,10 +29,7 @@ const router = createRouter({
         if (!auth.user) {
           return '/login'
         }
-        // Priority: logist > administrator > regular user
-        if (auth.isLogist) return '/registers'
-        if (auth.isAdmin) return '/users'
-        return '/user/edit/' + auth.user.id
+        return '/registers'
       }
     },
     {
@@ -103,10 +99,6 @@ router.beforeEach(async (to) => {
     return routeToLogin(to, auth)
   }
 
-  // (3) Check role-specific access BEFORE general redirects
-  if (logistPages.includes(to.path) && !auth.isLogist) {
-    return routeToLogin(to, auth)
-  }
 
   // (4) Handle login page access with role-priority redirect
   if (loginPages.includes(to.path)) {
@@ -126,9 +118,7 @@ router.beforeEach(async (to) => {
     }
     
     // No need to login, redirect based on role priority
-    if (auth.isLogist) return '/registers'
-    if (auth.isAdmin) return '/users'
-    return '/user/edit/' + auth.user.id
+    return '/registers'
   }
 
   // (5) Allow access to other routes

@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import UserSettings from '@/components/User_Settings.vue'
 import { resolveAll } from './helpers/test-utils'
 
@@ -25,11 +26,7 @@ const registerUser = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const routerPush = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const successAlert = vi.hoisted(() => vi.fn())
 const setErrorsMock = vi.hoisted(() => vi.fn())
-
-vi.mock('pinia', async () => {
-  const actual = await vi.importActual('pinia')
-  return { ...actual, storeToRefs: () => ({ user: mockUser }) }
-})
+const ensureLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 
 vi.mock('@/stores/users.store.js', () => ({
   useUsersStore: () => ({
@@ -43,8 +40,15 @@ vi.mock('@/stores/users.store.js', () => ({
 vi.mock('@/stores/auth.store.js', () => ({
   useAuthStore: () => ({
     isAdmin,
+    isAdministrator: isAdmin,
     user: { id: 2 },
     register: registerUser
+  })
+}))
+
+vi.mock('@/stores/roles.store.js', () => ({
+  useRolesStore: () => ({
+    ensureLoaded
   })
 }))
 
@@ -63,6 +67,9 @@ const Parent = {
 }
 
 beforeEach(() => {
+  // Set up Pinia instance for each test
+  setActivePinia(createPinia())
+  
   vi.clearAllMocks()
   isAdmin = false
   mockUser.value = { id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: ['logist'] }
