@@ -51,6 +51,7 @@ const getUserById = (id) => {
       getAll() 
     } catch (err) {
       error.value = err
+      throw err
     }
     finally {
       loading.value = false
@@ -66,6 +67,7 @@ const getUserById = (id) => {
     } catch (err) {
       error.value = err
       users.value = []
+      throw err
     }
     finally {
       loading.value = false
@@ -81,6 +83,7 @@ const getUserById = (id) => {
     } catch (err) {
       error.value = err
       user.value = null
+      throw err
     }
     finally {
       loading.value = false
@@ -95,6 +98,7 @@ const getUserById = (id) => {
       getAll() 
     } catch (err) {
       error.value = err
+      throw err
     }
     finally {
       loading.value = false
@@ -124,6 +128,7 @@ const getUserById = (id) => {
       getAll()
     } catch (err) {
       error.value = err
+      throw err
     }
     finally {
       loading.value = false

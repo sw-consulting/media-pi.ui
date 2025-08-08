@@ -1,3 +1,25 @@
+// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// This file is a part of Media Pi frontend application
+
 /* @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -15,6 +37,7 @@ const getAll = vi.hoisted(() => vi.fn())
 const deleteUserFn = vi.hoisted(() => vi.fn())
 const errorFn = vi.hoisted(() => vi.fn())
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+const ensureLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const router = vi.hoisted(() => ({
   push: vi.fn()
 }))
@@ -46,6 +69,17 @@ vi.mock('@/stores/auth.store.js', () => ({
     users_search: '',
     users_sort_by: ['id'],
     users_page: 1
+  })
+}))
+
+vi.mock('@/stores/roles.store.js', () => ({
+  useRolesStore: () => ({
+    ensureLoaded,
+    roles: [
+      { id: 1, roleId: 1, name: 'Администратор' },
+      { id: 11, roleId: 11, name: 'Менеджер' },
+      { id: 21, roleId: 21, name: 'Инженер' }
+    ]
   })
 }))
 
@@ -309,5 +343,21 @@ describe('Users_List.vue', () => {
     
     // Verify that getAll was not called again (since the delete failed)
     expect(getAll).toHaveBeenCalledTimes(1) // Only the initial call on mount
+  })
+
+  it('calls ensureLoaded from roles store on component mount', async () => {
+    mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    await resolveAll()
+    expect(ensureLoaded).toHaveBeenCalled()
   })
 })

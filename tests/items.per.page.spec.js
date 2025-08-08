@@ -20,10 +20,12 @@
 //
 // This file is a part of Media Pi frontend application
 
-<script setup>
-import Users from '@/components/Users_List.vue'
-</script>
+import { describe, it, expect } from 'vitest'
+import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 
-<template>
-  <Users />
-</template>
+describe('items per page options', () => {
+  it('contains expected options', () => {
+    expect(itemsPerPageOptions).toHaveLength(4)
+    expect(itemsPerPageOptions[3]).toEqual({ value: -1, title: 'Все' })
+  })
+})

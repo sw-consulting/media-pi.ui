@@ -4,18 +4,7 @@
 // Licensed under the MIT License.
 // This file is a part of Mediapi frontend application
 
-import { watch } from 'vue'
-import { useAuthStore } from '@/stores/auth.store.js'
-import { storeToRefs } from 'pinia'
 
-
-const authStore = useAuthStore()
-const { registers_per_page, registers_search, registers_sort_by, registers_page } = storeToRefs(authStore)
-
-// Watch for changes in pagination, sorting, or search
-watch([registers_page, registers_per_page, registers_sort_by, registers_search], () => {
-  loadRegisters()
-}, { immediate: true, deep: true })
 
 
 </script>

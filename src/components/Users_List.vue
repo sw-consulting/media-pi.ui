@@ -29,13 +29,22 @@ import { useUsersStore } from '@/stores/users.store.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { getRoleName } from '@/helpers/user.helpers.js'
 import { mdiMagnify } from '@mdi/js'
+import { onMounted } from 'vue'
 
 import { useAuthStore } from '@/stores/auth.store.js'
 const authStore = useAuthStore()
 
+import { useRolesStore } from '@/stores/roles.store.js'
+const rolesStore = useRolesStore()
+
 const usersStore = useUsersStore()
 const { users } = storeToRefs(usersStore)
 usersStore.getAll()
+
+// Load roles when component mounts to ensure getRoleName works properly
+onMounted(async () => {
+  await rolesStore.ensureLoaded()
+})
 
 import { useAlertStore } from '@/stores/alert.store.js'
 const alertStore = useAlertStore()

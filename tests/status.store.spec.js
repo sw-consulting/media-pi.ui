@@ -20,53 +20,52 @@
 //
 // This file is a part of Media Pi frontend application
 
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
+import { useStatusStore } from '@/stores/status.store.js'
 import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
 import { apiUrl } from '@/helpers/config.js'
 
-const baseUrl = `${apiUrl}/roles`
-
-export const useRolesStore = defineStore('roles', () => {
-  const roles = ref([])
-  const loading = ref(false)
-  const error = ref(null)
-
-  const roleMap = ref(new Map())
-  let initialized = false
-
-  async function getAll() {
-    loading.value = true
-    error.value = null
-    try {
-      const res = await fetchWrapper.get(baseUrl)
-      roles.value = res || []
-      roleMap.value = new Map(roles.value.map(t => [t.id, t]))
-    } catch (err) {
-      error.value = err
-      throw err
-    } finally {
-      loading.value = false
-    }
+vi.mock('@/helpers/fetch.wrapper.js', () => ({
+  fetchWrapper: {
+    get: vi.fn()
   }
-  
-  async function ensureLoaded() {
-    if (!initialized  && !loading.value) {
-      initialized = true
-      await getAll()
-    }
-  }
+}))
 
-  function getName(id) {
-    const role = roleMap.value.get(id)
-    return role ? role.name : `Роль ${id}`
-  }
+vi.mock('@/helpers/config.js', () => ({
+  apiUrl: 'http://localhost:8080/api'
+}))
 
-  return { 
-    roles, 
-    loading, 
-    error, 
-    getAll, 
-    ensureLoaded, 
-    getName }
+describe('status store', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('fetchStatus sets versions from API', async () => {
+    fetchWrapper.get.mockResolvedValue({
+      appVersion: '1.2.3',
+      dbVersion: '20240624'
+    })
+
+    const store = useStatusStore()
+    await store.fetchStatus()
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith(
+      `${apiUrl}/status/status`
+    )
+    expect(store.coreVersion).toBe('1.2.3')
+    expect(store.dbVersion).toBe('20240624')
+  })
+
+  it('fetchStatus throws error when API fails', async () => {
+    const mockError = new Error('API error')
+    fetchWrapper.get.mockRejectedValue(mockError)
+
+    const store = useStatusStore()
+    
+    await expect(store.fetchStatus()).rejects.toThrow('API error')
+    expect(store.coreVersion).toBeUndefined()
+    expect(store.dbVersion).toBeUndefined()
+  })
 })

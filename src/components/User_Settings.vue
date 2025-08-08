@@ -22,7 +22,7 @@
 
 <script setup>
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 
 import router from '@/router'
 import { storeToRefs } from 'pinia'
@@ -36,11 +36,8 @@ import { getRoleName } from '@/helpers/user.helpers.js'
 import { useRolesStore } from '@/stores/roles.store.js'
 const rolesStore = useRolesStore()
 
-// Load roles only once on component mount
-onMounted(async () => {
-  await rolesStore.ensureLoaded()
-})
-
+// Load roles before component renders to avoid race condition
+await rolesStore.ensureLoaded()
 
 const props = defineProps({
   register: {
@@ -152,8 +149,7 @@ function onSubmit(values) {
   
   if (isRegister()) {
     if (asAdmin()) {
-      // Admin can set roles via the combobox, selectedRole already contains roleId
-      if (selectedRole.value !== null) {
+      if (selectedRole.value !== null && selectedRole.value !== undefined) {
         values.roles = [selectedRole.value]
       } else {
         values.roles = []
@@ -161,7 +157,7 @@ function onSubmit(values) {
       return usersStore
         .add(values, true)
         .then(() =>
-          router.push(authStore.isAdmin ? '/users' : '/user/edit/' + authStore.user.id)
+          router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
         )
         .catch((error) => alertStore.error(error.message || String(error)))
     } else {
@@ -370,7 +366,7 @@ function onSubmit(values) {
           class="button"
           type="button"
           @click="
-            $router.push(authStore.isAdmin ? '/users' : '/user/edit/' + authStore.user.id)
+            $router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
           "
         >
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
