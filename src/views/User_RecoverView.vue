@@ -6,6 +6,7 @@
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
 import router from '@/router'
+import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 
@@ -15,15 +16,21 @@ const schema = Yup.object().shape({
     .email('Неверный формат электронной почты')
 })
 
-function onSubmit(values, { setErrors }) {
+const alertStore = useAlertStore()
+const { alert } = storeToRefs(alertStore)
+
+function onSubmit(values) {
   const authStore = useAuthStore()
   values.host = window.location.href
   values.host = values.host.substring(0, values.host.lastIndexOf('/'))
+  
+  // Clear any previous alerts
+  alertStore.clear()
+  
   return authStore
     .recover(values)
     .then(() => {
       router.push('/').then(() => {
-        const alertStore = useAlertStore()
         alertStore.success(
           'На Ваш адрес электронной почты отправлено письмо со ссылкой для восстановления пароля. ' +
             'Обратите внимание, что ссылка одноразовая и действует 4 часа. ' +
@@ -32,7 +39,7 @@ function onSubmit(values, { setErrors }) {
         )
       })
     })
-    .catch((error) => setErrors({ apiError: error.message || String(error) }))
+    .catch((error) => alertStore.error(error.message || String(error)))
 }
 </script>
 
@@ -59,7 +66,10 @@ function onSubmit(values, { setErrors }) {
         </button>
       </div>
       <div v-if="errors.email" class="alert alert-danger mt-3 mb-0">{{ errors.email }}</div>
-      <div v-if="errors.apiError" class="alert alert-danger mt-3 mb-0">{{ errors.apiError }}</div>
     </Form>
+    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
+      {{ alert.message }}
+    </div>
   </div>
 </template>

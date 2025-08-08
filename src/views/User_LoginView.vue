@@ -25,14 +25,17 @@ const showPassword = ref(false)
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
 
-function onSubmit(values, { setErrors }) {
+function onSubmit(values) {
   const authStore = useAuthStore()
   const { login_email, login_password } = values
+
+  // Clear any previous alerts
+  alertStore.clear()
 
   return authStore
     .login(login_email, login_password)
     .then(() => router.push(authStore.isAdmin ? '/users' : '/user/edit/' + authStore.user.id))
-    .catch((error) => setErrors({ apiError: error.message || String(error) }))
+    .catch((error) => alertStore.error(error.message || String(error)))
 }
 </script>
 
@@ -100,11 +103,10 @@ function onSubmit(values, { setErrors }) {
       <div v-if="errors.login_password" class="alert alert-danger mt-3 mb-0">
         {{ errors.login_password }}
       </div>
-      <div v-if="errors.apiError" class="alert alert-danger mt-3 mb-0">{{ errors.apiError }}</div>
-      <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-        <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-        {{ alert.message }}
-      </div>
     </Form>
+    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
+      {{ alert.message }}
+    </div>
   </div>
 </template>

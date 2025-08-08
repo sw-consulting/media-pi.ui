@@ -25,7 +25,8 @@ const updateUser = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const registerUser = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const routerPush = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const successAlert = vi.hoisted(() => vi.fn())
-const setErrorsMock = vi.hoisted(() => vi.fn())
+const errorAlert = vi.hoisted(() => vi.fn())
+const clearAlert = vi.hoisted(() => vi.fn())
 const ensureLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const getName = vi.hoisted(() => vi.fn((id) => `Role ${id}`))
 
@@ -60,7 +61,11 @@ vi.mock('@/stores/roles.store.js', () => ({
 }))
 
 vi.mock('@/stores/alert.store.js', () => ({
-  useAlertStore: () => ({ success: successAlert })
+  useAlertStore: () => ({ 
+    success: successAlert,
+    error: errorAlert,
+    clear: clearAlert
+  })
 }))
 
 vi.mock('@/router', () => ({
@@ -100,7 +105,7 @@ describe('User_Settings.vue real component', () => {
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
-    await child.vm.$.setupState.onSubmit({ firstName: 'A' }, { setErrors: vi.fn() })
+    await child.vm.$.setupState.onSubmit({ firstName: 'A' })
     await resolveAll()
     expect(registerUser).toHaveBeenCalled()
     const arg = registerUser.mock.calls[0][0]
@@ -118,7 +123,7 @@ describe('User_Settings.vue real component', () => {
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
-    await child.vm.$.setupState.onSubmit({ firstName: 'B' }, { setErrors: vi.fn() })
+    await child.vm.$.setupState.onSubmit({ firstName: 'B' })
     await resolveAll()
     expect(addUser).toHaveBeenCalledWith(expect.any(Object), true)
     expect(routerPush).toHaveBeenCalledWith('/users')
@@ -132,7 +137,7 @@ describe('User_Settings.vue real component', () => {
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
-    await child.vm.$.setupState.onSubmit({ firstName: 'C' }, { setErrors: vi.fn() })
+    await child.vm.$.setupState.onSubmit({ firstName: 'C' })
     await resolveAll()
     expect(updateUser).toHaveBeenCalledWith(7, expect.any(Object), true)
     expect(routerPush).toHaveBeenCalledWith('/users')
@@ -146,7 +151,7 @@ describe('User_Settings.vue real component', () => {
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
-    await child.vm.$.setupState.onSubmit({ firstName: 'D' }, { setErrors: vi.fn() })
+    await child.vm.$.setupState.onSubmit({ firstName: 'D' })
     await resolveAll()
     expect(updateUser).toHaveBeenCalled()
     const args = updateUser.mock.calls[0]
@@ -167,11 +172,11 @@ describe('User_Settings.vue real component', () => {
     await resolveAll()
     
     const child = wrapper.findComponent(UserSettings)
-    await child.vm.$.setupState.onSubmit({ firstName: 'Test' }, { setErrors: setErrorsMock })
+    await child.vm.$.setupState.onSubmit({ firstName: 'Test' })
     await resolveAll()
     
     expect(addUser).toHaveBeenCalled()
-    expect(setErrorsMock).toHaveBeenCalledWith({ apiError: errorMessage })
+    expect(errorAlert).toHaveBeenCalledWith(errorMessage)
     expect(routerPush).not.toHaveBeenCalled()
   })
 
@@ -186,11 +191,11 @@ describe('User_Settings.vue real component', () => {
     await resolveAll()
     
     const child = wrapper.findComponent(UserSettings)
-    await child.vm.$.setupState.onSubmit({ firstName: 'Test' }, { setErrors: setErrorsMock })
+    await child.vm.$.setupState.onSubmit({ firstName: 'Test' })
     await resolveAll()
     
     expect(updateUser).toHaveBeenCalled()
-    expect(setErrorsMock).toHaveBeenCalledWith({ apiError: errorMessage })
+    expect(errorAlert).toHaveBeenCalledWith(errorMessage)
     expect(routerPush).not.toHaveBeenCalled()
   })
 
@@ -207,11 +212,11 @@ describe('User_Settings.vue real component', () => {
     await resolveAll()
     
     const child = wrapper.findComponent(UserSettings)
-    await child.vm.$.setupState.onSubmit({ firstName: 'Test' }, { setErrors: setErrorsMock })
+    await child.vm.$.setupState.onSubmit({ firstName: 'Test' })
     await resolveAll()
     
     expect(registerUser).toHaveBeenCalled()
-    expect(setErrorsMock).toHaveBeenCalledWith({ apiError: errorMessage })
+    expect(errorAlert).toHaveBeenCalledWith(errorMessage)
     expect(routerPush).not.toHaveBeenCalled()
     expect(successAlert).not.toHaveBeenCalled()
   })
@@ -254,7 +259,7 @@ describe('User_Settings.vue real component', () => {
     // Change selected role
     child.vm.$.setupState.selectedRole = 1 // Set to Admin role
     
-    await child.vm.$.setupState.onSubmit({ firstName: 'Test' }, { setErrors: vi.fn() })
+    await child.vm.$.setupState.onSubmit({ firstName: 'Test' })
     await resolveAll()
     
     expect(updateUser).toHaveBeenCalled()
@@ -275,7 +280,7 @@ describe('User_Settings.vue real component', () => {
     // Set to no role
     child.vm.$.setupState.selectedRole = null
     
-    await child.vm.$.setupState.onSubmit({ firstName: 'Test' }, { setErrors: vi.fn() })
+    await child.vm.$.setupState.onSubmit({ firstName: 'Test' })
     await resolveAll()
     
     expect(updateUser).toHaveBeenCalled()

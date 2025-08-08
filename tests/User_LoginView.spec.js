@@ -55,7 +55,7 @@ describe('User_LoginView.vue', () => {
     const wrapper = mount(UserLoginView, {
       global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
     })
-    await wrapper.vm.onSubmit({ login_email: 'a', login_password: 'b' }, { setErrors: vi.fn() })
+    await wrapper.vm.onSubmit({ login_email: 'a', login_password: 'b' })
     await resolveAll()
     expect(loginMock).toHaveBeenCalledWith('a', 'b')
     expect(routerPush).toHaveBeenCalledWith('/users')
@@ -66,7 +66,7 @@ describe('User_LoginView.vue', () => {
     const wrapper = mount(UserLoginView, {
       global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
     })
-    await wrapper.vm.onSubmit({ login_email: 'a', login_password: 'b' }, { setErrors: vi.fn() })
+    await wrapper.vm.onSubmit({ login_email: 'a', login_password: 'b' })
     await resolveAll()
     expect(routerPush).toHaveBeenCalledWith('/user/edit/1')
   })

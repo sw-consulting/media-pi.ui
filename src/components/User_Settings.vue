@@ -55,6 +55,8 @@ const props = defineProps({
 
 const usersStore = useUsersStore()
 const authStore = useAuthStore()
+const alertStore = useAlertStore()
+const { alert } = storeToRefs(alertStore)
 
 const pwdErr =
   'Пароль должен быть не короче 8 символов и содержать хотя бы одну цифру и один специальный символ (!@#$%^&*()\\-_=+{};:,<.>)'
@@ -143,7 +145,11 @@ function showAndEditCredentials() {
   return asAdmin()
 }
 
-function onSubmit(values, { setErrors }) {
+function onSubmit(values) {
+  // Clear any previous alerts
+  const alertStore = useAlertStore()
+  alertStore.clear()
+  
   if (isRegister()) {
     if (asAdmin()) {
       // Admin can set roles via the combobox, selectedRole already contains roleId
@@ -157,7 +163,7 @@ function onSubmit(values, { setErrors }) {
         .then(() =>
           router.push(authStore.isAdmin ? '/users' : '/user/edit/' + authStore.user.id)
         )
-        .catch((error) => setErrors({ apiError: error.message || String(error) }))
+        .catch((error) => alertStore.error(error.message || String(error)))
     } else {
       // Non-admin registers with empty roles array
       values.roles = []
@@ -177,7 +183,7 @@ function onSubmit(values, { setErrors }) {
             )
           })
         })
-        .catch((error) => setErrors({ apiError: error.message || String(error) }))
+        .catch((error) => alertStore.error(error.message || String(error)))
     }
   } else {
     if (asAdmin()) {
@@ -196,7 +202,7 @@ function onSubmit(values, { setErrors }) {
       .then(() =>
         router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
       )
-      .catch((error) => setErrors({ apiError: error.message || String(error) }))
+      .catch((error) => alertStore.error(error.message || String(error)))
   }
 }
 
@@ -379,8 +385,11 @@ function onSubmit(values, { setErrors }) {
       <div v-if="errors.email" class="alert alert-danger mt-3 mb-0">{{ errors.email }}</div>
       <div v-if="errors.password" class="alert alert-danger mt-3 mb-0">{{ errors.password }}</div>
       <div v-if="errors.password2" class="alert alert-danger mt-3 mb-0">{{ errors.password2 }}</div>
-      <div v-if="errors.apiError" class="alert alert-danger mt-3 mb-0">{{ errors.apiError }}</div>
     </Form>
+    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
+      {{ alert.message }}
+    </div>
   </div>
   <div v-if="user?.loading" class="text-center m-5">
     <span class="spinner-border spinner-border-lg align-center"></span>
