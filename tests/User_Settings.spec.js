@@ -18,7 +18,7 @@ const FieldStub = {
 }
 
 let isAdmin
-const mockUser = ref({ id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: ['logist'] })
+const mockUser = ref({ id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: [11] })
 const getById = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const addUser = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const updateUser = vi.hoisted(() => vi.fn(() => Promise.resolve()))
@@ -27,6 +27,7 @@ const routerPush = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const successAlert = vi.hoisted(() => vi.fn())
 const setErrorsMock = vi.hoisted(() => vi.fn())
 const ensureLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const getName = vi.hoisted(() => vi.fn((id) => `Role ${id}`))
 
 vi.mock('@/stores/users.store.js', () => ({
   useUsersStore: () => ({
@@ -48,7 +49,13 @@ vi.mock('@/stores/auth.store.js', () => ({
 
 vi.mock('@/stores/roles.store.js', () => ({
   useRolesStore: () => ({
-    ensureLoaded
+    ensureLoaded,
+    getName,
+    roles: [
+      { id: 1, name: 'Администратор' },
+      { id: 11, name: 'Менеджер' },
+      { id: 21, name: 'Инженер' }
+    ]
   })
 }))
 
@@ -72,7 +79,7 @@ beforeEach(() => {
   
   vi.clearAllMocks()
   isAdmin = false
-  mockUser.value = { id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: ['logist'] }
+  mockUser.value = { id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: [11] }
 })
 
 describe('User_Settings.vue real component', () => {
@@ -97,7 +104,7 @@ describe('User_Settings.vue real component', () => {
     await resolveAll()
     expect(registerUser).toHaveBeenCalled()
     const arg = registerUser.mock.calls[0][0]
-    expect(arg.roles).toEqual(['logist'])
+    expect(arg.roles).toEqual([11])
     expect(arg.host).toBe('http://localhost')
     expect(routerPush).toHaveBeenCalledWith('/')
     expect(successAlert).toHaveBeenCalled()
@@ -132,7 +139,7 @@ describe('User_Settings.vue real component', () => {
   })
 
   it('updates user roles when editing as non-admin', async () => {
-    mockUser.value.roles = ['logist']
+    mockUser.value.roles = [11]
     const wrapper = mount(Parent, {
       props: { register: false, id: 1 },
       global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
@@ -143,7 +150,7 @@ describe('User_Settings.vue real component', () => {
     await resolveAll()
     expect(updateUser).toHaveBeenCalled()
     const args = updateUser.mock.calls[0]
-    expect(args[1].roles).toEqual(['logist'])
+    expect(args[1].roles).toEqual([11])
     expect(routerPush).toHaveBeenCalledWith('/user/edit/2')
   })
 
@@ -207,5 +214,81 @@ describe('User_Settings.vue real component', () => {
     expect(setErrorsMock).toHaveBeenCalledWith({ apiError: errorMessage })
     expect(routerPush).not.toHaveBeenCalled()
     expect(successAlert).not.toHaveBeenCalled()
+  })
+
+  // New tests for role combobox functionality
+  it('selects the smallest role ID when user has multiple roles', async () => {
+    mockUser.value.roles = [21, 11, 1] // Multiple roles: Engineer, Manager, Admin
+    const wrapper = mount(Parent, {
+      props: { register: false, id: 1 },
+      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+    })
+    await resolveAll()
+    const child = wrapper.findComponent(UserSettings)
+    const selectedRole = child.vm.$.setupState.selectedRole
+    expect(selectedRole).toBe(1) // Should select the smallest ID (Admin)
+  })
+
+  it('handles no roles correctly', async () => {
+    mockUser.value.roles = []
+    const wrapper = mount(Parent, {
+      props: { register: false, id: 1 },
+      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+    })
+    await resolveAll()
+    const child = wrapper.findComponent(UserSettings)
+    const selectedRole = child.vm.$.setupState.selectedRole
+    expect(selectedRole).toBe(null)
+  })
+
+  it('updates roles when admin changes role selection', async () => {
+    isAdmin = true
+    mockUser.value.roles = [11]
+    const wrapper = mount(Parent, {
+      props: { register: false, id: 5 },
+      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+    })
+    await resolveAll()
+    const child = wrapper.findComponent(UserSettings)
+    
+    // Change selected role
+    child.vm.$.setupState.selectedRole = 1 // Set to Admin role
+    
+    await child.vm.$.setupState.onSubmit({ firstName: 'Test' }, { setErrors: vi.fn() })
+    await resolveAll()
+    
+    expect(updateUser).toHaveBeenCalled()
+    const args = updateUser.mock.calls[0]
+    expect(args[1].roles).toEqual([1]) // Should be updated to Admin role
+  })
+
+  it('sets empty roles array when admin selects no role', async () => {
+    isAdmin = true
+    mockUser.value.roles = [11]
+    const wrapper = mount(Parent, {
+      props: { register: false, id: 5 },
+      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+    })
+    await resolveAll()
+    const child = wrapper.findComponent(UserSettings)
+    
+    // Set to no role
+    child.vm.$.setupState.selectedRole = null
+    
+    await child.vm.$.setupState.onSubmit({ firstName: 'Test' }, { setErrors: vi.fn() })
+    await resolveAll()
+    
+    expect(updateUser).toHaveBeenCalled()
+    const args = updateUser.mock.calls[0]
+    expect(args[1].roles).toEqual([]) // Should be empty array
+  })
+
+  it('calls ensureLoaded from roles store on component mount', async () => {
+    mount(Parent, {
+      props: { register: false, id: 5 },
+      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+    })
+    await resolveAll()
+    expect(ensureLoaded).toHaveBeenCalled()
   })
 })

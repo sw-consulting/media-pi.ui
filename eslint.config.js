@@ -4,32 +4,33 @@ import pluginVue from 'eslint-plugin-vue';
 import vueParser from 'vue-eslint-parser';
 
 export default [
-  // Global configuration for all files
   {
     ignores: [
       'doc/**',
-        'logs',
-        '*.log',
-        'npm-debug.log*',
-        'yarn-debug.log*',
-        'yarn-error.log*',
-        'pnpm-debug.log*',
-        'lerna-debug.log*',
-        'node_modules/**',
-        '.DS_Store',
-        '__MACOSX',
-        'dist/**',        
-        'dist-ssr/**',    
-        'coverage/**',    
-        '*.local',
-        '.idea',
-        '*.suo',
-        '*.ntvs*',
-        '*.njsproj',
-        '*.sln',
-        '*.sw?',
-        '.env'
-    ],
+      'logs',
+      '*.log',
+      'npm-debug.log*',
+      'yarn-debug.log*',
+      'yarn-error.log*',
+      'pnpm-debug.log*',
+      'lerna-debug.log*',
+      'node_modules/**',
+      '.DS_Store',
+      '__MACOSX',
+      'dist/**',
+      'dist-ssr/**',
+      'coverage/**',
+      '*.local',
+      '.idea',
+      '*.suo',
+      '*.ntvs*',
+      '*.njsproj',
+      '*.sln',
+      '*.sw?',
+      '.env'
+    ]
+  },
+  {
     languageOptions: {
       sourceType: 'module',
       ecmaVersion: 2022,

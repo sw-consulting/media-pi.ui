@@ -3,7 +3,7 @@
 // Licensed under the MIT License.
 // This file is a part of Mediapi frontend application
 
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 import router from '@/router'
 import { storeToRefs } from 'pinia'
@@ -15,7 +15,11 @@ import { useAlertStore } from '@/stores/alert.store.js'
 
 import { useRolesStore } from '@/stores/roles.store.js'
 const rolesStore = useRolesStore()
-rolesStore.ensureLoaded()
+
+// Load roles only once on component mount
+onMounted(async () => {
+  await rolesStore.ensureLoaded()
+})
 
 
 const props = defineProps({
@@ -60,6 +64,36 @@ const showPassword2 = ref(false)
 let user = ref({
 })
 
+// Computed property for available roles as options for the combobox
+const roleOptions = computed(() => {
+  const options = [{ value: null, text: 'Без роли' }]
+  if (rolesStore.roles && rolesStore.roles.length > 0) {
+    rolesStore.roles.forEach(role => {
+      options.push({ value: role.id, text: role.name })
+    })
+  }
+  return options
+})
+
+// Computed property for selected role (0 or 1 role)
+const selectedRole = computed({
+  get() {
+    if (!user.value || !Array.isArray(user.value.roles) || user.value.roles.length === 0) {
+      return null
+    }
+    // If multiple roles, select the one with smallest ID
+    return Math.min(...user.value.roles)
+  },
+  set(roleId) {
+    if (!user.value) user.value = {}
+    if (roleId === null || roleId === undefined) {
+      user.value.roles = []
+    } else {
+      user.value.roles = [roleId]
+    }
+  }
+})
+
 if (!isRegister()) {
   ;({ user } = storeToRefs(usersStore))
   await usersStore.getById(props.id, true)
@@ -91,13 +125,10 @@ function showAndEditCredentials() {
 
 function getCredentials() {
   const crd = []
-  if (user.value) {
-    if (user.value.roles && user.value.roles.includes('administrator')) {
-      crd.push('Администратор')
-    }
-    if (user.value.roles && user.value.roles.includes('logist')) {
-      crd.push('Логист')
-    }
+  if (user.value && Array.isArray(user.value.roles)) {
+    user.value.roles.forEach(roleId => {
+      crd.push(rolesStore.getName(roleId))
+    })
   }
   return crd.join(', ')
 }
@@ -105,6 +136,12 @@ function getCredentials() {
 function onSubmit(values, { setErrors }) {
   if (isRegister()) {
     if (asAdmin()) {
+      // Admin can set roles via the combobox, convert selectedRole to roles array
+      if (selectedRole.value !== null) {
+        values.roles = [selectedRole.value]
+      } else {
+        values.roles = []
+      }
       return usersStore
         .add(values, true)
         .then(() =>
@@ -112,7 +149,8 @@ function onSubmit(values, { setErrors }) {
         )
         .catch((error) => setErrors({ apiError: error.message || String(error) }))
     } else {
-      values.roles = ['logist']
+      // Non-admin registers with default role (assuming role ID 11 for AccountManager/logist)
+      values.roles = [11]
       values.host = window.location.href
       values.host = values.host.substring(0, values.host.lastIndexOf('/'))
       return authStore
@@ -132,7 +170,15 @@ function onSubmit(values, { setErrors }) {
         .catch((error) => setErrors({ apiError: error.message || String(error) }))
     }
   } else {
-    if (!asAdmin()) {
+    if (asAdmin()) {
+      // Admin can edit roles via the combobox
+      if (selectedRole.value !== null) {
+        values.roles = [selectedRole.value]
+      } else {
+        values.roles = []
+      }
+    } else {
+      // Non-admin keeps existing roles
       values.roles = user.value.roles
     }
     return usersStore
@@ -282,23 +328,20 @@ function onSubmit(values, { setErrors }) {
       </div>
 
       <div v-if="showAndEditCredentials()" class="form-group">
-        <label class="label">Права:</label>
-        <Field
-          id="isAdmin"
-          type="checkbox"
-          name="isAdmin"
-          class="checkbox checkbox-styled"
-          value="ADMIN"
-        />
-        <label for="isAdmin">Администратор</label>
-        <Field
-          id="isLogist"
-          type="checkbox"
-          name="isLogist"
-          class="checkbox checkbox-styled"
-          value="LOGIST"
-        />
-        <label for="isLogist">Логист</label>
+        <label for="roleSelect" class="label">Роль:</label>
+        <select
+          id="roleSelect"
+          v-model="selectedRole"
+          class="form-control input"
+        >
+          <option
+            v-for="option in roleOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.text }}
+          </option>
+        </select>
       </div>
 
       <div class="form-group mt-5">
