@@ -75,7 +75,6 @@ function filterUsers(value, query, item) {
   return false
 }
 
-
 async function deleteUser(item) {
   const content = 'Удалить пользователя "' + item.firstName + ' ' + item.lastName + '" ?'
   const result = await confirm({
