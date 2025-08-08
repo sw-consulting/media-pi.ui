@@ -1,7 +1,26 @@
+// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// This file is a part of Media Pi frontend application
+
 <script setup>
-// Copyright (c) 2025 sw.consulting
-// Licensed under the MIT License.
-// This file is a part of Mediapi frontend application
 
 import { ref, computed, onMounted } from 'vue'
 
@@ -12,6 +31,7 @@ import * as Yup from 'yup'
 import { useUsersStore } from '@/stores/users.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import { getRoleName } from '@/helpers/user.helpers.js'
 
 import { useRolesStore } from '@/stores/roles.store.js'
 const rolesStore = useRolesStore()
@@ -69,7 +89,7 @@ const roleOptions = computed(() => {
   const options = [{ value: null, text: 'Без роли' }]
   if (rolesStore.roles && rolesStore.roles.length > 0) {
     rolesStore.roles.forEach(role => {
-      options.push({ value: role.id, text: role.name })
+      options.push({ value: role.roleId, text: role.name })
     })
   }
   return options
@@ -81,7 +101,7 @@ const selectedRole = computed({
     if (!user.value || !Array.isArray(user.value.roles) || user.value.roles.length === 0) {
       return null
     }
-    // If multiple roles, select the one with smallest ID
+    // If multiple roles, select the one with smallest roleId
     return Math.min(...user.value.roles)
   },
   set(roleId) {
@@ -123,20 +143,10 @@ function showAndEditCredentials() {
   return asAdmin()
 }
 
-function getCredentials() {
-  const crd = []
-  if (user.value && Array.isArray(user.value.roles)) {
-    user.value.roles.forEach(roleId => {
-      crd.push(rolesStore.getName(roleId))
-    })
-  }
-  return crd.join(', ')
-}
-
 function onSubmit(values, { setErrors }) {
   if (isRegister()) {
     if (asAdmin()) {
-      // Admin can set roles via the combobox, convert selectedRole to roles array
+      // Admin can set roles via the combobox, selectedRole already contains roleId
       if (selectedRole.value !== null) {
         values.roles = [selectedRole.value]
       } else {
@@ -149,8 +159,8 @@ function onSubmit(values, { setErrors }) {
         )
         .catch((error) => setErrors({ apiError: error.message || String(error) }))
     } else {
-      // Non-admin registers with default role (assuming role ID 11 for AccountManager/logist)
-      values.roles = [11]
+      // Non-admin registers with empty roles array
+      values.roles = []
       values.host = window.location.href
       values.host = values.host.substring(0, values.host.lastIndexOf('/'))
       return authStore
@@ -171,7 +181,7 @@ function onSubmit(values, { setErrors }) {
     }
   } else {
     if (asAdmin()) {
-      // Admin can edit roles via the combobox
+      // Admin can edit roles via the combobox, selectedRole already contains roleId
       if (selectedRole.value !== null) {
         values.roles = [selectedRole.value]
       } else {
@@ -184,7 +194,7 @@ function onSubmit(values, { setErrors }) {
     return usersStore
       .update(props.id, values, true)
       .then(() =>
-        router.push(authStore.isAdmin ? '/users' : '/user/edit/' + authStore.user.id)
+        router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
       )
       .catch((error) => setErrors({ apiError: error.message || String(error) }))
   }
@@ -323,7 +333,7 @@ function onSubmit(values, { setErrors }) {
       <div v-if="showCredentials()" class="form-group">
         <label for="crd" class="label">Права:</label>
         <span id="crd"
-          ><em>{{ getCredentials() }}</em></span
+          ><em>{{ getRoleName(user) }}</em></span
         >
       </div>
 

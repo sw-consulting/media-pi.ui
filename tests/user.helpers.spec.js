@@ -1,5 +1,18 @@
-import { describe, it, expect } from 'vitest'
-import { UserRoleConstants, isAdministrator, isManager, isEngineer } from '@/helpers/user.helpers.js'
+import { describe, it, expect, vi } from 'vitest'
+import { UserRoleConstants, isAdministrator, isManager, isEngineer, getRoleName } from '@/helpers/user.helpers.js'
+
+// Mock the roles store
+const mockRolesStore = {
+  roles: [
+    { id: 1, roleId: 1, name: 'Администратор' },
+    { id: 11, roleId: 11, name: 'Менеджер' },
+    { id: 21, roleId: 21, name: 'Инженер' }
+  ]
+}
+
+vi.mock('@/stores/roles.store.js', () => ({
+  useRolesStore: () => mockRolesStore
+}))
 
 describe('User Role Helpers', () => {
   const adminUser = { roles: [UserRoleConstants.SystemAdministrator] }
@@ -34,5 +47,29 @@ describe('User Role Helpers', () => {
     expect(isEngineer(multiRoleUser)).toBe(false)
     expect(isEngineer(noRoleUser)).toBe(false)
     expect(isEngineer(undefinedRolesUser)).toBe(false)
+  })
+
+  describe('getRoleName', () => {
+    it('should return role name for user with single role', () => {
+      expect(getRoleName(adminUser)).toBe('Администратор')
+      expect(getRoleName(managerUser)).toBe('Менеджер')
+      expect(getRoleName(engineerUser)).toBe('Инженер')
+    })
+
+    it('should return role name with smallest roleId for user with multiple roles', () => {
+      expect(getRoleName(multiRoleUser)).toBe('Администратор') // roleId 1 is smaller than 11
+    })
+
+    it('should return "Без роли" for user with no roles', () => {
+      expect(getRoleName(noRoleUser)).toBe('Без роли')
+      expect(getRoleName(undefinedRolesUser)).toBe('Без роли')
+      expect(getRoleName(null)).toBe('Без роли')
+      expect(getRoleName(undefined)).toBe('Без роли')
+    })
+
+    it('should return fallback text for unknown role', () => {
+      const unknownRoleUser = { roles: [999] }
+      expect(getRoleName(unknownRoleUser)).toBe('Роль 999')
+    })
   })
 })

@@ -18,7 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// This file is a part of Mediapi frontend application
+// This file is a part of Media Pi frontend application
+
+import { useRolesStore } from '@/stores/roles.store.js'
 
 export const UserRoleConstants = {
   SystemAdministrator: 1,
@@ -36,4 +38,19 @@ export function isManager(user) {
 
 export function isEngineer(user) {
   return user && Array.isArray(user.roles) && user.roles.includes(UserRoleConstants.InstallationEngineer)
+}
+
+export function getRoleName(user) {
+  if (user && Array.isArray(user.roles) && user.roles.length > 0) {
+    // Find the role with minimal roleId
+    const minRoleId = Math.min(...user.roles)
+    // Find the role name by roleId
+    const rolesStore = useRolesStore()
+    if (rolesStore.roles && rolesStore.roles.length > 0) {
+      const role = rolesStore.roles.find(r => r.roleId === minRoleId)
+      return role ? role.name : `Роль ${minRoleId}`
+    }
+    return `Роль ${minRoleId}`
+  }
+  return 'Без роли'
 }

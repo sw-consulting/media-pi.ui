@@ -52,9 +52,9 @@ vi.mock('@/stores/roles.store.js', () => ({
     ensureLoaded,
     getName,
     roles: [
-      { id: 1, name: 'Администратор' },
-      { id: 11, name: 'Менеджер' },
-      { id: 21, name: 'Инженер' }
+      { id: 1, roleId: 1, name: 'Администратор' },
+      { id: 11, roleId: 11, name: 'Менеджер' },
+      { id: 21, roleId: 21, name: 'Инженер' }
     ]
   })
 }))
@@ -104,7 +104,7 @@ describe('User_Settings.vue real component', () => {
     await resolveAll()
     expect(registerUser).toHaveBeenCalled()
     const arg = registerUser.mock.calls[0][0]
-    expect(arg.roles).toEqual([11])
+    expect(arg.roles).toEqual([])
     expect(arg.host).toBe('http://localhost')
     expect(routerPush).toHaveBeenCalledWith('/')
     expect(successAlert).toHaveBeenCalled()
