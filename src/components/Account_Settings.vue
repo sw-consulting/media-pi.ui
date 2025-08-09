@@ -68,7 +68,8 @@ if (isRegister() && !authStore.isAdministrator) {
 }
 
 if (!isRegister()) {
-  ;({ account } = storeToRefs(accountsStore))
+  const accountRef = storeToRefs(accountsStore)
+  account = accountRef.account
   try {
     await accountsStore.getById(props.id)
     account.value.managers = account.value.managers || account.value.managerIds || []
