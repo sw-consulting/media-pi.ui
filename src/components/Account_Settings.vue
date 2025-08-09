@@ -61,8 +61,6 @@ const { loading, error } = storeToRefs(accountsStore)
 const componentError = ref(null)
 const initialLoading = ref(false)
 
-redirectToDefaultRoute()
-
 if (!isRegister()) {
   initialLoading.value = true
   try {
@@ -72,9 +70,13 @@ if (!isRegister()) {
       throw new Error(`Лицевой счёт с ID ${props.id} не найден`)
     }
     // Update the reactive account data
+    // Only include valid AccountManager IDs
+    const validManagerIds = (usersStore.users || [])
+      .filter(u => Array.isArray(u.roles) && u.roles.includes(UserRoleConstants.AccountManager))
+      .map(u => u.id)
     account.value = {
       name: loadedAccount.name || '',
-      managers: loadedAccount.managers || loadedAccount.managerIds || []
+      managers: (loadedAccount.userIds || []).filter(id => validManagerIds.includes(id))
     }
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
@@ -110,7 +112,7 @@ const managerOptions = computed(() => {
 })
 
 const selectedManagerNames = computed(() => {
-  const managers = isRegister() ? [] : (accountsStore.account?.managers || accountsStore.account?.managerIds || [])
+  const managers = isRegister() ? [] : (accountsStore.account?.userIds || [])
   return managers
     .map(id => {
       const u = usersStore.getUserById ? usersStore.getUserById(id) : (usersStore.users || []).find(u => u.id === id)
@@ -135,15 +137,13 @@ async function onSubmit(values) {
   try {
     const payload = { 
       name: values.name.trim(), 
-      managerIds: values.managers || [] 
+      userIds: values.managers || [] 
     }
     
     if (isRegister()) {
       await accountsStore.add(payload)
-      alertStore.success('Лицевой счёт успешно создан')
     } else {
       await accountsStore.update(props.id, payload)
-      alertStore.success('Настройки лицевого счёта сохранены')
     }
     router.push('/accounts')
   } catch (err) {
@@ -168,11 +168,10 @@ async function onSubmit(values) {
     <h1 class="primary-heading">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
     <hr class="hr" />
 
-    <Form 
-      @submit="onSubmit" 
-      :initial-values="account" 
-      :validation-schema="schema" 
-      :key="account.name + (account.managers || []).join(',')"
+    <Form
+      :validation-schema="schema"
+      :initial-values="account"
+      @submit="onSubmit"
       v-slot="{ errors, isSubmitting }"
     >
       <div class="form-group">
