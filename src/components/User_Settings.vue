@@ -31,7 +31,7 @@ import * as Yup from 'yup'
 import { useUsersStore } from '@/stores/users.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
-import { getRoleName } from '@/helpers/user.helpers.js'
+import { getRoleName, isManager } from '@/helpers/user.helpers.js'
 import { useRolesStore } from '@/stores/roles.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 
@@ -122,6 +122,13 @@ const selectedRole = computed({
     }
   }
 })
+
+// Helper to check if selected role is a manager using isManager from user.helpers.js
+const isSelectedRoleManager = computed(() => {
+  if (!selectedRole.value) return false;
+  // isManager expects a user object with a roles array
+  return isManager({ roles: [selectedRole.value] });
+});
 
 const accountOptions = computed(() => {
   return (accountsStore.accounts || []).map(acc => ({
@@ -376,14 +383,24 @@ function onSubmit(values) {
           </button>
         </div>
       </div>
-      <div v-if="showCredentials() && authStore.isManager" class="form-group">
-        <label for="accountList" class="label">Лицевые счета:</label>
-        <ul id="accountList">
-          <li v-for="name in selectedAccountNames" :key="name">{{ name }}</li>
-          <li v-if="!selectedAccountNames.length">Не назначены</li>
-        </ul>
+
+       <div v-if="showAndEditCredentials()" class="form-group">
+        <label for="roleSelect" class="label">Роль:</label>
+        <select
+          id="roleSelect"
+          v-model="selectedRole"
+          class="form-control input"
+        >
+          <option
+            v-for="option in roleOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.text }}
+          </option>
+        </select>
       </div>
-      <div v-if="showAndEditCredentials()" class="form-group">
+      <div v-if="showAndEditCredentials() && isSelectedRoleManager" class="form-group">
         <label for="accountIds" class="label">Лицевые счета:</label>
         <Field
           name="accountIds"
@@ -408,23 +425,6 @@ function onSubmit(values) {
         <span id="crd"
           ><em>{{ getRoleName(user) }}</em></span
         >
-      </div>
-
-      <div v-if="showAndEditCredentials()" class="form-group">
-        <label for="roleSelect" class="label">Роль:</label>
-        <select
-          id="roleSelect"
-          v-model="selectedRole"
-          class="form-control input"
-        >
-          <option
-            v-for="option in roleOptions"
-            :key="option.value"
-            :value="option.value"
-          >
-            {{ option.text }}
-          </option>
-        </select>
       </div>
 
       <div class="form-group mt-8">
