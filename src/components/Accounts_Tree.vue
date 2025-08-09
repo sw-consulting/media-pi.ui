@@ -36,6 +36,15 @@ const deviceGroupsStore = useDeviceGroupsStore()
 
 const loading = ref(true)
 
+// Role-based access helper functions
+const canViewUnassignedDevices = computed(() => 
+  authStore.isAdministrator || authStore.isEngineer
+)
+
+const canViewAccounts = computed(() => 
+  authStore.isAdministrator || authStore.isManager
+)
+
 onMounted(async () => {
   try {
     await Promise.all([
@@ -49,7 +58,7 @@ onMounted(async () => {
 })
 
 const unassignedRoot = computed(() => {
-  if (!(authStore.isAdministrator || authStore.isEngineer)) return null
+  if (!canViewUnassignedDevices.value) return null
   const children = (devicesStore.devices || [])
     .filter(d => !d.accountId || d.accountId === 0)
     .map(d => ({ id: `device-${d.id}`, name: d.name }))
@@ -57,7 +66,7 @@ const unassignedRoot = computed(() => {
 })
 
 const accountsRoot = computed(() => {
-  if (!(authStore.isAdministrator || authStore.isManager)) return null
+  if (!canViewAccounts.value) return null
   const accounts = (accountsStore.accounts || []).map(acc => {
     const devices = (devicesStore.devices || []).filter(d => d.accountId === acc.id)
     const unassigned = devices
