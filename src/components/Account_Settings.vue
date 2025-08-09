@@ -71,14 +71,17 @@ if (isRegister() && !authStore.isAdministrator) {
 
 if (!isRegister()) {
   initialLoading.value = true
-  const accountRef = storeToRefs(accountsStore)
-  account.value = accountRef.account
   try {
     await accountsStore.getById(props.id)
-    if (!account.value) {
+    const loadedAccount = accountsStore.account
+    if (!loadedAccount) {
       throw new Error(`Лицевой счёт с ID ${props.id} не найден`)
     }
-    account.value.managers = account.value.managers || account.value.managerIds || []
+    // Update the reactive account data
+    account.value = {
+      name: loadedAccount.name || '',
+      managers: loadedAccount.managers || loadedAccount.managerIds || []
+    }
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
@@ -113,7 +116,8 @@ const managerOptions = computed(() => {
 })
 
 const selectedManagerNames = computed(() => {
-  return (account.value.managers || [])
+  const managers = isRegister() ? [] : (accountsStore.account?.managers || accountsStore.account?.managerIds || [])
+  return managers
     .map(id => {
       const u = usersStore.getUserById ? usersStore.getUserById(id) : (usersStore.users || []).find(u => u.id === id)
       return u ? `${u.lastName || ''} ${u.firstName || ''}`.trim() : `#${id}`
@@ -137,7 +141,7 @@ async function onSubmit(values) {
   try {
     const payload = { 
       name: values.name.trim(), 
-      managerIds: account.value.managers || [] 
+      managerIds: values.managers || [] 
     }
     
     if (isRegister()) {
@@ -170,14 +174,19 @@ async function onSubmit(values) {
     <h1 class="orange">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
     <hr class="hr" />
 
-    <Form @submit="onSubmit" :validation-schema="schema" v-slot="{ errors, isSubmitting }">
+    <Form 
+      @submit="onSubmit" 
+      :initial-values="account" 
+      :validation-schema="schema" 
+      :key="account.name + (account.managers || []).join(',')"
+      v-slot="{ errors, isSubmitting }"
+    >
       <div class="form-group">
         <label for="name" class="label">Название:</label>
         <Field
           name="name"
           type="text"
           id="name"
-          v-model="account.name"
           class="form-control input"
           :class="{ 'is-invalid': errors.name }"
           placeholder="Введите название лицевого счёта"
@@ -188,11 +197,12 @@ async function onSubmit(values) {
 
       <div class="form-group">
         <label for="managers" class="label">Менеджеры:</label>
-        <select
+        <Field
           v-if="canEditManagers()"
+          name="managers"
+          as="select"
           id="managers"
           multiple
-          v-model="account.managers"
           class="form-control input"
           :class="{ 'is-invalid': errors.managers }"
           :disabled="isSubmitting || !managerOptions.length"
@@ -203,7 +213,7 @@ async function onSubmit(values) {
           <option v-for="option in managerOptions" :key="option.value" :value="option.value">
             {{ option.text }}
           </option>
-        </select>
+        </Field>
         <ul v-else>
           <li v-for="name in selectedManagerNames" :key="name">{{ name }}</li>
           <li v-if="!selectedManagerNames.length">Менеджеры не назначены</li>
