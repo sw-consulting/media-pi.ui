@@ -644,14 +644,14 @@ a,
   width: 100%;
   flex: 1;
   margin-right: 5px;
-  margin-bottom: 1rem; /* Keep the original margin for consistent spacing */
+  margin-bottom: 0; /* Remove extra margin to match form-group spacing */
 }
 
 .password-wrapper .button-o {
   width: 40px;
   min-width: 40px;
   flex-shrink: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 0; /* Remove extra margin to match form-group spacing */
 }
 
 .password-wrapper .button-o-c {

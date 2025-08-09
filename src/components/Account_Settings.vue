@@ -165,7 +165,7 @@ async function onSubmit(values) {
 
 <template>
   <div class="settings form-2">
-    <h1 class="orange">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
+    <h1 class="primary-heading">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
     <hr class="hr" />
 
     <Form 
@@ -215,16 +215,22 @@ async function onSubmit(values) {
         <div v-if="errors.managers" class="invalid-feedback">{{ errors.managers }}</div>
       </div>
 
-      <div class="form-group mt-5">
-        <button class="button" type="submit" :disabled="isSubmitting || componentError">
+      <div class="form-group mt-8">
+        <button class="button primary" type="submit" :disabled="isSubmitting">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          {{ getButton() }}
+          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
+            {{ getButton() }}
         </button>
-        <button class="button" type="button" @click="$router.push('/accounts')" :disabled="isSubmitting">
+        <button
+          class="button secondary"
+          type="button"
+          @click="$router.push('/accounts')"
+        >
+          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
           Отменить
         </button>
       </div>
-      
+
       <!-- Component-level errors -->
       <div v-if="componentError" class="alert alert-danger mt-3 mb-0">
         {{ componentError }}

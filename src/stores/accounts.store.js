@@ -122,7 +122,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     getAll,
     getById,
     update,
-    delete: deleteAccount
+    deleteAccount
   }
 })
 

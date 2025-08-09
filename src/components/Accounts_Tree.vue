@@ -23,6 +23,7 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
@@ -36,6 +37,7 @@ const accountsStore = useAccountsStore()
 const devicesStore = useDevicesStore()
 const deviceGroupsStore = useDeviceGroupsStore()
 const alertStore = useAlertStore()
+const { alert } = storeToRefs(alertStore)
 
 const accountsCaption = useAccountsCaption(authStore)
 
@@ -217,7 +219,7 @@ const getAccountIdFromNodeId = (nodeId) => {
 
 <template>
   <div class="settings table-2">
-    <h1 class="orange">{{ accountsCaption || 'Информация не доступна' }}</h1>
+    <h1 class="primary-heading">{{ accountsCaption || 'Информация не доступна' }}</h1>
     <hr class="hr" />
 
     <v-card>
@@ -244,15 +246,9 @@ const getAccountIdFromNodeId = (nodeId) => {
             width="2"
             color="primary"
           />
-          <v-icon v-else-if="item.children && item.children.length === 0" size="16">
-            mdi-folder-outline
-          </v-icon>
-          <v-icon v-else-if="item.children && item.children.length > 0" size="16">
-            mdi-folder-open-outline
-          </v-icon>
-          <v-icon v-else size="16">
-            mdi-circle-small
-          </v-icon>
+          <font-awesome-icon v-else-if="item.children && item.children.length === 0" icon="fa-regular fa-folder" size="1x" class="anti-btn" />
+          <font-awesome-icon v-else-if="item.children && item.children.length > 0" icon="fa-regular fa-folder-open" size="1x" class="anti-btn" />
+          <font-awesome-icon v-else icon="fa-regular fa-circle" size="1x" class="anti-btn" />
         </template>
         
         <template #append="{ item }">
@@ -284,6 +280,12 @@ const getAccountIdFromNodeId = (nodeId) => {
         Нет данных для отображения
       </v-alert>
     </v-card>
+    
+    <!-- Global alert messages -->
+    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
+      {{ alert.message }}
+    </div>
   </div>
 </template>
 

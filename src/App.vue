@@ -105,13 +105,13 @@ function getUserName() {
       </v-list>
       <template v-slot:append>
         <div class="pa-2">
-          <span class="orange version"> Клиент {{ version }} </span>
+          <span class="primary-heading version-info"> Клиент {{ version }} </span>
           <br v-if="statusStore.coreVersion"/>
-          <span v-if="statusStore.coreVersion" class="orange version">
+          <span v-if="statusStore.coreVersion" class="primary-heading version-info">
             Сервер {{ statusStore.coreVersion }}
           </span>
           <br v-if="statusStore.dbVersion"/>
-          <span v-if="statusStore.dbVersion" class="orange version"          >
+          <span v-if="statusStore.dbVersion" class="primary-heading version-info">
             БД {{ statusStore.dbVersion }}
           </span>
         </div>
@@ -134,17 +134,19 @@ function getUserName() {
 .logo {
   margin: 1rem;
   display: block;
-  width: 90%;
+  width: 75%;
 }
 
-.version {
-  margin: 2rem;
-  font-size: 1rem;
+.version-info {
+  margin-left: 1rem;
+  margin-top: 0;
+  margin-bottom: 0;
+  font-size: smaller;
 }
 
 nav {
   width: 100%;
-  margin-top: 2rem;
+  margin-top: 1.5rem;
   text-align: left;
   margin-left: 1rem;
   font-size: 1rem;
@@ -180,5 +182,20 @@ nav a:first-of-type {
     background-color: var(--gtc-color-1);
 }
 
+/* Style for nested menu items */
+:deep(.v-list-group .v-list-item) {
+  padding-left: 2rem;
+}
 
+:deep(.v-list-group .v-list-item .link) {
+  font-size: 1rem;
+}
+
+/* Ensure menu group activator text matches list items */
+:deep(.v-list-group__header .v-list-item-title) {
+  font-size: 1.2rem !important;
+  font-family: inherit !important;
+  font-weight: normal !important;
+  color: var(--primary-color) !important;
+}
 </style>

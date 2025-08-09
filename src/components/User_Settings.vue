@@ -32,8 +32,8 @@ import { useUsersStore } from '@/stores/users.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { getRoleName } from '@/helpers/user.helpers.js'
-
 import { useRolesStore } from '@/stores/roles.store.js'
+
 const rolesStore = useRolesStore()
 
 // Load roles before component renders to avoid race condition
@@ -127,7 +127,7 @@ function asAdmin() {
 }
 
 function getTitle() {
-  return isRegister() ? (asAdmin() ? 'Регистрация пользователя' : 'Регистрация') : 'Настройки'
+  return isRegister() ? (asAdmin() ? 'Регистрация пользователя' : 'Регистрация') : 'Настройки пользователя'
 }
 
 function getButton() {
@@ -140,6 +140,10 @@ function showCredentials() {
 
 function showAndEditCredentials() {
   return asAdmin()
+}
+
+function redirectToReturnRoute() {
+  return router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
 }
 
 function onSubmit(values) {
@@ -157,7 +161,7 @@ function onSubmit(values) {
       return usersStore
         .add(values, true)
         .then(() =>
-          router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
+          redirectToReturnRoute()
         )
         .catch((error) => alertStore.error(error.message || String(error)))
     } else {
@@ -205,8 +209,8 @@ function onSubmit(values) {
 </script>
 
 <template>
-  <div class="settings form-2">
-    <h1 class="orange">{{ getTitle() }}</h1>
+  <div class="settings form-2 form-compact">
+    <h1 class="primary-heading">{{ getTitle() }}</h1>
     <hr class="hr" />
     <Form
       @submit="onSubmit"
@@ -356,23 +360,23 @@ function onSubmit(values) {
         </select>
       </div>
 
-      <div class="form-group mt-5">
-        <button class="button" type="submit" :disabled="isSubmitting">
+      <div class="form-group mt-8">
+        <button class="button primary" type="submit" :disabled="isSubmitting">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          {{ getButton() }}
+          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
+            {{ getButton() }}
         </button>
         <button
           v-if="asAdmin()"
-          class="button"
+          class="button secondary"
           type="button"
-          @click="
-            $router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
-          "
+          @click="redirectToReturnRoute()"
         >
-          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
+          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
           Отменить
         </button>
       </div>
+
       <div v-if="errors.lastName" class="alert alert-danger mt-3 mb-0">{{ errors.lastName }}</div>
       <div v-if="errors.firstName" class="alert alert-danger mt-3 mb-0">{{ errors.firstName }}</div>
       <div v-if="errors.patronymic" class="alert alert-danger mt-3 mb-0">

@@ -37,10 +37,35 @@ import {
   faPlus,
   faTrashCan,
   faUserPlus,
-  faList
+  faList,
+  faCheckDouble,
+  faXmark
 } from '@fortawesome/free-solid-svg-icons'
 
-library.add(faDownload, faEye, faEyeSlash, faHand, faPen, faPlay, faPlus, faTrashCan, faUserPlus, faList)
+import {
+  // Regular icons (for tree items)
+  faFolder,
+  faFolderOpen,
+  faCircle
+} from '@fortawesome/free-regular-svg-icons'
+
+library.add(
+  faDownload, 
+  faEye, 
+  faEyeSlash, 
+  faHand, 
+  faPen, 
+  faPlay, 
+  faPlus, 
+  faTrashCan, 
+  faUserPlus, 
+  faList, 
+  faCheckDouble, 
+  faXmark,
+  faFolder,
+  faFolderOpen,
+  faCircle
+)
 
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'

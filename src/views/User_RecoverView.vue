@@ -78,7 +78,7 @@ function onSubmit(values) {
           placeholder="Адрес электронной почты"
         />
       </div>
-      <div class="form-group">
+      <div class="form-actions">
         <button class="button" type="submit" :disabled="isSubmitting">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
           Отправить ссылку
