@@ -35,11 +35,12 @@ const FormStub = {
 }
 const FieldStub = {
   name: 'Field',
-  props: ['name','id','type'],
-  template: '<input :id="id" :type="type" />'
+  props: ['name', 'id', 'type', 'as'],
+  template: '<component :is="as ? as : \'input\'" :id="id" :type="type"><slot /></component>'
 }
 
 let isAdmin
+let isManager
 const mockUser = ref({ id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: [11] })
 const getById = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const addUser = vi.hoisted(() => vi.fn(() => Promise.resolve()))
@@ -65,9 +66,20 @@ vi.mock('@/stores/auth.store.js', () => ({
   useAuthStore: () => ({
     isAdmin,
     isAdministrator: isAdmin,
+    isManager,
     user: { id: 2 },
     register: registerUser
   })
+}))
+
+const accountsStore = {
+  accounts: [],
+  getAll: vi.fn(() => Promise.resolve()),
+  getAccountById: vi.fn((id) => accountsStore.accounts.find(a => a.id === id))
+}
+
+vi.mock('@/stores/accounts.store.js', () => ({
+  useAccountsStore: () => accountsStore
 }))
 
 vi.mock('@/stores/roles.store.js', () => ({
@@ -103,10 +115,12 @@ const Parent = {
 beforeEach(() => {
   // Set up Pinia instance for each test
   setActivePinia(createPinia())
-  
+
   vi.clearAllMocks()
   isAdmin = false
+  isManager = false
   mockUser.value = { id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: [11] }
+  accountsStore.accounts = []
 })
 
 describe('User_Settings.vue real component', () => {

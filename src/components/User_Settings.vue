@@ -33,11 +33,18 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { getRoleName } from '@/helpers/user.helpers.js'
 import { useRolesStore } from '@/stores/roles.store.js'
+import { useAccountsStore } from '@/stores/accounts.store.js'
 
 const rolesStore = useRolesStore()
+const accountsStore = useAccountsStore()
 
 // Load roles before component renders to avoid race condition
 await rolesStore.ensureLoaded()
+try {
+  await accountsStore.getAll()
+} catch {
+  // ignore account loading errors for now
+}
 
 const props = defineProps({
   register: {
@@ -65,6 +72,7 @@ const schema = Yup.object().shape({
   email: Yup.string()
     .required('Необходимо указать электронную почту')
     .email('Неверный формат электронной почты'),
+  accountIds: Yup.array().of(Yup.number()),
   password: Yup.string().concat(
     isRegister() ? Yup.string().required('Необходимо указать пароль').matches(pwdReg, pwdErr) : null
   ),
@@ -81,6 +89,7 @@ const showPassword = ref(false)
 const showPassword2 = ref(false)
 
 let user = ref({
+  accountIds: []
 })
 
 // Computed property for available roles as options for the combobox
@@ -113,9 +122,36 @@ const selectedRole = computed({
   }
 })
 
+const accountOptions = computed(() => {
+  return (accountsStore.accounts || []).map(acc => ({
+    value: acc.id,
+    text: acc.name
+  }))
+})
+
+const selectedAccountNames = computed(() => {
+  const ids = user.value?.accountIds || []
+  return ids
+    .map(id => {
+      const acc = accountsStore.getAccountById
+        ? accountsStore.getAccountById(id)
+        : (accountsStore.accounts || []).find(a => a.id === id)
+      return acc ? acc.name : `#${id}`
+    })
+})
+
 if (!isRegister()) {
   ;({ user } = storeToRefs(usersStore))
   await usersStore.getById(props.id, true)
+  if (user.value && !Array.isArray(user.value.accountIds)) {
+    if (Array.isArray(user.value.accounts)) {
+      user.value.accountIds = user.value.accounts
+    } else {
+      user.value.accountIds = []
+    }
+  }
+} else {
+  user.value.accountIds = []
 }
 
 function isRegister() {
@@ -158,6 +194,7 @@ function onSubmit(values) {
       } else {
         values.roles = []
       }
+      values.accountIds = values.accountIds || []
       return usersStore
         .add(values, true)
         .then(() =>
@@ -193,9 +230,11 @@ function onSubmit(values) {
       } else {
         values.roles = []
       }
+      values.accountIds = values.accountIds || []
     } else {
       // Non-admin keeps existing roles
       values.roles = user.value.roles
+      values.accountIds = user.value.accountIds
     }
     return usersStore
       .update(props.id, values, true)
@@ -336,6 +375,33 @@ function onSubmit(values) {
           </button>
         </div>
       </div>
+      <div v-if="showCredentials() && authStore.isManager" class="form-group">
+        <label for="accountList" class="label">Лицевые счета:</label>
+        <ul id="accountList">
+          <li v-for="name in selectedAccountNames" :key="name">{{ name }}</li>
+          <li v-if="!selectedAccountNames.length">Не назначены</li>
+        </ul>
+      </div>
+      <div v-if="showAndEditCredentials()" class="form-group">
+        <label for="accountIds" class="label">Лицевые счета:</label>
+        <Field
+          name="accountIds"
+          as="select"
+          id="accountIds"
+          multiple
+          class="form-control input"
+          :class="{ 'is-invalid': errors.accountIds }"
+        >
+          <option
+            v-for="option in accountOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.text }}
+          </option>
+        </Field>
+        <div v-if="errors.accountIds" class="invalid-feedback">{{ errors.accountIds }}</div>
+      </div>
       <div v-if="showCredentials()" class="form-group">
         <label for="crd" class="label">Права:</label>
         <span id="crd"
@@ -383,6 +449,7 @@ function onSubmit(values) {
         {{ errors.patronymic }}
       </div>
       <div v-if="errors.email" class="alert alert-danger mt-3 mb-0">{{ errors.email }}</div>
+      <div v-if="errors.accountIds" class="alert alert-danger mt-3 mb-0">{{ errors.accountIds }}</div>
       <div v-if="errors.password" class="alert alert-danger mt-3 mb-0">{{ errors.password }}</div>
       <div v-if="errors.password2" class="alert alert-danger mt-3 mb-0">{{ errors.password2 }}</div>
     </Form>
