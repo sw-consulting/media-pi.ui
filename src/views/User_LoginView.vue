@@ -53,7 +53,7 @@ function onSubmit(values) {
 
   return authStore
     .login(login_email, login_password)
-    .then(() => router.push(authStore.isAdmin ? '/users' : '/user/edit/' + authStore.user.id))
+    .then(() => router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id))
     .catch((error) => alertStore.error(error.message || String(error)))
 }
 </script>

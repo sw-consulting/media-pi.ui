@@ -36,7 +36,7 @@ export const useUsersStore = defineStore('users', () => {
 
   // getters
 const getUserById = (id) => {
-  if (!users || !Array.isArray(users.value)) {
+  if (!users.value || !Array.isArray(users.value)) {
     return null
   }
   return users.value.find(user => user && user.id === id);

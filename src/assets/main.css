@@ -344,7 +344,7 @@ a,
 }
 }
 
-/* Table header styling for both registers and users tables - Vuetify 3.x */
+/* Table header styling for both accounts and users tables - Vuetify 3.x */
 .v-data-table thead th,
 .v-data-table-server thead th {
   background-color: var(--gtc-color-1) !important;

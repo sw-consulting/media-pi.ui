@@ -34,7 +34,7 @@ export const useDeviceGroupsStore = defineStore('devicegroups', () => {
   const error = ref(null)
 
   const getGroupById = (id) => {
-    if (!groups || !Array.isArray(groups.value)) {
+    if (!groups.value || !Array.isArray(groups.value)) {
       return null
     }
     return groups.value.find(g => g && g.id === id)

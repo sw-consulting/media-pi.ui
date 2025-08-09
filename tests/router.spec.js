@@ -40,7 +40,7 @@ vi.mock('@/views/User_RecoverView.vue', () => ({ default: { template: '<div />' 
 vi.mock('@/views/User_RegisterView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/Users_View.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/User_EditView.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('@/views/Registers_View.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/Accounts_View.vue', () => ({ default: { template: '<div />' } }))
 
 import router from '@/router'
 
@@ -73,13 +73,26 @@ describe('router guards', () => {
     expect(authStore.returnUrl).toBe('/users')
   })
 
-  it('redirects authenticated users away from login to registers', async () => {
-    // Directly set user property instead of using $patch
+  it('redirects authenticated users away from login to accounts', async () => {
+    // Directly set user property with a role
     authStore.user = { id: 3 }
+    authStore.isAdministrator = true
     
     await router.push('/login')
     await router.isReady()
-    expect(router.currentRoute.value.fullPath).toBe('/registers')
+    expect(router.currentRoute.value.fullPath).toBe('/accounts')
+  })
+
+  it('redirects authenticated users without roles to their edit form', async () => {
+    // User without any roles
+    authStore.user = { id: 3 }
+    authStore.isAdministrator = false
+    authStore.isManager = false
+    authStore.isEngineer = false
+    
+    await router.push('/login')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe('/user/edit/3')
   })
 
   describe('root path redirects', () => {
@@ -92,15 +105,14 @@ describe('router guards', () => {
       expect(router.currentRoute.value.fullPath).toBe('/login')
     })
 
-    it('redirects user to registers', async () => {
+    it('redirects user to accounts', async () => {
       // Set user directly, not as a ref value
       authStore.user = { id: 3 }
-      authStore.isLogist = true
-      authStore.isAdmin = true
-      
+      authStore.isAdministrator = true
+
       await router.push('/')
       await router.isReady()
-      expect(router.currentRoute.value.fullPath).toBe('/registers')
+      expect(router.currentRoute.value.fullPath).toBe('/accounts')
     })
 
   })

@@ -21,11 +21,19 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
-import RegistersList from '@/components/Registers_List.vue'
+
+import { useAccountsCaption } from '@/helpers/accounts.caption.js'
+
+const accountsCaption = useAccountsCaption()
+
 </script>
 
 <template>
-  <Suspense>
-    <RegistersList />
-  </Suspense>
+  <div class="settings table-2">
+    <h1 class="orange">{{ accountsCaption || 'Информация не доступна' }}</h1>
+    <hr class="hr" />
+
+    <v-card>
+    </v-card>
+    </div>
 </template>

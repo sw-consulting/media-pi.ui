@@ -34,7 +34,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const error = ref(null)
 
   const getAccountById = (id) => {
-    if (!accounts || !Array.isArray(accounts.value)) {
+    if (!accounts.value || !Array.isArray(accounts.value)) {
       return null
     }
     return accounts.value.find(account => account && account.id === id)

@@ -73,7 +73,7 @@ describe('User_LoginView.vue', () => {
   })
 
   it('redirects after successful login', async () => {
-    authStore.isAdmin = true
+    authStore.isAdministrator = true
     const wrapper = mount(UserLoginView, {
       global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
     })
@@ -84,7 +84,7 @@ describe('User_LoginView.vue', () => {
   })
 
   it('redirects non-admin to edit page', async () => {
-    authStore.isAdmin = false
+    authStore.isAdministrator = false
     const wrapper = mount(UserLoginView, {
       global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
     })
