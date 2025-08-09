@@ -34,7 +34,7 @@ export const useDevicesStore = defineStore('devices', () => {
   const error = ref(null)
 
   const getDeviceById = (id) => {
-    if (!devices || !Array.isArray(devices.value)) {
+    if (!devices.value || !Array.isArray(devices.value)) {
       return null
     }
     return devices.value.find(d => d && d.id === id)

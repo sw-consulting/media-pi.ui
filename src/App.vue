@@ -25,12 +25,15 @@ import { RouterLink, RouterView } from 'vue-router'
 import { version } from '@/../package'
 import { onMounted } from 'vue'
 import { useStatusStore } from '@/stores/status.store.js'
+import { useAccountsCaption } from '@/helpers/accounts.caption.js'
 
 import { useDisplay } from 'vuetify'
 const { height } = useDisplay()
 
 import { useAuthStore } from '@/stores/auth.store.js'
 const authStore = useAuthStore()
+
+const accountsCaption = useAccountsCaption(authStore)
 
 const statusStore = useStatusStore()
 statusStore.fetchStatus().catch(() => {})
@@ -88,8 +91,8 @@ function getUserName() {
         <v-list-item v-if="authStore.isAdministrator">
           <RouterLink to="/users" class="link">Пользователи</RouterLink>
         </v-list-item>
-        <v-list-item v-if="authStore.isLogist">
-          <RouterLink to="/registers" class="link">Реестры</RouterLink>
+        <v-list-item v-if="accountsCaption">
+          <RouterLink to="/accounts" class="link">{{ accountsCaption }}</RouterLink>
         </v-list-item>
         <v-list-item>
           <RouterLink to="/login" @click="deauth()" class="link">Выход</RouterLink>

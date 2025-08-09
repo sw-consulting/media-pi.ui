@@ -20,12 +20,18 @@
 //
 // This file is a part of Media Pi frontend application
 
-<script setup>
-import RegistersList from '@/components/Registers_List.vue'
-</script>
+import { computed } from 'vue'
 
-<template>
-  <Suspense>
-    <RegistersList />
-  </Suspense>
-</template>
+/**
+ * Get the appropriate accounts caption based on user role
+ * @param {Object} authStore - The auth store instance
+ * @returns {ComputedRef<string|null>} The caption for accounts section or null if no role
+ */
+export function useAccountsCaption(authStore) {
+  return computed(() => {
+    if (authStore.isEngineer) return 'Нераспределённые устройства'
+    if (authStore.isManager) return 'Устройства'
+    if (authStore.isAdministrator) return 'Лицевые счета и устройства'
+    return null
+  })
+}

@@ -50,7 +50,7 @@ const router = createRouter({
     { path: '/', component: { template: '<div>Home</div>' } },
     { path: '/login', component: { template: '<div>Login</div>' } },
     { path: '/users', component: { template: '<div>Users</div>' } },
-    { path: '/registers', component: { template: '<div>Registers</div>' } },
+    { path: '/accounts', component: { template: '<div>Accounts</div>' } },
     { path: '/user/edit/:id', component: { template: '<div>Edit User</div>' } },
     { path: '/recover', component: { template: '<div>Recover</div>' } },
     { path: '/register', component: { template: '<div>Register</div>' } }
