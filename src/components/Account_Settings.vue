@@ -33,6 +33,8 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { UserRoleConstants } from '@/helpers/user.helpers.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
+
 
 const props = defineProps({
   register: {
@@ -53,15 +55,19 @@ const { alert } = storeToRefs(alertStore)
 
 const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя'),
-  managers: Yup.array().of(Yup.number())
+  managers: Yup.array().of(
+    Yup.mixed().test(
+      'is-number-or-empty', 
+      'Invalid manager selection', 
+      value => value === '' || (typeof value === 'number' && !isNaN(value))
+    )
+  )
 })
 
-let account = ref({ name: '', managers: [] })
-const { loading, error } = storeToRefs(accountsStore)
+let account = ref({ name: '', managers: [''] })
+const { loading } = storeToRefs(accountsStore) 
 const componentError = ref(null)
 const initialLoading = ref(false)
-
-redirectToDefaultRoute()
 
 if (!isRegister()) {
   initialLoading.value = true
@@ -72,9 +78,17 @@ if (!isRegister()) {
       throw new Error(`Лицевой счёт с ID ${props.id} не найден`)
     }
     // Update the reactive account data
+    // Only include valid AccountManager IDs
+    const validManagerIds = (usersStore.users || [])
+      .filter(u => Array.isArray(u.roles) && u.roles.includes(UserRoleConstants.AccountManager))
+      .map(u => u.id)
+    let filteredManagers = (loadedAccount.userIds || []).filter(id => validManagerIds.includes(id))
+    if (filteredManagers.length === 0) {
+      filteredManagers = ['']
+    }
     account.value = {
       name: loadedAccount.name || '',
-      managers: loadedAccount.managers || loadedAccount.managerIds || []
+      managers: filteredManagers
     }
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
@@ -91,7 +105,6 @@ if (!isRegister()) {
   }
 }
 
-// Load users with better error handling
 try {
   await usersStore.getAll()
 } catch (err) {
@@ -110,7 +123,7 @@ const managerOptions = computed(() => {
 })
 
 const selectedManagerNames = computed(() => {
-  const managers = isRegister() ? [] : (accountsStore.account?.managers || accountsStore.account?.managerIds || [])
+  const managers = isRegister() ? [] : (accountsStore.account?.userIds || [])
   return managers
     .map(id => {
       const u = usersStore.getUserById ? usersStore.getUserById(id) : (usersStore.users || []).find(u => u.id === id)
@@ -133,19 +146,23 @@ function getButton() {
 async function onSubmit(values) {
   componentError.value = null
   try {
+    // Filter out empty string values and convert to numbers
+    const filteredManagers = (values.managers || [])
+      .filter(manager => manager !== '' && manager !== null && manager !== undefined)
+      .map(manager => typeof manager === 'string' ? parseInt(manager, 10) : manager)
+      .filter(manager => !isNaN(manager))
+    
     const payload = { 
       name: values.name.trim(), 
-      managerIds: values.managers || [] 
+      userIds: filteredManagers 
     }
     
     if (isRegister()) {
       await accountsStore.add(payload)
-      alertStore.success('Лицевой счёт успешно создан')
     } else {
       await accountsStore.update(props.id, payload)
-      alertStore.success('Настройки лицевого счёта сохранены')
     }
-    router.push('/accounts')
+    router.go(-1)
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
@@ -164,73 +181,61 @@ async function onSubmit(values) {
 </script>
 
 <template>
-  <div class="settings form-2">
-    <h1 class="orange">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
+  <div class="settings form-2 form-compact">
+    <h1 class="primary-heading">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
     <hr class="hr" />
 
-    <Form 
-      @submit="onSubmit" 
-      :initial-values="account" 
-      :validation-schema="schema" 
-      :key="account.name + (account.managers || []).join(',')"
+    <Form
+      :validation-schema="schema"
+      :initial-values="account"
+      @submit="onSubmit"
       v-slot="{ errors, isSubmitting }"
     >
       <div class="form-group">
         <label for="name" class="label">Название:</label>
-        <Field
-          name="name"
-          type="text"
-          id="name"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.name }"
+        <Field name="name" type="text" id="name" :disabled="isSubmitting"
+          class="form-control input" :class="{ 'is-invalid': errors.name }"
           placeholder="Введите название лицевого счёта"
-          :disabled="isSubmitting"
         />
-        <div v-if="errors.name" class="invalid-feedback">{{ errors.name }}</div>
       </div>
 
-      <div class="form-group">
-        <label for="managers" class="label">Менеджеры:</label>
-        <Field
-          v-if="canEditManagers()"
+      <div v-if="canEditManagers()">
+        <FieldArrayWithButtons
           name="managers"
-          as="select"
-          id="managers"
-          multiple
-          class="form-control input"
-          :class="{ 'is-invalid': errors.managers }"
-          :disabled="isSubmitting || !managerOptions.length"
-        >
-          <option v-if="!managerOptions.length" disabled>
-            Нет доступных пользователей
-          </option>
-          <option v-for="option in managerOptions" :key="option.value" :value="option.value">
-            {{ option.text }}
-          </option>
-        </Field>
-        <ul v-else>
+          label="Менеджеры"
+          field-type="select"
+          :options="managerOptions"
+          placeholder="Выберите менеджера:"
+          add-tooltip="Добавить менеджера"
+          remove-tooltip="Удалить менеджера"
+          :has-error="!!errors.managers"
+        />
+      </div>
+
+      <div v-else class="form-group">
+        <label class="label">Менеджеры:</label>
+        <ul>
           <li v-for="name in selectedManagerNames" :key="name">{{ name }}</li>
           <li v-if="!selectedManagerNames.length">Менеджеры не назначены</li>
         </ul>
-        <div v-if="errors.managers" class="invalid-feedback">{{ errors.managers }}</div>
       </div>
 
-      <div class="form-group mt-5">
-        <button class="button" type="submit" :disabled="isSubmitting || componentError">
+      <div class="form-group mt-8">
+        <button class="button primary" type="submit" :disabled="isSubmitting">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          {{ getButton() }}
+          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
+            {{ getButton() }}
         </button>
-        <button class="button" type="button" @click="$router.push('/accounts')" :disabled="isSubmitting">
+        <button
+          class="button secondary"
+          type="button"
+          @click="$router.go(-1)"
+        >
+          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
           Отменить
         </button>
       </div>
-      
-      <!-- Component-level errors -->
-      <div v-if="componentError" class="alert alert-danger mt-3 mb-0">
-        {{ componentError }}
-        <button @click="componentError = null" class="btn btn-link close">×</button>
-      </div>
-      
+
       <!-- Form validation errors -->
       <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
       <div v-if="errors.managers" class="alert alert-danger mt-3 mb-0">{{ errors.managers }}</div>
@@ -248,11 +253,5 @@ async function onSubmit(values) {
       <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
     
-    <div v-if="error && !componentError" class="text-center m-5">
-      <div class="text-danger">Ошибка при загрузке информации о счёте: {{ error }}</div>
-      <button @click="$router.go(0)" class="btn btn-primary mt-2">
-        Обновить страницу
-      </button>
-    </div>
   </div>
 </template>

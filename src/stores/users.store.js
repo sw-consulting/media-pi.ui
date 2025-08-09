@@ -95,7 +95,6 @@ const getUserById = (id) => {
     error.value = null
     try {
       await fetchWrapper.put(`${baseUrl}/${id}`, params)
-      getAll() 
     } catch (err) {
       error.value = err
       throw err

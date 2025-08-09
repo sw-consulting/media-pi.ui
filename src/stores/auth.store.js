@@ -48,13 +48,53 @@ export const useAuthStore = defineStore('auth', () => {
   const users_search = ref('')
   const users_sort_by = ref(['id'])
   const users_page = ref(1)
-  const registers_per_page = ref(10)
-  const registers_search = ref('')
-  const registers_sort_by = ref([{ key: 'id', order: 'asc' }])
-  const registers_page = ref(1)
   const returnUrl = ref(null)
   const re_jwt = ref(null)
   const re_tgt = ref(null)
+
+  // Accounts tree state management
+  const accountsTreeState = ref({})
+
+  // Load tree state from localStorage on store initialization
+  function loadAccountsTreeState() {
+    try {
+      const saved = localStorage.getItem('accountsTreeState')
+      if (saved) {
+        accountsTreeState.value = JSON.parse(saved)
+      }
+    } catch {
+      accountsTreeState.value = {}
+    }
+  }
+
+  // Get tree state for current user
+  const getAccountsTreeState = computed(() => {
+    if (!user.value?.id) return { selectedNode: null, expandedNodes: [] }
+    return accountsTreeState.value[user.value.id] || { selectedNode: null, expandedNodes: [] }
+  })
+
+  // Save tree state for current user
+  function saveAccountsTreeState(selectedNode, expandedNodes) {
+    if (!user.value?.id) return
+
+    accountsTreeState.value[user.value.id] = {
+      selectedNode: selectedNode || null,
+      expandedNodes: expandedNodes ? [...expandedNodes] : []
+    }
+
+    // Persist to localStorage
+    localStorage.setItem('accountsTreeState', JSON.stringify(accountsTreeState.value))
+  }
+
+  // Clear tree state for current user
+  function clearAccountsTreeState() {
+    if (!user.value?.id) return
+
+    if (accountsTreeState.value[user.value.id]) {
+      delete accountsTreeState.value[user.value.id]
+      localStorage.setItem('accountsTreeState', JSON.stringify(accountsTreeState.value))
+    }
+  }
 
   async function check() {
     await fetchWrapper.get(`${baseUrl}/check`)
@@ -130,6 +170,9 @@ export const useAuthStore = defineStore('auth', () => {
     statusStore.fetchStatus().catch(() => {})
   }
 
+  // Load tree state when store is initialized
+  loadAccountsTreeState()
+
   return {
     // state
     user,
@@ -137,22 +180,22 @@ export const useAuthStore = defineStore('auth', () => {
     users_search,
     users_sort_by,
     users_page,
-    registers_per_page,
-    registers_search,
-    registers_sort_by,
-    registers_page,
     returnUrl,
     re_jwt,
     re_tgt,
     isAdministrator,
     isManager,
     isEngineer,
+    getAccountsTreeState,
     // actions
     check,
     register,
     recover,
     re,
     login,
-    logout
+    logout,
+    saveAccountsTreeState,
+    clearAccountsTreeState,
+    loadAccountsTreeState
   }
 })

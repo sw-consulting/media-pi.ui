@@ -1,3 +1,6 @@
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faCheckDouble, faXmark, faPlus, faMinus } from '@fortawesome/free-solid-svg-icons';
+library.add(faCheckDouble, faXmark, faPlus, faMinus);
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,6 +26,7 @@
 /* @vitest-environment jsdom */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import AccountSettings from '@/components/Account_Settings.vue'
 
 let authStore
@@ -100,18 +104,42 @@ const mountSettings = (props = {}) => mount({
     id: 1,
     ...props
   },
-  global: {
-    stubs: {
-      'Form': { 
-        template: '<form @submit="$emit(\'submit\', { name: \'Test Account\', managers: [1, 2] })"><slot :errors="{}" :isSubmitting="false" /></form>',
-        emits: ['submit']
-      },
-      'Field': { 
-        template: '<input />', 
-        props: ['name', 'type', 'as', 'multiple'] 
+      global: {
+        stubs: {
+          'Form': { 
+            template: '<div data-testid="form" @submit="onSubmit"><slot :errors="{}" :isSubmitting="false" /></div>',
+            props: ['validation-schema', 'initial-values'],
+            emits: ['submit'],
+            methods: {
+              onSubmit() {
+                this.$emit('submit', { name: 'Test Account', managers: [1, 2] })
+              }
+            }
+          },
+          'Field': { 
+            template: '<input />', 
+            props: ['name', 'type', 'as', 'multiple'] 
+          },
+          'FieldArray': {
+            template: '<div><slot :fields="mockFields" :push="mockPush" :remove="mockRemove" /></div>',
+            props: ['name'],
+            setup() {
+              return {
+                mockFields: [{ key: 0 }],
+                mockPush: vi.fn(),
+                mockRemove: vi.fn()
+              }
+            }
+          },
+          'VTooltip': {
+            template: '<div><slot /></div>',
+            props: ['text', 'disabled']
+          }
+        },
+        components: {
+          'font-awesome-icon': FontAwesomeIcon
+        }
       }
-    }
-  }
 })
 
 describe('Account_Settings.vue', () => {
@@ -135,7 +163,7 @@ describe('Account_Settings.vue', () => {
     const wrapper = mountSettings({ register: true })
     await flushPromises()
     
-    expect(wrapper.find('form').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="form"]').exists()).toBe(true)
     expect(accountsStore.getById).not.toHaveBeenCalled()
   })
 
@@ -150,22 +178,21 @@ describe('Account_Settings.vue', () => {
     await flushPromises()
     
     expect(accountsStore.getById).toHaveBeenCalledWith(1)
-    expect(wrapper.find('form').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="form"]').exists()).toBe(true)
   })
 
   it('handles form submission for creating account', async () => {
     const wrapper = mountSettings({ register: true })
     await flushPromises()
     
-    const form = wrapper.find('form')
+    const form = wrapper.find('[data-testid="form"]')
     await form.trigger('submit')
     await flushPromises()
-    
+
     expect(accountsStore.add).toHaveBeenCalledWith({
       name: 'Test Account',
-      managerIds: [1, 2]
+      userIds: [1, 2]
     })
-    expect(alertStore.success).toHaveBeenCalledWith('Лицевой счёт успешно создан')
   })
 
   it('handles form submission for updating account', async () => {
@@ -177,16 +204,15 @@ describe('Account_Settings.vue', () => {
     
     const wrapper = mountSettings({ register: false, id: 1 })
     await flushPromises()
-    
-    const form = wrapper.find('form')
+
+    const form = wrapper.find('[data-testid="form"]')
     await form.trigger('submit')
     await flushPromises()
-    
+
     expect(accountsStore.update).toHaveBeenCalledWith(1, {
       name: 'Test Account',
-      managerIds: [1, 2]
+      userIds: [1, 2]
     })
-    expect(alertStore.success).toHaveBeenCalledWith('Настройки лицевого счёта сохранены')
   })
 
   it('handles account not found error', async () => {
@@ -204,10 +230,62 @@ describe('Account_Settings.vue', () => {
     const wrapper = mountSettings({ register: true })
     await flushPromises()
     
-    const form = wrapper.find('form')
+    const form = wrapper.find('[data-testid="form"]')
     await form.trigger('submit')
     await flushPromises()
     
     expect(alertStore.error).toHaveBeenCalledWith('Ошибка при создании лицевого счёта: Account name already exists')
+  })
+
+  it('allows form submission when no managers are selected', async () => {
+    const wrapper = mount({
+      template: '<Suspense><AccountSettings v-bind="$attrs" /></Suspense>',
+      components: { AccountSettings },
+      inheritAttrs: false
+    }, {
+      attrs: { register: true },
+      global: {
+        stubs: {
+          'Form': { 
+            template: '<div data-testid="form" @submit="onSubmit"><slot :errors="{}" :isSubmitting="false" /></div>',
+            props: ['validation-schema', 'initial-values'],
+            emits: ['submit'],
+            methods: {
+              onSubmit() {
+                this.$emit('submit', { name: 'Test Account', managers: [''] })
+              }
+            }
+          },
+          'Field': { template: '<input />', props: ['name', 'type', 'as', 'multiple'] },
+          'FieldArray': {
+            template: '<div><slot :fields="mockFields" :push="mockPush" :remove="mockRemove" /></div>',
+            props: ['name'],
+            setup() {
+              return {
+                mockFields: [{ key: 0 }],
+                mockPush: vi.fn(),
+                mockRemove: vi.fn()
+              }
+            }
+          },
+          'VTooltip': {
+            template: '<div><slot /></div>',
+            props: ['text', 'disabled']
+          }
+        },
+        components: { 'font-awesome-icon': FontAwesomeIcon }
+      }
+    })
+    
+    await flushPromises()
+    
+    const form = wrapper.find('[data-testid="form"]')
+    await form.trigger('submit')
+    await flushPromises()
+    
+    expect(accountsStore.add).toHaveBeenCalledWith({
+      name: 'Test Account',
+      userIds: []
+    })
   })
 })

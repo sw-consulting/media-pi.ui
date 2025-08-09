@@ -13,6 +13,7 @@ __MACOSX
 dist
 dist-ssr
 coverage
+analysis
 *.local
 
 # Editor directories and files

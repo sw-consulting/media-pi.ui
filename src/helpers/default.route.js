@@ -35,7 +35,6 @@ export function redirectToDefaultRoute() {
     router.push('/login')
     return
   }
-  
   // Users with any role go to accounts, users with no role go to their edit form
   if (auth.isAdministrator || auth.isManager || auth.isEngineer) {
     router.push('/accounts')

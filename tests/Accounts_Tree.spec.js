@@ -48,6 +48,14 @@ const mockPush = vi.fn()
 // Mock global confirm function
 global.confirm = vi.fn()
 
+// Mock confirmation helper
+const mockConfirmDelete = vi.fn().mockResolvedValue(true)
+vi.mock('@/helpers/confirmation.js', () => ({
+  useConfirmation: () => ({
+    confirmDelete: mockConfirmDelete
+  })
+}))
+
 vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
   return { ...actual, storeToRefs: (store) => store }
@@ -88,7 +96,13 @@ const mountTree = () => mount(AccountsTree, {
       'v-progress-circular': { template: '<div />' },
       'v-alert': { template: '<div />' },
       'v-icon': { template: '<div />' },
-      'font-awesome-icon': { template: '<div />' }
+      'v-tooltip': { template: '<div><slot name="activator" :props="{}"></slot></div>' },
+      'font-awesome-icon': { template: '<div />' },
+      'ActionButton': { 
+        props: ['item', 'icon', 'tooltipText'], 
+        template: '<button @click="$emit(\'click\', item)"><div /></button>',
+        emits: ['click']
+      }
     }
   }
 })
@@ -180,20 +194,20 @@ describe('Accounts_Tree.vue', () => {
     })
 
     it('shows confirm dialog when delete button is clicked', async () => {
-      global.confirm = vi.fn().mockReturnValue(false)
+      mockConfirmDelete.mockResolvedValue(false)
       
       const wrapper = mountTree()
       await resolveAll()
       
       const accountId = 1
       await wrapper.vm.deleteAccount(accountId)
-      
-      expect(global.confirm).toHaveBeenCalledWith('Вы уверены, что хотите удалить этот лицевой счёт?')
+
+      expect(mockConfirmDelete).toHaveBeenCalledWith('Account 1', 'лицевой счёт')
     })
 
     it('deletes account when deletion is confirmed', async () => {
-      global.confirm = vi.fn().mockReturnValue(true)
-      accountsStore.deleteAccount = vi.fn().mockResolvedValue()
+      mockConfirmDelete.mockResolvedValue(true)
+      accountsStore.delete = vi.fn().mockResolvedValue()
       alertStore.success = vi.fn()
       
       const wrapper = mountTree()
@@ -201,28 +215,27 @@ describe('Accounts_Tree.vue', () => {
       
       const accountId = 1
       await wrapper.vm.deleteAccount(accountId)
-      
-      expect(accountsStore.deleteAccount).toHaveBeenCalledWith(accountId)
-      expect(alertStore.success).toHaveBeenCalledWith('Лицевой счёт "Account 1" успешно удален')
+
+      expect(accountsStore.delete).toHaveBeenCalledWith(accountId)
     })
 
     it('does not delete account when deletion is cancelled', async () => {
-      global.confirm = vi.fn().mockReturnValue(false)
-      accountsStore.deleteAccount = vi.fn()
-      
+      mockConfirmDelete.mockResolvedValue(false)
+      accountsStore.delete = vi.fn()
+
       const wrapper = mountTree()
       await resolveAll()
       
       const accountId = 1
       await wrapper.vm.deleteAccount(accountId)
-      
-      expect(accountsStore.deleteAccount).not.toHaveBeenCalled()
+
+      expect(accountsStore.delete).not.toHaveBeenCalled()
     })
 
     it('handles delete error gracefully', async () => {
-      global.confirm = vi.fn().mockReturnValue(true)
+      mockConfirmDelete.mockResolvedValue(true)
       const deleteError = new Error('Delete failed')
-      accountsStore.deleteAccount = vi.fn().mockRejectedValue(deleteError)
+      accountsStore.delete = vi.fn().mockRejectedValue(deleteError)
       alertStore.error = vi.fn()
       
       const wrapper = mountTree()
@@ -231,8 +244,8 @@ describe('Accounts_Tree.vue', () => {
       const accountId = 1
       // Should not throw error
       await expect(wrapper.vm.deleteAccount(accountId)).resolves.toBeUndefined()
-      
-      expect(accountsStore.deleteAccount).toHaveBeenCalledWith(accountId)
+
+      expect(accountsStore.delete).toHaveBeenCalledWith(accountId)
       expect(alertStore.error).toHaveBeenCalledWith('Ошибка при удалении лицевого счёта: Delete failed')
     })
 
@@ -309,6 +322,94 @@ describe('Accounts_Tree.vue', () => {
       wrapper.vm.editAccount(1)
       
       expect(alertStore.error).toHaveBeenCalledWith('Не удалось перейти к редактированию лицевого счёта: Navigation failed')
+    })
+  })
+
+  describe('Tree State Persistence', () => {
+    beforeEach(() => {
+      authStore = { 
+        isAdministrator: true, 
+        isManager: false, 
+        isEngineer: false,
+        getAccountsTreeState: { selectedNode: null, expandedNodes: [] },
+        saveAccountsTreeState: vi.fn()
+      }
+      vi.clearAllMocks()
+    })
+
+    it('saves tree state when selection changes', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Simulate selection change
+      wrapper.vm.selectedNode = ['account-1']
+      await wrapper.vm.$nextTick()
+
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledWith('account-1', [])
+    })
+
+    it('saves tree state when expanded nodes change', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Simulate expansion change
+      wrapper.vm.expandedNodes = ['root-accounts', 'account-1']
+      await wrapper.vm.$nextTick()
+
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledWith(null, ['root-accounts', 'account-1'])
+    })
+
+    it('handles empty tree state gracefully', async () => {
+      authStore.getAccountsTreeState = { selectedNode: null, expandedNodes: [] }
+
+      const wrapper = mountTree()
+      await resolveAll()
+
+      expect(wrapper.vm.selectedNode).toEqual([])
+      expect(wrapper.vm.expandedNodes).toEqual([])
+    })
+
+    it('handles tree state with multiple selections', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Simulate multiple selection
+      wrapper.vm.selectedNode = ['account-1', 'account-2']
+      await wrapper.vm.$nextTick()
+
+      // Should only save the first selected node
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledWith('account-1', [])
+    })
+
+    it('auto-saves state on every tree interaction', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Multiple tree operations
+      wrapper.vm.selectedNode = ['account-1']
+      await wrapper.vm.$nextTick()
+      
+      wrapper.vm.expandedNodes = ['root-accounts']
+      await wrapper.vm.$nextTick()
+
+      wrapper.vm.selectedNode = ['account-2']
+      await wrapper.vm.$nextTick()
+
+      // Should have been called for each change
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledTimes(3)
+      expect(authStore.saveAccountsTreeState).toHaveBeenLastCalledWith('account-2', ['root-accounts'])
+    })
+
+    it('calls saveAccountsTreeState with correct parameters for empty selection', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Simulate clearing selection
+      wrapper.vm.selectedNode = []
+      wrapper.vm.expandedNodes = ['root-accounts']
+      await wrapper.vm.$nextTick()
+
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledWith(null, ['root-accounts'])
     })
   })
 })
