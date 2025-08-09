@@ -23,7 +23,7 @@
 
 import { RouterLink, RouterView } from 'vue-router'
 import { version } from '@/../package'
-import { onMounted, computed } from 'vue'
+import { onMounted } from 'vue'
 import { useStatusStore } from '@/stores/status.store.js'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
 
