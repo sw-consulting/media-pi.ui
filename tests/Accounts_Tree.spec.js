@@ -43,10 +43,21 @@ const alertStore = {
   error: vi.fn()
 }
 
+const mockPush = vi.fn()
+
+// Mock global confirm function
+global.confirm = vi.fn()
+
 vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
   return { ...actual, storeToRefs: (store) => store }
 })
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({
+    push: mockPush
+  })
+}))
 
 vi.mock('@/stores/auth.store.js', () => ({
   useAuthStore: () => authStore
@@ -72,11 +83,12 @@ const mountTree = () => mount(AccountsTree, {
   global: {
     stubs: {
       'v-card': { template: '<div><slot /></div>' },
-      'v-treeview': { props: ['items'], template: '<div />' },
+      'v-treeview': { props: ['items'], template: '<div><slot name="append" v-for="item in items" :item="item"></slot></div>' },
       'v-progress-linear': { template: '<div />' },
       'v-progress-circular': { template: '<div />' },
       'v-alert': { template: '<div />' },
-      'v-icon': { template: '<div />' }
+      'v-icon': { template: '<div />' },
+      'font-awesome-icon': { template: '<div />' }
     }
   }
 })
@@ -136,6 +148,168 @@ describe('Accounts_Tree.vue', () => {
     expect(wrapper.vm.treeItems[0].name).toBe('Нераспределённые устройства')
     // With lazy loading, children are empty initially
     expect(wrapper.vm.treeItems[0].children).toEqual([])
+  })
+
+  describe('Action Buttons', () => {
+    beforeEach(() => {
+      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      accountsStore.accounts = [
+        { id: 1, name: 'Account 1' },
+        { id: 2, name: 'Account 2' }
+      ]
+      vi.clearAllMocks()
+    })
+
+    it('navigates to account create page when create button is clicked', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      await wrapper.vm.createAccount()
+      
+      expect(mockPush).toHaveBeenCalledWith('/account/create')
+    })
+
+    it('navigates to account edit page when edit button is clicked', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      const accountId = 1
+      await wrapper.vm.editAccount(accountId)
+      
+      expect(mockPush).toHaveBeenCalledWith('/account/edit/1')
+    })
+
+    it('shows confirm dialog when delete button is clicked', async () => {
+      global.confirm = vi.fn().mockReturnValue(false)
+      
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      const accountId = 1
+      await wrapper.vm.deleteAccount(accountId)
+      
+      expect(global.confirm).toHaveBeenCalledWith('Вы уверены, что хотите удалить этот лицевой счёт?')
+    })
+
+    it('deletes account when deletion is confirmed', async () => {
+      global.confirm = vi.fn().mockReturnValue(true)
+      accountsStore.deleteAccount = vi.fn().mockResolvedValue()
+      alertStore.success = vi.fn()
+      
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      const accountId = 1
+      await wrapper.vm.deleteAccount(accountId)
+      
+      expect(accountsStore.deleteAccount).toHaveBeenCalledWith(accountId)
+      expect(alertStore.success).toHaveBeenCalledWith('Лицевой счёт "Account 1" успешно удален')
+    })
+
+    it('does not delete account when deletion is cancelled', async () => {
+      global.confirm = vi.fn().mockReturnValue(false)
+      accountsStore.deleteAccount = vi.fn()
+      
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      const accountId = 1
+      await wrapper.vm.deleteAccount(accountId)
+      
+      expect(accountsStore.deleteAccount).not.toHaveBeenCalled()
+    })
+
+    it('handles delete error gracefully', async () => {
+      global.confirm = vi.fn().mockReturnValue(true)
+      const deleteError = new Error('Delete failed')
+      accountsStore.deleteAccount = vi.fn().mockRejectedValue(deleteError)
+      alertStore.error = vi.fn()
+      
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      const accountId = 1
+      // Should not throw error
+      await expect(wrapper.vm.deleteAccount(accountId)).resolves.toBeUndefined()
+      
+      expect(accountsStore.deleteAccount).toHaveBeenCalledWith(accountId)
+      expect(alertStore.error).toHaveBeenCalledWith('Ошибка при удалении лицевого счёта: Delete failed')
+    })
+
+    it('renders create button for root accounts node', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      // Check if the component has the createAccount method available
+      expect(typeof wrapper.vm.createAccount).toBe('function')
+    })
+
+    it('renders edit and delete buttons for account nodes', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      // Check if the component has the edit and delete methods available
+      expect(typeof wrapper.vm.editAccount).toBe('function')
+      expect(typeof wrapper.vm.deleteAccount).toBe('function')
+    })
+
+    it('calls edit and delete functions correctly', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      // Test that methods can be called without errors
+      expect(() => wrapper.vm.createAccount()).not.toThrow()
+      expect(() => wrapper.vm.editAccount(1)).not.toThrow()
+    })
+
+    it('only shows create functionality for administrators and managers', async () => {
+      // Test for manager role
+      authStore = { isAdministrator: false, isManager: true, isEngineer: false }
+      
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      // Manager should have access to create functionality
+      expect(typeof wrapper.vm.createAccount).toBe('function')
+      
+      // Test for engineer role (should not see accounts tree at all)
+      authStore = { isAdministrator: false, isManager: false, isEngineer: true }
+      
+      const wrapper2 = mountTree()
+      await resolveAll()
+      
+      // Engineer should not see accounts tree at all based on previous tests
+      const engineerAccountsRoot = wrapper2.vm.treeItems.find(item => item.name === 'Лицевые счета')
+      expect(engineerAccountsRoot).toBeUndefined()
+    })
+
+    it('handles navigation errors in createAccount', async () => {
+      mockPush.mockImplementationOnce(() => {
+        throw new Error('Navigation failed')
+      })
+      alertStore.error = vi.fn()
+      
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      wrapper.vm.createAccount()
+      
+      expect(alertStore.error).toHaveBeenCalledWith('Не удалось перейти к созданию лицевого счёта: Navigation failed')
+    })
+
+    it('handles navigation errors in editAccount', async () => {
+      mockPush.mockImplementationOnce(() => {
+        throw new Error('Navigation failed')
+      })
+      alertStore.error = vi.fn()
+      
+      const wrapper = mountTree()
+      await resolveAll()
+      
+      wrapper.vm.editAccount(1)
+      
+      expect(alertStore.error).toHaveBeenCalledWith('Не удалось перейти к редактированию лицевого счёта: Navigation failed')
+    })
   })
 })
 

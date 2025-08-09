@@ -198,7 +198,6 @@ function requestBlob(method) {
  * @returns {Promise<boolean>} - True if download initiated successfully
  */
 async function downloadFile(fileUrl, defaultFilename) {
-  try {
     const response = await requestBlob('GET')(fileUrl)
     
     let filename = defaultFilename
@@ -221,10 +220,6 @@ async function downloadFile(fileUrl, defaultFilename) {
     a.remove()
     window.URL.revokeObjectURL(objectUrl)
     return true
-  } catch (error) {
-    console.error('Error downloading file:', error)
-    throw error
-  }
 }
 
 function handleResponse(response) {

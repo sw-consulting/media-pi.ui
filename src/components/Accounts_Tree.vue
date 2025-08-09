@@ -22,6 +22,7 @@
 
 <script setup>
 import { onMounted, ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
@@ -29,6 +30,7 @@ import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const accountsStore = useAccountsStore()
 const devicesStore = useDevicesStore()
@@ -167,6 +169,50 @@ const loadChildren = async (item) => {
     loadingNodes.value.delete(nodeId)
   }
 }
+
+// Action button functions
+const canManageAccounts = computed(() => authStore.isAdministrator)
+
+const createAccount = () => {
+  try {
+    router.push('/account/create')
+  } catch (error) {
+    alertStore.error(`Не удалось перейти к созданию лицевого счёта: ${error.message || error}`)
+  }
+}
+
+const editAccount = (accountId) => {
+  try {
+    router.push(`/account/edit/${accountId}`)
+  } catch (error) {
+    alertStore.error(`Не удалось перейти к редактированию лицевого счёта: ${error.message || error}`)
+  }
+}
+
+const deleteAccount = async (accountId) => {
+  const account = accountsStore.accounts.find(a => a.id === accountId)
+  if (!account) return
+  
+  // eslint-disable-next-line no-undef
+  const confirmed = confirm('Вы уверены, что хотите удалить этот лицевой счёт?')
+  
+  if (confirmed) {
+    try {
+      await accountsStore.deleteAccount(accountId)
+      alertStore.success(`Лицевой счёт "${account.name}" успешно удален`)
+    } catch (error) {
+      alertStore.error(`Ошибка при удалении лицевого счёта: ${error.message || error}`)
+    }
+  }
+}
+
+// Helper to extract account ID from tree node ID
+const getAccountIdFromNodeId = (nodeId) => {
+  if (nodeId.startsWith('account-')) {
+    return parseInt(nodeId.replace('account-', ''))
+  }
+  return null
+}
 </script>
 
 <template>
@@ -208,6 +254,25 @@ const loadChildren = async (item) => {
             mdi-circle-small
           </v-icon>
         </template>
+        
+        <template #append="{ item }">
+          <!-- Action buttons for root-accounts node -->
+          <div v-if="item.id === 'root-accounts' && canManageAccounts" class="tree-actions">
+            <button @click.stop="createAccount()" class="anti-btn" title="Создать лицевой счёт">
+              <font-awesome-icon size="1x" icon="fa-solid fa-plus" class="anti-btn" />
+            </button>
+          </div>
+          
+          <!-- Action buttons for account nodes -->
+          <div v-else-if="item.id.startsWith('account-') && canManageAccounts" class="tree-actions">
+            <button @click.stop="editAccount(getAccountIdFromNodeId(item.id))" class="anti-btn" title="Редактировать лицевой счёт">
+              <font-awesome-icon size="1x" icon="fa-solid fa-pen" class="anti-btn" />
+            </button>
+            <button @click.stop="deleteAccount(getAccountIdFromNodeId(item.id))" class="anti-btn" title="Удалить лицевой счёт">
+              <font-awesome-icon size="1x" icon="fa-solid fa-trash-can" class="anti-btn" />
+            </button>
+          </div>
+        </template>
       </v-treeview>
       
       <v-alert
@@ -221,4 +286,25 @@ const loadChildren = async (item) => {
     </v-card>
   </div>
 </template>
+
+<style scoped>
+.tree-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.tree-actions .anti-btn {
+  padding: 2px 6px;
+  margin: 0 2px;
+  font-size: 12px;
+  min-width: auto;
+  height: auto;
+}
+
+.tree-actions .anti-btn:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+</style>
 
