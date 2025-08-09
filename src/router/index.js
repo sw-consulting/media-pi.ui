@@ -81,6 +81,17 @@ const router = createRouter({
       component: () => import('@/views/Accounts_View.vue')
     },
     {
+      path: '/account/create',
+      name: 'Создание лицевого счёта',
+      component: () => import('@/views/Account_CreateView.vue')
+    },
+    {
+      path: '/account/edit/:id',
+      name: 'Настройки лицевого счёта',
+      component: () => import('@/views/Account_EditView.vue'),
+      props: true
+    },
+    {
       path: '/user/edit/:id',
       name: 'Настройки',
       component: () => import('@/views/User_EditView.vue'),
@@ -132,6 +143,18 @@ router.beforeEach(async (to) => {
   if (to.path === '/users') {
     if (!auth.isAdministrator && !auth.isManager && !auth.isEngineer) {
       return `/user/edit/${auth.user.id}`
+    }
+  }
+
+  if (to.path === '/account/create') {
+    if (!auth.isAdministrator) {
+      return '/'
+    }
+  }
+
+  if (to.path.startsWith('/account/edit/')) {
+    if (!auth.isAdministrator && !auth.isManager) {
+      return '/'
     }
   }
 
