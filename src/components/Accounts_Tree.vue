@@ -200,7 +200,7 @@ const deleteAccount = async (accountId) => {
   
   if (confirmed) {
     try {
-      await accountsStore.deleteAccount(accountId)
+      await accountsStore.delete(accountId)
       alertStore.success(`Лицевой счёт "${account.name}" успешно удален`)
     } catch (error) {
       alertStore.error(`Ошибка при удалении лицевого счёта: ${error.message || error}`)

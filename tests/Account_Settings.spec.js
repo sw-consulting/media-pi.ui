@@ -1,3 +1,6 @@
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faCheckDouble, faXmark } from '@fortawesome/free-solid-svg-icons';
+library.add(faCheckDouble, faXmark);
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,6 +26,7 @@
 /* @vitest-environment jsdom */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import AccountSettings from '@/components/Account_Settings.vue'
 
 let authStore
@@ -100,18 +104,21 @@ const mountSettings = (props = {}) => mount({
     id: 1,
     ...props
   },
-  global: {
-    stubs: {
-      'Form': { 
-        template: '<form @submit="$emit(\'submit\', { name: \'Test Account\', managers: [1, 2] })"><slot :errors="{}" :isSubmitting="false" /></form>',
-        emits: ['submit']
-      },
-      'Field': { 
-        template: '<input />', 
-        props: ['name', 'type', 'as', 'multiple'] 
+      global: {
+        stubs: {
+          'Form': { 
+            template: '<form @submit="$emit(\'submit\', { name: \'Test Account\', managers: [1, 2] })"><slot :errors="{}" :isSubmitting="false" /></form>',
+            emits: ['submit']
+          },
+          'Field': { 
+            template: '<input />', 
+            props: ['name', 'type', 'as', 'multiple'] 
+          }
+        },
+        components: {
+          'font-awesome-icon': FontAwesomeIcon
+        }
       }
-    }
-  }
 })
 
 describe('Account_Settings.vue', () => {

@@ -187,13 +187,13 @@ describe('Accounts_Tree.vue', () => {
       
       const accountId = 1
       await wrapper.vm.deleteAccount(accountId)
-      
+
       expect(global.confirm).toHaveBeenCalledWith('Вы уверены, что хотите удалить этот лицевой счёт?')
     })
 
     it('deletes account when deletion is confirmed', async () => {
       global.confirm = vi.fn().mockReturnValue(true)
-      accountsStore.deleteAccount = vi.fn().mockResolvedValue()
+      accountsStore.delete = vi.fn().mockResolvedValue()
       alertStore.success = vi.fn()
       
       const wrapper = mountTree()
@@ -201,28 +201,28 @@ describe('Accounts_Tree.vue', () => {
       
       const accountId = 1
       await wrapper.vm.deleteAccount(accountId)
-      
-      expect(accountsStore.deleteAccount).toHaveBeenCalledWith(accountId)
+
+      expect(accountsStore.delete).toHaveBeenCalledWith(accountId)
       expect(alertStore.success).toHaveBeenCalledWith('Лицевой счёт "Account 1" успешно удален')
     })
 
     it('does not delete account when deletion is cancelled', async () => {
       global.confirm = vi.fn().mockReturnValue(false)
-      accountsStore.deleteAccount = vi.fn()
-      
+      accountsStore.delete = vi.fn()
+
       const wrapper = mountTree()
       await resolveAll()
       
       const accountId = 1
       await wrapper.vm.deleteAccount(accountId)
-      
-      expect(accountsStore.deleteAccount).not.toHaveBeenCalled()
+
+      expect(accountsStore.delete).not.toHaveBeenCalled()
     })
 
     it('handles delete error gracefully', async () => {
       global.confirm = vi.fn().mockReturnValue(true)
       const deleteError = new Error('Delete failed')
-      accountsStore.deleteAccount = vi.fn().mockRejectedValue(deleteError)
+      accountsStore.delete = vi.fn().mockRejectedValue(deleteError)
       alertStore.error = vi.fn()
       
       const wrapper = mountTree()
@@ -231,8 +231,8 @@ describe('Accounts_Tree.vue', () => {
       const accountId = 1
       // Should not throw error
       await expect(wrapper.vm.deleteAccount(accountId)).resolves.toBeUndefined()
-      
-      expect(accountsStore.deleteAccount).toHaveBeenCalledWith(accountId)
+
+      expect(accountsStore.delete).toHaveBeenCalledWith(accountId)
       expect(alertStore.error).toHaveBeenCalledWith('Ошибка при удалении лицевого счёта: Delete failed')
     })
 
