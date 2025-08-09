@@ -29,7 +29,7 @@ const props = defineProps({
     required: true
   }
 })
-const id = parseInt(props.id)
+const id = parseInt(props.id, 10)
 </script>
 
 <template>
