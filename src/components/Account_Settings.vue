@@ -1,51 +1,6 @@
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
-// Permission is hereby gr// Load utry {
-  a}// Load use} // Load use} catch (err) {
-  // Don't block the form if users fail to load, just show a warning
-  if (authStore.isAdministrator) {
-    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
-  }
-} better error handling
-try {
-  await usersStore.getAll()
-} catch (err) {
-  // Don't block the form if users fail to load, just show a warning
-  if (authStore.isAdministrator) {
-    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
-  }
-}) {
-  // Don't block the form if users fail to load, just show a warning
-  if (authStore.isAdministrator) {
-    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
-  }
-} better error handling
-try {
-  await usersStore.getAll()
-} catch (err) {
-  // Don't block the form if users fail to load, just show a warning
-  if (authStore.isAdministrator) {
-    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
-  }
-}rr) {
-  // Don't block the form if users fail to load, just show a warning
-  if (authStore.isAdministrator) {
-    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
-  }sersStore.getAll()
-} catch (err) {
-  // Don't block the form if users fail to load, just show a warning
-  if (authStore.isAdministrator) {
-    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
-  }
-} better error handling
-try {
-  await usersStore.getAll()
-} catch (err) {
-  // Don't block the form if users fail to load, just show a warning
-  if (authStore.isAdministrator) {
-    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
-  }
-}e of charge, to any person obtaining a copy
+// Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
