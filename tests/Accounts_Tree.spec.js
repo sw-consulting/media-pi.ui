@@ -39,6 +39,9 @@ const deviceGroupsStore = {
   groups: [],
   getAll: vi.fn().mockResolvedValue()
 }
+const alertStore = {
+  error: vi.fn()
+}
 
 vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
@@ -61,11 +64,19 @@ vi.mock('@/stores/device.groups.store.js', () => ({
   useDeviceGroupsStore: () => deviceGroupsStore
 }))
 
+vi.mock('@/stores/alert.store.js', () => ({
+  useAlertStore: () => alertStore
+}))
+
 const mountTree = () => mount(AccountsTree, {
   global: {
     stubs: {
       'v-card': { template: '<div><slot /></div>' },
-      'v-treeview': { props: ['items'], template: '<div />' }
+      'v-treeview': { props: ['items'], template: '<div />' },
+      'v-progress-linear': { template: '<div />' },
+      'v-progress-circular': { template: '<div />' },
+      'v-alert': { template: '<div />' },
+      'v-icon': { template: '<div />' }
     }
   }
 })
@@ -93,6 +104,8 @@ describe('Accounts_Tree.vue', () => {
     expect(wrapper.vm.treeItems[0].name).toBe('Нераспределённые устройства')
     expect(wrapper.vm.treeItems[1].name).toBe('Лицевые счета')
     expect(wrapper.vm.treeItems[1].children[0].name).toBe('Account 1')
+    // With lazy loading, unassigned devices children are empty initially
+    expect(wrapper.vm.treeItems[0].children).toEqual([])
   })
 
   it('shows only accounts for manager', async () => {
@@ -107,7 +120,9 @@ describe('Accounts_Tree.vue', () => {
     await resolveAll()
     expect(wrapper.vm.treeItems.length).toBe(1)
     expect(wrapper.vm.treeItems[0].name).toBe('Лицевые счета')
-    expect(wrapper.vm.treeItems[0].children[0].children[0].name).toBe('Нераспределённые устройства')
+    expect(wrapper.vm.treeItems[0].children[0].name).toBe('Account 1')
+    // With lazy loading, children are empty initially
+    expect(wrapper.vm.treeItems[0].children[0].children).toEqual([])
   })
 
   it('shows only unassigned devices for engineer', async () => {
@@ -119,6 +134,8 @@ describe('Accounts_Tree.vue', () => {
     await resolveAll()
     expect(wrapper.vm.treeItems.length).toBe(1)
     expect(wrapper.vm.treeItems[0].name).toBe('Нераспределённые устройства')
+    // With lazy loading, children are empty initially
+    expect(wrapper.vm.treeItems[0].children).toEqual([])
   })
 })
 

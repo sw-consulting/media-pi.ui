@@ -21,15 +21,13 @@
 // This file is a part of Media Pi frontend application
 
 import { computed } from 'vue'
-import { useAuthStore } from '@/stores/auth.store.js'
 
 /**
  * Get the appropriate accounts caption based on user role
+ * @param {Object} authStore - The auth store instance
  * @returns {ComputedRef<string|null>} The caption for accounts section or null if no role
  */
-export function useAccountsCaption() {
-  const authStore = useAuthStore()
-  
+export function useAccountsCaption(authStore) {
   return computed(() => {
     if (authStore.isEngineer) return 'Нераспределённые устройства'
     if (authStore.isManager) return 'Устройства'

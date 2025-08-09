@@ -27,14 +27,19 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
+import { useAlertStore } from '@/stores/alert.store.js'
 
-const accountsCaption = useAccountsCaption()
 const authStore = useAuthStore()
 const accountsStore = useAccountsStore()
 const devicesStore = useDevicesStore()
 const deviceGroupsStore = useDeviceGroupsStore()
+const alertStore = useAlertStore()
+
+const accountsCaption = useAccountsCaption(authStore)
 
 const loading = ref(true)
+const loadedNodes = ref(new Set())
+const loadingNodes = ref(new Set())
 
 // Role-based access helper functions
 const canViewUnassignedDevices = computed(() => 
@@ -47,56 +52,121 @@ const canViewAccounts = computed(() =>
 
 onMounted(async () => {
   try {
-    await Promise.all([
-      accountsStore.getAll(),
-      devicesStore.getAll(),
-      deviceGroupsStore.getAll()
-    ])
+    // Only load accounts initially for lazy loading
+    await accountsStore.getAll()
+  } catch (error) {
+    alertStore.error('Не удалось загрузить данные: ' + (error.message || error))
   } finally {
     loading.value = false
   }
 })
 
-const unassignedRoot = computed(() => {
-  if (!canViewUnassignedDevices.value) return null
-  const children = (devicesStore.devices || [])
-    .filter(d => !d.accountId || d.accountId === 0)
-    .map(d => ({ id: `device-${d.id}`, name: d.name }))
-  return { id: 'root-unassigned', name: 'Нераспределённые устройства', children }
-})
-
-const accountsRoot = computed(() => {
-  if (!canViewAccounts.value) return null
-  const accounts = (accountsStore.accounts || []).map(acc => {
-    const devices = (devicesStore.devices || []).filter(d => d.accountId === acc.id)
-    const unassigned = devices
-      .filter(d => !d.deviceGroupId || d.deviceGroupId === 0)
-      .map(d => ({ id: `device-${d.id}`, name: d.name }))
-    const groups = (deviceGroupsStore.groups || [])
-      .filter(g => g.accountId === acc.id)
-      .map(g => ({
-        id: `group-${g.id}`,
-        name: g.name,
-        children: devices
-          .filter(d => d.deviceGroupId === g.id)
-          .map(d => ({ id: `device-${d.id}`, name: d.name }))
-      }))
-    const children = []
-    if (unassigned.length > 0) {
-      children.push({ id: `account-${acc.id}-unassigned`, name: 'Нераспределённые устройства', children: unassigned })
-    }
-    children.push(...groups)
-    return { id: `account-${acc.id}`, name: acc.name, children }
-  })
-  return { id: 'root-accounts', name: 'Лицевые счета', children: accounts }
-})
-
+// Initial tree structure (only top-level nodes with lazy loading markers)
 const treeItems = computed(() => {
   const items = []
-  if (unassignedRoot.value) items.push(unassignedRoot.value)
-  if (accountsRoot.value) items.push(accountsRoot.value)
+  
+  if (canViewUnassignedDevices.value) {
+    const hasChildren = !loadedNodes.value.has('root-unassigned')
+    items.push({
+      id: 'root-unassigned',
+      name: 'Нераспределённые устройства',
+      children: hasChildren ? [] : getUnassignedDevices()
+    })
+  }
+  
+  if (canViewAccounts.value) {
+    const accounts = (accountsStore.accounts || []).map(acc => {
+      const hasChildren = !loadedNodes.value.has(`account-${acc.id}`)
+      return {
+        id: `account-${acc.id}`,
+        name: acc.name,
+        children: hasChildren ? [] : getAccountChildren(acc.id)
+      }
+    })
+    
+    items.push({
+      id: 'root-accounts',
+      name: 'Лицевые счета',
+      children: accounts
+    })
+  }
+  
   return items
 })
+
+// Helper function to get unassigned devices
+const getUnassignedDevices = () => {
+  return (devicesStore.devices || [])
+    .filter(d => !d.accountId || d.accountId === 0)
+    .map(d => ({ id: `device-${d.id}`, name: d.name }))
+}
+
+// Helper function to get children for a specific account
+const getAccountChildren = (accountId) => {
+  const devices = (devicesStore.devices || []).filter(d => d.accountId === accountId)
+  const unassigned = devices
+    .filter(d => !d.deviceGroupId || d.deviceGroupId === 0)
+    .map(d => ({ id: `device-${d.id}`, name: d.name }))
+  
+  const groups = (deviceGroupsStore.groups || [])
+    .filter(g => g.accountId === accountId)
+    .map(g => ({
+      id: `group-${g.id}`,
+      name: g.name,
+      children: devices
+        .filter(d => d.deviceGroupId === g.id)
+        .map(d => ({ id: `device-${d.id}`, name: d.name }))
+    }))
+  
+  const children = []
+  if (unassigned.length > 0) {
+    children.push({ 
+      id: `account-${accountId}-unassigned`, 
+      name: 'Нераспределённые устройства', 
+      children: unassigned 
+    })
+  }
+  children.push(...groups)
+  
+  return children
+}
+
+// Lazy loading function with exception handling
+const loadChildren = async (item) => {
+  const nodeId = item.id
+  
+  // Prevent duplicate loading
+  if (loadedNodes.value.has(nodeId) || loadingNodes.value.has(nodeId)) {
+    return
+  }
+  
+  loadingNodes.value.add(nodeId)
+  
+  try {
+    if (nodeId === 'root-unassigned') {
+      // Load devices for unassigned root
+      await devicesStore.getAll()
+      loadedNodes.value.add(nodeId)
+      
+    } else if (nodeId.startsWith('account-')) {
+      // Load devices and groups for specific account
+      await Promise.all([
+        devicesStore.getAll(),
+        deviceGroupsStore.getAll()
+      ])
+      loadedNodes.value.add(nodeId)
+    }
+    
+    // Force reactivity update
+    treeItems.value
+    
+  } catch (error) {
+    alertStore.error(`Не удалось загрузить данные для "${item.name}": ` + (error.message || error))
+    console.error('Lazy loading failed for', nodeId, error)
+  } finally {
+    loadingNodes.value.delete(nodeId)
+  }
+}
 </script>
 
 <template>
@@ -105,13 +175,49 @@ const treeItems = computed(() => {
     <hr class="hr" />
 
     <v-card>
+      <v-progress-linear 
+        v-if="loading" 
+        indeterminate 
+        color="primary"
+        class="mb-2"
+      />
+      
       <v-treeview
         v-if="!loading"
         :items="treeItems"
         item-title="name"
         item-value="id"
+        :load-children="loadChildren"
         open-on-click
-      />
+      >
+        <template #prepend="{ item }">
+          <v-progress-circular
+            v-if="loadingNodes.has(item.id)"
+            indeterminate
+            size="16"
+            width="2"
+            color="primary"
+          />
+          <v-icon v-else-if="item.children && item.children.length === 0" size="16">
+            mdi-folder-outline
+          </v-icon>
+          <v-icon v-else-if="item.children && item.children.length > 0" size="16">
+            mdi-folder-open-outline
+          </v-icon>
+          <v-icon v-else size="16">
+            mdi-circle-small
+          </v-icon>
+        </template>
+      </v-treeview>
+      
+      <v-alert
+        v-if="!loading && treeItems.length === 0"
+        type="info"
+        variant="outlined"
+        class="ma-4"
+      >
+        Нет данных для отображения
+      </v-alert>
     </v-card>
   </div>
 </template>

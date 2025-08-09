@@ -33,7 +33,7 @@ const { height } = useDisplay()
 import { useAuthStore } from '@/stores/auth.store.js'
 const authStore = useAuthStore()
 
-const accountsCaption = useAccountsCaption()
+const accountsCaption = useAccountsCaption(authStore)
 
 const statusStore = useStatusStore()
 statusStore.fetchStatus().catch(() => {})
