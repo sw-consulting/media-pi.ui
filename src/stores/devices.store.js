@@ -74,7 +74,7 @@ export const useDevicesStore = defineStore('devices', () => {
     loading.value = true
     error.value = null
     try {
-      const url = accountId == null ? `${baseUrl}/by-account` : `${baseUrl}/by-account/${accountId}`
+      const url = accountId === null ? `${baseUrl}/by-account` : `${baseUrl}/by-account/${accountId}`
       const result = await fetchWrapper.get(url)
       devices.value = result || []
     } catch (err) {
