@@ -27,6 +27,7 @@ export const fetchWrapper = {
   get: request('GET'),
   post: request('POST'),
   put: request('PUT'),
+  patch: request('PATCH'),
   delete: request('DELETE'),
   postFile: requestFile('POST'),
   getFile: requestBlob('GET'),
