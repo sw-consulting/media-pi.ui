@@ -42,8 +42,9 @@ const accountsStore = useAccountsStore()
 await rolesStore.ensureLoaded()
 try {
   await accountsStore.getAll()
-} catch {
-  // ignore account loading errors for now
+} catch (err) {
+  console.error('Failed to load accounts:', err);
+  alertStore.error('Не удалось загрузить список аккаунтов. Попробуйте обновить страницу или обратитесь к администратору.');
 }
 
 const props = defineProps({
