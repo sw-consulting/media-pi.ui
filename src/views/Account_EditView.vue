@@ -35,5 +35,11 @@ const id = parseInt(props.id, 10)
 <template>
   <Suspense>
     <AccountSettings :register="false" :id="id" />
+    <template #fallback>
+      <div class="text-center m-5">
+        <span class="spinner-border spinner-border-lg align-center"></span>
+        <div class="mt-2">Загрузка информации о лицевом счёте...</div>
+      </div>
+    </template>
   </Suspense>
 </template>

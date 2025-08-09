@@ -1,6 +1,51 @@
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
-// Permission is hereby granted, free of charge, to any person obtaining a copy
+// Permission is hereby gr// Load utry {
+  a}// Load use} // Load use} catch (err) {
+  // Don't block the form if users fail to load, just show a warning
+  if (authStore.isAdministrator) {
+    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
+  }
+} better error handling
+try {
+  await usersStore.getAll()
+} catch (err) {
+  // Don't block the form if users fail to load, just show a warning
+  if (authStore.isAdministrator) {
+    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
+  }
+}) {
+  // Don't block the form if users fail to load, just show a warning
+  if (authStore.isAdministrator) {
+    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
+  }
+} better error handling
+try {
+  await usersStore.getAll()
+} catch (err) {
+  // Don't block the form if users fail to load, just show a warning
+  if (authStore.isAdministrator) {
+    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
+  }
+}rr) {
+  // Don't block the form if users fail to load, just show a warning
+  if (authStore.isAdministrator) {
+    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
+  }sersStore.getAll()
+} catch (err) {
+  // Don't block the form if users fail to load, just show a warning
+  if (authStore.isAdministrator) {
+    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
+  }
+} better error handling
+try {
+  await usersStore.getAll()
+} catch (err) {
+  // Don't block the form if users fail to load, just show a warning
+  if (authStore.isAdministrator) {
+    alertStore.error('Не удалось загрузить список пользователей для выбора менеджеров')
+  }
+}e of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
@@ -58,6 +103,8 @@ const schema = Yup.object().shape({
 
 let account = ref({ name: '', managers: [] })
 const { loading, error } = storeToRefs(accountsStore)
+const componentError = ref(null)
+const initialLoading = ref(false)
 
 // Access control
 if (!isRegister() && !authStore.isAdministrator && !authStore.isManager) {
@@ -68,21 +115,38 @@ if (isRegister() && !authStore.isAdministrator) {
 }
 
 if (!isRegister()) {
+  initialLoading.value = true
   const accountRef = storeToRefs(accountsStore)
-  account = accountRef.account
+  account.value = accountRef.account
   try {
     await accountsStore.getById(props.id)
+    if (!account.value) {
+      throw new Error(`Лицевой счёт с ID ${props.id} не найден`)
+    }
     account.value.managers = account.value.managers || account.value.managerIds || []
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
+    } else if (err.status === 404) {
+      componentError.value = `Лицевой счёт с ID ${props.id} не найден`
+      alertStore.error(componentError.value)
     } else {
-      alertStore.error(err.message || err)
+      componentError.value = err.message || err
+      alertStore.error(`Ошибка загрузки лицевого счёта: ${componentError.value}`)
     }
+  } finally {
+    initialLoading.value = false
   }
 }
 
-await usersStore.getAll().catch(() => {})
+// Load users with better error handling
+try {
+  await usersStore.getAll()
+} catch (err) {
+  if (authStore.isAdministrator) {
+    alertStore.error(`Не удалось загрузить список для выбора менеджеров: ${err.message || err}`)
+  }
+}
 
 const managerOptions = computed(() => {
   return (usersStore.users || [])
@@ -114,18 +178,33 @@ function getButton() {
 }
 
 async function onSubmit(values) {
+  componentError.value = null
   try {
+    const payload = { 
+      name: values.name.trim(), 
+      managerIds: account.value.managers || [] 
+    }
+    
     if (isRegister()) {
-      await accountsStore.add({ name: values.name, managerIds: account.value.managers })
+      await accountsStore.add(payload)
+      alertStore.success('Лицевой счёт успешно создан')
     } else {
-      await accountsStore.update(props.id, { name: values.name, managerIds: account.value.managers })
+      await accountsStore.update(props.id, payload)
+      alertStore.success('Настройки лицевого счёта сохранены')
     }
     router.push('/accounts')
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
+    } else if (err.status === 409) {
+      componentError.value = 'Лицевой счёт с таким названием уже существует'
+      alertStore.error(componentError.value)
+    } else if (err.status === 422) {
+      componentError.value = 'Проверьте корректность введённых данных'
+      alertStore.error(componentError.value)
     } else {
-      alertStore.error(err.message || err)
+      componentError.value = err.message || err
+      alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} лицевого счёта: ${componentError.value}`)
     }
   }
 }
@@ -146,8 +225,10 @@ async function onSubmit(values) {
           v-model="account.name"
           class="form-control input"
           :class="{ 'is-invalid': errors.name }"
-          placeholder="Название"
+          placeholder="Введите название лицевого счёта"
+          :disabled="isSubmitting"
         />
+        <div v-if="errors.name" class="invalid-feedback">{{ errors.name }}</div>
       </div>
 
       <div class="form-group">
@@ -158,37 +239,61 @@ async function onSubmit(values) {
           multiple
           v-model="account.managers"
           class="form-control input"
+          :class="{ 'is-invalid': errors.managers }"
+          :disabled="isSubmitting || !managerOptions.length"
         >
+          <option v-if="!managerOptions.length" disabled>
+            Нет доступных пользователей
+          </option>
           <option v-for="option in managerOptions" :key="option.value" :value="option.value">
             {{ option.text }}
           </option>
         </select>
         <ul v-else>
           <li v-for="name in selectedManagerNames" :key="name">{{ name }}</li>
+          <li v-if="!selectedManagerNames.length">Менеджеры не назначены</li>
         </ul>
+        <div v-if="errors.managers" class="invalid-feedback">{{ errors.managers }}</div>
       </div>
 
       <div class="form-group mt-5">
-        <button class="button" type="submit" :disabled="isSubmitting">
+        <button class="button" type="submit" :disabled="isSubmitting || componentError">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
           {{ getButton() }}
         </button>
-        <button class="button" type="button" @click="$router.push('/accounts')">
-          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
+        <button class="button" type="button" @click="$router.push('/accounts')" :disabled="isSubmitting">
           Отменить
         </button>
       </div>
+      
+      <!-- Component-level errors -->
+      <div v-if="componentError" class="alert alert-danger mt-3 mb-0">
+        {{ componentError }}
+        <button @click="componentError = null" class="btn btn-link close">×</button>
+      </div>
+      
+      <!-- Form validation errors -->
       <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
+      <div v-if="errors.managers" class="alert alert-danger mt-3 mb-0">{{ errors.managers }}</div>
     </Form>
+    
+    <!-- Global alert messages -->
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
     </div>
-    <div v-if="loading" class="text-center m-5">
+    
+    <!-- Store loading and error states -->
+    <div v-if="loading || initialLoading" class="text-center m-5">
       <span class="spinner-border spinner-border-lg align-center"></span>
+      <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
-    <div v-if="error" class="text-center m-5">
+    
+    <div v-if="error && !componentError" class="text-center m-5">
       <div class="text-danger">Ошибка при загрузке информации о счёте: {{ error }}</div>
+      <button @click="$router.go(0)" class="btn btn-primary mt-2">
+        Обновить страницу
+      </button>
     </div>
   </div>
 </template>
