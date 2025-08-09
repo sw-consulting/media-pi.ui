@@ -21,10 +21,25 @@
 // This file is a part of Media Pi frontend application
 
 import router from '@/router'
+import { useAuthStore } from '@/stores/auth.store.js'
 
 /**
  * Redirects user to the application's default route.
+ * Users with any role go to /accounts
+ * Users without a role go to their edit page
  */
 export function redirectToDefaultRoute() {
-  router.push('/')
+  const auth = useAuthStore()
+  
+  if (!auth.user) {
+    router.push('/login')
+    return
+  }
+  
+  // Users with any role go to accounts, users with no role go to their edit form
+  if (auth.isAdministrator || auth.isManager || auth.isEngineer) {
+    router.push('/accounts')
+  } else {
+    router.push(`/user/edit/${auth.user.id}`)
+  }
 }

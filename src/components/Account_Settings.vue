@@ -61,13 +61,7 @@ const { loading, error } = storeToRefs(accountsStore)
 const componentError = ref(null)
 const initialLoading = ref(false)
 
-// Access control
-if (!isRegister() && !authStore.isAdministrator && !authStore.isManager) {
-  redirectToDefaultRoute()
-}
-if (isRegister() && !authStore.isAdministrator) {
-  redirectToDefaultRoute()
-}
+redirectToDefaultRoute()
 
 if (!isRegister()) {
   initialLoading.value = true
@@ -170,7 +164,7 @@ async function onSubmit(values) {
 </script>
 
 <template>
-  <div class="settings table">
+  <div class="settings form-2">
     <h1 class="orange">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
     <hr class="hr" />
 
