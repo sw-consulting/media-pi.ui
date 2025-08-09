@@ -21,11 +21,73 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
-
+import { onMounted, ref, computed } from 'vue'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
+import { useAuthStore } from '@/stores/auth.store.js'
+import { useAccountsStore } from '@/stores/accounts.store.js'
+import { useDevicesStore } from '@/stores/devices.store.js'
+import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
 
 const accountsCaption = useAccountsCaption()
+const authStore = useAuthStore()
+const accountsStore = useAccountsStore()
+const devicesStore = useDevicesStore()
+const deviceGroupsStore = useDeviceGroupsStore()
 
+const loading = ref(true)
+
+onMounted(async () => {
+  try {
+    await Promise.all([
+      accountsStore.getAll(),
+      devicesStore.getAll(),
+      deviceGroupsStore.getAll()
+    ])
+  } finally {
+    loading.value = false
+  }
+})
+
+const unassignedRoot = computed(() => {
+  if (!(authStore.isAdministrator || authStore.isEngineer)) return null
+  const children = (devicesStore.devices || [])
+    .filter(d => !d.accountId || d.accountId === 0)
+    .map(d => ({ id: `device-${d.id}`, name: d.name }))
+  return { id: 'root-unassigned', name: 'Нераспределённые устройства', children }
+})
+
+const accountsRoot = computed(() => {
+  if (!(authStore.isAdministrator || authStore.isManager)) return null
+  const accounts = (accountsStore.accounts || []).map(acc => {
+    const devices = (devicesStore.devices || []).filter(d => d.accountId === acc.id)
+    const unassigned = devices
+      .filter(d => !d.deviceGroupId || d.deviceGroupId === 0)
+      .map(d => ({ id: `device-${d.id}`, name: d.name }))
+    const groups = (deviceGroupsStore.groups || [])
+      .filter(g => g.accountId === acc.id)
+      .map(g => ({
+        id: `group-${g.id}`,
+        name: g.name,
+        children: devices
+          .filter(d => d.deviceGroupId === g.id)
+          .map(d => ({ id: `device-${d.id}`, name: d.name }))
+      }))
+    const children = []
+    if (unassigned.length > 0) {
+      children.push({ id: `account-${acc.id}-unassigned`, name: 'Нераспределённые устройства', children: unassigned })
+    }
+    children.push(...groups)
+    return { id: `account-${acc.id}`, name: acc.name, children }
+  })
+  return { id: 'root-accounts', name: 'Лицевые счета', children: accounts }
+})
+
+const treeItems = computed(() => {
+  const items = []
+  if (unassignedRoot.value) items.push(unassignedRoot.value)
+  if (accountsRoot.value) items.push(accountsRoot.value)
+  return items
+})
 </script>
 
 <template>
@@ -34,6 +96,14 @@ const accountsCaption = useAccountsCaption()
     <hr class="hr" />
 
     <v-card>
+      <v-treeview
+        v-if="!loading"
+        :items="treeItems"
+        item-title="name"
+        item-value="id"
+        open-on-click
+      />
     </v-card>
-    </div>
+  </div>
 </template>
+
