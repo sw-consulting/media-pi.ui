@@ -191,10 +191,10 @@ async function onSubmit(values) {
       @submit="onSubmit"
       v-slot="{ errors, isSubmitting }"
     >
-      <div class="form-group-1">
-        <label for="name" class="label-1">Название:</label>
+      <div class="form-group">
+        <label for="name" class="label">Название:</label>
         <Field name="name" type="text" id="name" :disabled="isSubmitting"
-          class="form-control input-1" :class="{ 'is-invalid': errors.name }"
+          class="form-control input" :class="{ 'is-invalid': errors.name }"
           placeholder="Введите название лицевого счёта"
         />
       </div>
@@ -212,8 +212,8 @@ async function onSubmit(values) {
         />
       </div>
 
-      <div v-else class="form-group-1">
-        <label class="label-1">Менеджеры:</label>
+      <div v-else class="form-group">
+        <label class="label">Менеджеры:</label>
         <ul>
           <li v-for="name in selectedManagerNames" :key="name">{{ name }}</li>
           <li v-if="!selectedManagerNames.length">Менеджеры не назначены</li>

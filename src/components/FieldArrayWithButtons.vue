@@ -71,9 +71,9 @@ defineProps({
 
 <template>
   <FieldArray :name="name" v-slot="{ fields, push, remove }">
-    <div v-for="(field, idx) in fields" :key="field.key" class="form-group-1 mb-2">
-      <label v-if="idx === 0" class="label-1">{{ label }}:</label>
-      <div v-else class="label-1"></div>
+    <div v-for="(field, idx) in fields" :key="field.key" class="form-group mb-2">
+      <label v-if="idx === 0" class="label">{{ label }}:</label>
+      <div v-else class="label"></div>
       
       <div class="field-container">
         <!-- Plus button positioned to the left for first option -->
@@ -87,7 +87,7 @@ defineProps({
         />
         
         <Field :name="`${name}[${idx}]`" :as="fieldType" :id="`${name}_${idx}`"
-          class="form-control input-1 field-container-select" :class="{ 'is-invalid': hasError }"
+          class="form-control input field-container-select" :class="{ 'is-invalid': hasError }"
           v-bind="fieldProps"
         >
           <option v-if="fieldType === 'select'" value="">{{ placeholder }}</option>

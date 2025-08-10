@@ -39,6 +39,12 @@ const FieldStub = {
   template: '<component :is="as ? as : \'input\'" :id="id" :type="type"><slot /></component>'
 }
 
+const FieldArrayWithButtonsStub = {
+  name: 'FieldArrayWithButtons',
+  props: ['name', 'label', 'options', 'hasError', 'addTooltip', 'removeTooltip', 'placeholder'],
+  template: '<div class="field-array-stub">{{ label }}</div>'
+}
+
 let isAdmin
 let isManager
 const mockUser = ref({ id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: [11] })
@@ -127,7 +133,7 @@ describe('User_Settings.vue real component', () => {
   it('fetches user by id when editing', async () => {
     mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     expect(getById).toHaveBeenCalledWith(5, true)
@@ -137,7 +143,7 @@ describe('User_Settings.vue real component', () => {
     Object.defineProperty(window, 'location', { writable: true, value: { href: 'http://localhost/path' } })
     const wrapper = mount(Parent, {
       props: { register: true },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -155,7 +161,7 @@ describe('User_Settings.vue real component', () => {
     isAdmin = true
     const wrapper = mount(Parent, {
       props: { register: true },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -169,7 +175,7 @@ describe('User_Settings.vue real component', () => {
     isAdmin = true
     const wrapper = mount(Parent, {
       props: { register: false, id: 7 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -183,7 +189,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = [11]
     const wrapper = mount(Parent, {
       props: { register: false, id: 1 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -203,7 +209,7 @@ describe('User_Settings.vue real component', () => {
     
     const wrapper = mount(Parent, {
       props: { register: true },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     
@@ -222,7 +228,7 @@ describe('User_Settings.vue real component', () => {
     
     const wrapper = mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     
@@ -243,7 +249,7 @@ describe('User_Settings.vue real component', () => {
     Object.defineProperty(window, 'location', { writable: true, value: { href: 'http://localhost/path' } })
     const wrapper = mount(Parent, {
       props: { register: true },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     
@@ -262,7 +268,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = [21, 11, 1] // Multiple roles: Engineer, Manager, Admin
     const wrapper = mount(Parent, {
       props: { register: false, id: 1 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -274,7 +280,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = []
     const wrapper = mount(Parent, {
       props: { register: false, id: 1 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -287,7 +293,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = [11]
     const wrapper = mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -308,7 +314,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = [11]
     const wrapper = mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -327,7 +333,7 @@ describe('User_Settings.vue real component', () => {
   it('calls ensureLoaded from roles store during component setup', async () => {
     mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
+      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
     expect(ensureLoaded).toHaveBeenCalled()

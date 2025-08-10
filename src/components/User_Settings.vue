@@ -35,6 +35,7 @@ import { getRoleName, isManager } from '@/helpers/user.helpers.js'
 import { useRolesStore } from '@/stores/roles.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { redirectToDefaultRoute } from '../helpers/default.route'
+import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
 const rolesStore = useRolesStore()
 const accountsStore = useAccountsStore()
@@ -261,46 +262,26 @@ function onSubmit(values) {
     >
       <div class="form-group">
         <label for="lastName" class="label">Фамилия:</label>
-        <Field
-          name="lastName"
-          id="lastName"
-          type="text"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.lastName }"
-          placeholder="Фамилия"
+        <Field  name="lastName" id="lastName" type="text" class="form-control input"
+          :class="{ 'is-invalid': errors.lastName }" placeholder="Фамилия"
         />
       </div>
       <div class="form-group">
         <label for="firstName" class="label">Имя:</label>
-        <Field
-          name="firstName"
-          id="firstName"
-          type="text"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.firstName }"
-          placeholder="Имя"
+        <Field name="firstName" id="firstName" type="text" class="form-control input"
+          :class="{ 'is-invalid': errors.firstName }"  placeholder="Имя"
         />
       </div>
       <div class="form-group">
         <label for="patronymic" class="label">Отчество:</label>
-        <Field
-          name="patronymic"
-          id="patronymic"
-          type="text"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.patronymic }"
-          placeholder="Отчество"
+        <Field  name="patronymic" id="patronymic" type="text" class="form-control input"
+          :class="{ 'is-invalid': errors.patronymic }" placeholder="Отчество"
         />
       </div>
       <div class="form-group">
         <label for="email" class="label">Адрес электронной почты:</label>
-        <Field
-          name="email"
-          id="email"
-          autocomplete="off"
-          type="email"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.email }"
+        <Field  name="email" id="email" autocomplete="off" type="email"
+          class="form-control input" :class="{ 'is-invalid': errors.email }"
           placeholder="Адрес электронной почты"
         />
       </div>
@@ -311,28 +292,14 @@ function onSubmit(values) {
                  class="form-control input password" :class="{ 'is-invalid': errors.password }"
                  placeholder="Пароль"
           />
-          <button
-            type="button"
-            @click="
-              (event) => {
+          <button  type="button" class="button-o" @click=" (event) => {
                 event.preventDefault()
                 showPassword = !showPassword
               }
-            "
-            class="button-o"
+            "       
           >
-            <font-awesome-icon
-              size="1x"
-              v-if="!showPassword"
-              icon="fa-solid fa-eye"
-              class="button-o-c"
-            />
-            <font-awesome-icon
-              size="1x"
-              v-if="showPassword"
-              icon="fa-solid fa-eye-slash"
-              class="button-o-c"
-            />
+            <font-awesome-icon size="1x" v-if="!showPassword" icon="fa-solid fa-eye"  class="button-o-c"/>
+            <font-awesome-icon size="1x" v-if="showPassword" icon="fa-solid fa-eye-slash" class="button-o-c" />
           </button>
         </div>
       </div>
@@ -344,43 +311,24 @@ function onSubmit(values) {
                  placeholder="Пароль"
           />
           <button
-            type="button"
+            type="button" class="button-o"
             @click="
               (event) => {
                 event.preventDefault()
                 showPassword2 = !showPassword2
               }
-            "
-            class="button-o"
+            "            
           >
-            <font-awesome-icon
-              size="1x"
-              v-if="!showPassword2"
-              icon="fa-solid fa-eye"
-              class="button-o-c"
-            />
-            <font-awesome-icon
-              size="1x"
-              v-if="showPassword2"
-              icon="fa-solid fa-eye-slash"
-              class="button-o-c"
-            />
+            <font-awesome-icon size="1x" v-if="!showPassword2" icon="fa-solid fa-eye" class="button-o-c" />
+            <font-awesome-icon size="1x" v-if="showPassword2" icon="fa-solid fa-eye-slash" class="button-o-c" />
           </button>
         </div>
       </div>
 
        <div v-if="showAndEditCredentials()" class="form-group">
         <label for="roleSelect" class="label">Роль:</label>
-        <select
-          id="roleSelect"
-          v-model="selectedRole"
-          class="form-control input"
-        >
-          <option
-            v-for="option in roleOptions"
-            :key="option.value"
-            :value="option.value"
-          >
+        <select id="roleSelect" v-model="selectedRole" class="form-control input">
+          <option v-for="option in roleOptions" :key="option.value" :value="option.value" >
             {{ option.text }}
           </option>
         </select>
@@ -391,16 +339,16 @@ function onSubmit(values) {
           <em>{{ getRoleName(user) }}</em>
         </span>
       </div>
-      <div v-if="showAndEditCredentials() && isSelectedRoleManager" class="form-group">
-        <label for="accountIds" class="label">Лицевые счета:</label>
-        <Field name="accountIds" as="select" id="accountIds"  multiple
-               class="form-control input" :class="{ 'is-invalid': errors.accountIds }"
-        >
-          <option v-for="option in accountOptions" :key="option.value"  :value="option.value" >
-            {{ option.text }}
-          </option>
-        </Field>
-        <div v-if="errors.accountIds" class="invalid-feedback">{{ errors.accountIds }}</div>
+      <div v-if="showAndEditCredentials() && isSelectedRoleManager">
+        <FieldArrayWithButtons 
+          name="accountIds"
+          label="Лицевые счета"
+          :options="accountOptions"
+          :hasError="!!errors.accountIds"
+          addTooltip="Добавить лицевой счет"
+          removeTooltip="Удалить лицевой счет"
+          placeholder="Выберите лицевой счет:"
+        />
       </div>
 
       <div v-if="showCredentials()" class="form-group">

@@ -259,10 +259,10 @@ describe('FieldArrayWithButtons', () => {
     
     // Check container classes
     expect(wrapper.find('.field-container').exists()).toBe(true)
-    expect(wrapper.find('.form-group-1.mb-2').exists()).toBe(true)
+    expect(wrapper.find('.form-group.mb-2').exists()).toBe(true)
     
     // Check field classes
-    expect(wrapper.find('.form-control.input-1.field-container-select').exists()).toBe(true)
+    expect(wrapper.find('.form-control.input.field-container-select').exists()).toBe(true)
     
     // Check button classes
     expect(wrapper.find('.button-o-c.field-container-plus').exists()).toBe(true)
