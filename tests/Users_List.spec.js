@@ -337,9 +337,8 @@ describe('Users_List.vue', () => {
     // Verify that the delete function was called
     expect(deleteUserFn).toHaveBeenCalledWith(1)
     
-    // Verify that the error function was called with the error
-    expect(errorFn).toHaveBeenCalledWith(expect.any(Error))
-    expect(errorFn.mock.calls[0][0].message).toBe(errorMessage)
+    // Verify that the error function was called with the formatted error message
+    expect(errorFn).toHaveBeenCalledWith(`Ошибка при удалении пользователя: ${errorMessage}`)
     
     // Verify that getAll was not called again (since the delete failed)
     expect(getAll).toHaveBeenCalledTimes(1) // Only the initial call on mount

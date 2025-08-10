@@ -29,6 +29,7 @@ import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import { useConfirmation } from '@/helpers/confirmation.js'
 import ActionButton from '@/components/ActionButton.vue'
 
 const router = useRouter()
@@ -37,6 +38,7 @@ const accountsStore = useAccountsStore()
 const devicesStore = useDevicesStore()
 const deviceGroupsStore = useDeviceGroupsStore()
 const alertStore = useAlertStore()
+const { confirmDelete } = useConfirmation()
 const { alert } = storeToRefs(alertStore)
 const { getAccountsTreeState } = storeToRefs(authStore)
 
@@ -228,8 +230,7 @@ const deleteAccount = async (item) => {
   const account = accountsStore.accounts.find(a => a.id === accountId)
   if (!account) return
   
-  // eslint-disable-next-line no-undef
-  const confirmed = confirm('Вы уверены, что хотите удалить этот лицевой счёт?')
+  const confirmed = await confirmDelete(account.name, 'лицевой счёт')
   
   if (confirmed) {
     try {

@@ -48,11 +48,11 @@ onMounted(async () => {
 })
 
 import { useAlertStore } from '@/stores/alert.store.js'
+import { useConfirmation } from '@/helpers/confirmation.js'
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
 
-import { useConfirm } from 'vuetify-use-dialog'
-const confirm = useConfirm()
+const { confirmDelete } = useConfirmation()
 
 function userSettings(item) {
   const id = item.id
@@ -86,29 +86,17 @@ function filterUsers(value, query, item) {
 }
 
 async function deleteUser(item) {
-  const content = 'Удалить пользователя "' + item.firstName + ' ' + item.lastName + '" ?'
-  const result = await confirm({
-    title: 'Подтверждение',
-    confirmationText: 'Удалить',
-    cancellationText: 'Не удалять',
-    dialogProps: {
-      width: '30%',
-      minWidth: '250px'
-    },
-    confirmationButtonProps: {
-      color: 'orange-darken-3'
-    },
-    content: content
-  })
+  const userName = `${item.firstName} ${item.lastName}`
+  const confirmed = await confirmDelete(userName, 'пользователя')
 
-  if (result) {
+  if (confirmed) {
     usersStore
       .delete(item.id)
       .then(() => {
         usersStore.getAll()
       })
       .catch((error) => {
-        alertStore.error(error)
+        alertStore.error('Ошибка при удалении пользователя: ' + (error.message || error))
       })
   }
 }

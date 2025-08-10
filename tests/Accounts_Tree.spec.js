@@ -48,6 +48,14 @@ const mockPush = vi.fn()
 // Mock global confirm function
 global.confirm = vi.fn()
 
+// Mock confirmation helper
+const mockConfirmDelete = vi.fn().mockResolvedValue(true)
+vi.mock('@/helpers/confirmation.js', () => ({
+  useConfirmation: () => ({
+    confirmDelete: mockConfirmDelete
+  })
+}))
+
 vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
   return { ...actual, storeToRefs: (store) => store }
@@ -186,7 +194,7 @@ describe('Accounts_Tree.vue', () => {
     })
 
     it('shows confirm dialog when delete button is clicked', async () => {
-      global.confirm = vi.fn().mockReturnValue(false)
+      mockConfirmDelete.mockResolvedValue(false)
       
       const wrapper = mountTree()
       await resolveAll()
@@ -194,11 +202,11 @@ describe('Accounts_Tree.vue', () => {
       const accountId = 1
       await wrapper.vm.deleteAccount(accountId)
 
-      expect(global.confirm).toHaveBeenCalledWith('Вы уверены, что хотите удалить этот лицевой счёт?')
+      expect(mockConfirmDelete).toHaveBeenCalledWith('Account 1', 'лицевой счёт')
     })
 
     it('deletes account when deletion is confirmed', async () => {
-      global.confirm = vi.fn().mockReturnValue(true)
+      mockConfirmDelete.mockResolvedValue(true)
       accountsStore.delete = vi.fn().mockResolvedValue()
       alertStore.success = vi.fn()
       
@@ -212,7 +220,7 @@ describe('Accounts_Tree.vue', () => {
     })
 
     it('does not delete account when deletion is cancelled', async () => {
-      global.confirm = vi.fn().mockReturnValue(false)
+      mockConfirmDelete.mockResolvedValue(false)
       accountsStore.delete = vi.fn()
 
       const wrapper = mountTree()
@@ -225,7 +233,7 @@ describe('Accounts_Tree.vue', () => {
     })
 
     it('handles delete error gracefully', async () => {
-      global.confirm = vi.fn().mockReturnValue(true)
+      mockConfirmDelete.mockResolvedValue(true)
       const deleteError = new Error('Delete failed')
       accountsStore.delete = vi.fn().mockRejectedValue(deleteError)
       alertStore.error = vi.fn()
