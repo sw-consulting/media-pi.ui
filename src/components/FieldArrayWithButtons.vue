@@ -91,9 +91,11 @@ defineProps({
           v-bind="fieldProps"
         >
           <option v-if="fieldType === 'select'" value="">{{ placeholder }}</option>
-          <option v-if="fieldType === 'select'" v-for="option in options" :key="option.value" :value="option.value">
-            {{ option.text }}
-          </option>
+          <template v-if="fieldType === 'select'">
+            <option v-for="option in options" :key="option.value" :value="option.value">
+              {{ option.text }}
+            </option>
+          </template>
         </Field>
         
         <!-- Minus button always after select -->
