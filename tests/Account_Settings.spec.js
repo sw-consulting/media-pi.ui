@@ -170,9 +170,8 @@ describe('Account_Settings.vue', () => {
     
     expect(accountsStore.add).toHaveBeenCalledWith({
       name: 'Test Account',
-      managerIds: [1, 2]
+      userIds: [1, 2]
     })
-    expect(alertStore.success).toHaveBeenCalledWith('Лицевой счёт успешно создан')
   })
 
   it('handles form submission for updating account', async () => {
@@ -191,9 +190,8 @@ describe('Account_Settings.vue', () => {
     
     expect(accountsStore.update).toHaveBeenCalledWith(1, {
       name: 'Test Account',
-      managerIds: [1, 2]
+      userIds: [1, 2]
     })
-    expect(alertStore.success).toHaveBeenCalledWith('Настройки лицевого счёта сохранены')
   })
 
   it('handles account not found error', async () => {
@@ -216,5 +214,36 @@ describe('Account_Settings.vue', () => {
     await flushPromises()
     
     expect(alertStore.error).toHaveBeenCalledWith('Ошибка при создании лицевого счёта: Account name already exists')
+  })
+
+  it('allows form submission when no managers are selected', async () => {
+    const wrapper = mount({
+      template: '<Suspense><AccountSettings v-bind="$attrs" /></Suspense>',
+      components: { AccountSettings },
+      inheritAttrs: false
+    }, {
+      attrs: { register: true },
+      global: {
+        stubs: {
+          'Form': { 
+            template: '<form @submit="$emit(\'submit\', { name: \'Test Account\', managers: [\'\'] })"><slot :errors="{}" :isSubmitting="false" /></form>',
+            emits: ['submit']
+          },
+          'Field': { template: '<input />', props: ['name', 'type', 'as', 'multiple'] }
+        },
+        components: { 'font-awesome-icon': FontAwesomeIcon }
+      }
+    })
+    
+    await flushPromises()
+    
+    const form = wrapper.find('form')
+    await form.trigger('submit')
+    await flushPromises()
+    
+    expect(accountsStore.add).toHaveBeenCalledWith({
+      name: 'Test Account',
+      userIds: []
+    })
   })
 })

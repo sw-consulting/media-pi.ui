@@ -137,16 +137,6 @@ const accountOptions = computed(() => {
   }))
 })
 
-const selectedAccountNames = computed(() => {
-  const ids = user.value?.accountIds || []
-  return ids
-    .map(id => {
-      const acc = accountsStore.getAccountById
-        ? accountsStore.getAccountById(id)
-        : (accountsStore.accounts || []).find(a => a.id === id)
-      return acc ? acc.name : `#${id}`
-    })
-})
 
 if (!isRegister()) {
   ;({ user } = storeToRefs(usersStore))

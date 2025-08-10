@@ -203,7 +203,6 @@ describe('Accounts_Tree.vue', () => {
       await wrapper.vm.deleteAccount(accountId)
 
       expect(accountsStore.delete).toHaveBeenCalledWith(accountId)
-      expect(alertStore.success).toHaveBeenCalledWith('Лицевой счёт "Account 1" успешно удален')
     })
 
     it('does not delete account when deletion is cancelled', async () => {

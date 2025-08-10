@@ -53,11 +53,17 @@ const { alert } = storeToRefs(alertStore)
 
 const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя'),
-  managers: Yup.array().of(Yup.number())
+  managers: Yup.array().of(
+    Yup.mixed().test(
+      'is-number-or-empty', 
+      'Invalid manager selection', 
+      value => value === '' || (typeof value === 'number' && !isNaN(value))
+    )
+  )
 })
 
-let account = ref({ name: '', managers: [ ] })
-const { loading, error } = storeToRefs(accountsStore) 
+let account = ref({ name: '', managers: [''] })
+const { loading } = storeToRefs(accountsStore) 
 const componentError = ref(null)
 const initialLoading = ref(false)
 
@@ -97,7 +103,6 @@ if (!isRegister()) {
   }
 }
 
-// Load users with better error handling
 try {
   await usersStore.getAll()
 } catch (err) {
@@ -139,9 +144,15 @@ function getButton() {
 async function onSubmit(values) {
   componentError.value = null
   try {
+    // Filter out empty string values and convert to numbers
+    const filteredManagers = (values.managers || [])
+      .filter(manager => manager !== '' && manager !== null && manager !== undefined)
+      .map(manager => typeof manager === 'string' ? parseInt(manager, 10) : manager)
+      .filter(manager => !isNaN(manager))
+    
     const payload = { 
       name: values.name.trim(), 
-      userIds: values.managers || [] 
+      userIds: filteredManagers 
     }
     
     if (isRegister()) {
@@ -149,7 +160,7 @@ async function onSubmit(values) {
     } else {
       await accountsStore.update(props.id, payload)
     }
-    router.push('/accounts')
+    router.go(-1)
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
@@ -186,37 +197,37 @@ async function onSubmit(values) {
         />
       </div>
 
-<div v-if="canEditManagers()">
-  <FieldArray name="managers" v-slot="{ fields, push, remove }">
-    <div v-for="(field, idx) in fields" :key="field.key" class="form-group-1 mb-2">
-      <label v-if="idx === 0" class="label-1">Менеджеры:</label>
-      <div v-else class="label-1"></div>
-      
-      <div class="manager-field-container">
-        <!-- Plus button positioned to the left for first option -->
-        <button v-if="idx === 0" type="button" class="button-o-c plus-button" @click="push('')">
-          <font-awesome-icon size="1x" icon="fa-solid fa-plus" />
-        </button>
-        
-        <Field :name="`managers[${idx}]`" as="select" :id="'manager' + idx"
-          class="form-control input-1 manager-select" :class="{ 'is-invalid': errors.managers }"
-        >
-          <option value="">Выберите менеджера:</option>
-          <option v-for="option in managerOptions" :key="option.value" :value="option.value">
-            {{ option.text }}
-          </option>
-        </Field>
-        
-        <!-- Minus button always after select -->
-        <button type="button" class="button-o-c ml-2" @click="remove(idx)">
-          <font-awesome-icon size="1x" icon="fa-solid fa-minus" />
-        </button>
+      <div v-if="canEditManagers()">
+        <FieldArray name="managers" v-slot="{ fields, push, remove }">
+          <div v-for="(field, idx) in fields" :key="field.key" class="form-group-1 mb-2">
+            <label v-if="idx === 0" class="label-1">Менеджеры:</label>
+            <div v-else class="label-1"></div>
+            
+            <div class="manager-field-container">
+              <!-- Plus button positioned to the left for first option -->
+              <button v-if="idx === 0" type="button" class="button-o-c plus-button" @click="push('')">
+                <font-awesome-icon size="1x" icon="fa-solid fa-plus" />
+              </button>
+              
+              <Field :name="`managers[${idx}]`" as="select" :id="'manager' + idx"
+                class="form-control input-1 manager-select" :class="{ 'is-invalid': errors.managers }"
+              >
+                <option value="">Выберите менеджера:</option>
+                <option v-for="option in managerOptions" :key="option.value" :value="option.value">
+                  {{ option.text }}
+                </option>
+              </Field>
+              
+              <!-- Minus button always after select -->
+              <button type="button" class="button-o-c ml-2" @click="remove(idx)">
+                <font-awesome-icon size="1x" icon="fa-solid fa-minus" />
+              </button>
+            </div>
+          </div>
+        </FieldArray>
       </div>
-    </div>
-  </FieldArray>
-</div>
 
-<div v-else class="form-group-1">
+      <div v-else class="form-group-1">
         <label class="label-1">Менеджеры:</label>
         <ul>
           <li v-for="name in selectedManagerNames" :key="name">{{ name }}</li>
@@ -233,7 +244,7 @@ async function onSubmit(values) {
         <button
           class="button secondary"
           type="button"
-          @click="$router.push('/accounts')"
+          @click="$router.go(-1)"
         >
           <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
           Отменить

@@ -82,16 +82,6 @@
   background-color: rgba(var(--v-theme-surface), 1);
 }
 
-/* Highlight rows that have issues */
-.order-has-issues {
-  color: #d3223f !important;
-  background-color: #dc7786;
-}
-
-.order-has-issues:hover {
-  color: #d80327 !important;
-}
-
 /* Disabled button styles */
 .disabled-btn {
   opacity: 0.5;
@@ -136,46 +126,6 @@
   padding-right: 10px;
 }
 
-.label-with-link {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  width: 80%;
-  margin-bottom: 0.25rem;
-}
-
-.label-with-link .label {
-  width: auto;
-  flex-shrink: 0;
-  margin-bottom: 0;
-}
-
-.description-container {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  width: 100%;
-}
-
-.description-container .input {
-  flex: 1;
-  min-width: 0;
-}
-
-.product-link {
-  color: #2563eb;
-  text-decoration: underline;
-  font-size: 0.875rem;
-  cursor: pointer;
-  flex-shrink: 0;
-  white-space: nowrap;
-  align-self: center;
-}
-
-.product-link:hover {
-  color: #1d4ed8;
-}
 
 .hr {
   position: relative;
@@ -184,15 +134,6 @@
   height: 4px;
   background: #1976d2;
   margin-bottom: 50px;
-}
-
-.hr-light {
-  position: relative;
-  top: 0px;
-  border: none;
-  height: 2px;
-  background: gray;
-  margin-bottom: 20px;
 }
 
 .input {
@@ -240,14 +181,6 @@
 
 .select {
   padding-top: 0.1rem;
-}
-
-.select-o {
-  width: 55%;
-}
-
-.label-o-f {
-  width: 25%;
 }
 
 .button-o {
@@ -498,17 +431,6 @@ a,
   box-shadow: 0px 2px 10px rgba(EE, EE, EE, 0.3);
 }
 
-
-.manager-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  position: relative;
-}
-
-.manager-row:last-child {
-  margin-bottom: 0;
-}
 
 .manager-field-container {
   position: relative;
@@ -859,40 +781,6 @@ a,
   table-layout: fixed;
 }
 
-.truncated-cell {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
-  cursor: default;
-}
-
-.truncated-cell:hover {
-  cursor: help;
-}
-
-.status-cell {
-  font-weight: 500;
-  border-radius: 4px;
-  padding: 2px 8px;
-  display: inline-block;
-  min-width: 80px;
-  text-align: center;
-}
-
-/* Row background colors based on checkStatusId */
-:deep(.v-data-table__tbody tr.order-has-issues) {
-  background-color: rgba(244, 67, 54, 0.08) !important;
-}
-
-:deep(.v-data-table__tbody tr.order-has-issues:hover) {
-  background-color: rgba(244, 67, 54, 0.12) !important;
-}
-
-:deep(.v-data-table__tbody tr.order-has-issues td) {
-  background-color: transparent !important;
-}
-
 /* Custom pagination styling to match Vuetify's default exactly */
 .v-data-table-footer {
   display: flex;
@@ -1130,21 +1018,6 @@ a,
 }
 
 
-.product-link {
-  color: rgba(var(--v-theme-primary), 1);
-  text-decoration: none;
-  padding: 0.25rem 0;
-  display: inline-block;
-  font-size: 1rem;
-  width: 60%;
-  flex-grow: 1;
-}
-
-.product-link:hover {
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 .no-link {
   color: #999;
   font-style: italic;
@@ -1232,14 +1105,6 @@ a,
   padding: 0.2rem;
 }
 
-.form-compact .product-link-inline {
-  font-size: 0.875rem;    /* Make product links smaller */
-}
-
-.form-compact .no-link {
-  font-size: 0.875rem;    /* Make no-link text smaller */
-}
-
 /*
 .form-compact .button {
   font-size: 0.875rem;    
@@ -1257,9 +1122,6 @@ a,
   padding-top: 0.5rem;    /* Reduce padding */
 }
 
-.form-compact .stopwords-text {
-  font-size: 0.875rem;    /* Make stopwords text smaller */
-}
 /*
 .form-compact .primary-heading {
   font-size: 1.5rem;       
