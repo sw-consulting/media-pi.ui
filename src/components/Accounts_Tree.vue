@@ -1,21 +1,7 @@
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), const deleteAccount = async (item) => {
-  const accountId = typeof item === 'object' ? item.id : item
-  const account = accountsStore.accounts.find(a => a.id === accountId)
-  if (!account) return
-  
-  // eslint-disable-next-line no-undef
-  const confirmed = confirm('Вы уверены, что хотите удалить этот лицевой счёт?')
-  
-  if (confirmed) {
-    try {
-      await accountsStore.delete(accountId)
-    } catch (error) {
-      alertStore.error(`Ошибка при удалении лицевого счёта: ${error.message || error}`)
-    }
-  } the Software without restriction, including without limitation the rights
+// of this software and associated documentation files (the "Software")
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
@@ -237,7 +223,8 @@ const editAccount = (item) => {
   }
 }
 
-const deleteAccount = async (accountId) => {
+const deleteAccount = async (item) => {
+  const accountId = typeof item === 'object' ? item.id : item
   const account = accountsStore.accounts.find(a => a.id === accountId)
   if (!account) return
   

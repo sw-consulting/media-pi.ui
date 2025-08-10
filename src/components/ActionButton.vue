@@ -25,7 +25,7 @@
 
 <script setup>
 defineProps({
-  item: { type: Object, required: true },
+  item: { required: true },
   icon: { type: String, required: true },
   tooltipText: { type: String, required: true },
   iconSize: { type: String, default: '1x' },
@@ -41,7 +41,7 @@ defineEmits(['click'])
         type="button" 
         @click="$emit('click', item)" 
         class="anti-btn" 
-        :class="{ 'disabled-btn': disabled }"
+        :class="[{ 'disabled-btn': disabled }, $attrs.class]"
         v-bind="props"
         :disabled="disabled"
       >

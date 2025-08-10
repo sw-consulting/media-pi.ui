@@ -107,8 +107,14 @@ const mountSettings = (props = {}) => mount({
       global: {
         stubs: {
           'Form': { 
-            template: '<form @submit="$emit(\'submit\', { name: \'Test Account\', managers: [1, 2] })"><slot :errors="{}" :isSubmitting="false" /></form>',
-            emits: ['submit']
+            template: '<div data-testid="form" @submit="onSubmit"><slot :errors="{}" :isSubmitting="false" /></div>',
+            props: ['validation-schema', 'initial-values'],
+            emits: ['submit'],
+            methods: {
+              onSubmit() {
+                this.$emit('submit', { name: 'Test Account', managers: [1, 2] })
+              }
+            }
           },
           'Field': { 
             template: '<input />', 
@@ -124,6 +130,10 @@ const mountSettings = (props = {}) => mount({
                 mockRemove: vi.fn()
               }
             }
+          },
+          'VTooltip': {
+            template: '<div><slot /></div>',
+            props: ['text', 'disabled']
           }
         },
         components: {
@@ -153,7 +163,7 @@ describe('Account_Settings.vue', () => {
     const wrapper = mountSettings({ register: true })
     await flushPromises()
     
-    expect(wrapper.find('form').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="form"]').exists()).toBe(true)
     expect(accountsStore.getById).not.toHaveBeenCalled()
   })
 
@@ -168,17 +178,17 @@ describe('Account_Settings.vue', () => {
     await flushPromises()
     
     expect(accountsStore.getById).toHaveBeenCalledWith(1)
-    expect(wrapper.find('form').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="form"]').exists()).toBe(true)
   })
 
   it('handles form submission for creating account', async () => {
     const wrapper = mountSettings({ register: true })
     await flushPromises()
     
-    const form = wrapper.find('form')
+    const form = wrapper.find('[data-testid="form"]')
     await form.trigger('submit')
     await flushPromises()
-    
+
     expect(accountsStore.add).toHaveBeenCalledWith({
       name: 'Test Account',
       userIds: [1, 2]
@@ -194,11 +204,11 @@ describe('Account_Settings.vue', () => {
     
     const wrapper = mountSettings({ register: false, id: 1 })
     await flushPromises()
-    
-    const form = wrapper.find('form')
+
+    const form = wrapper.find('[data-testid="form"]')
     await form.trigger('submit')
     await flushPromises()
-    
+
     expect(accountsStore.update).toHaveBeenCalledWith(1, {
       name: 'Test Account',
       userIds: [1, 2]
@@ -220,7 +230,7 @@ describe('Account_Settings.vue', () => {
     const wrapper = mountSettings({ register: true })
     await flushPromises()
     
-    const form = wrapper.find('form')
+    const form = wrapper.find('[data-testid="form"]')
     await form.trigger('submit')
     await flushPromises()
     
@@ -237,8 +247,14 @@ describe('Account_Settings.vue', () => {
       global: {
         stubs: {
           'Form': { 
-            template: '<form @submit="$emit(\'submit\', { name: \'Test Account\', managers: [\'\'] })"><slot :errors="{}" :isSubmitting="false" /></form>',
-            emits: ['submit']
+            template: '<div data-testid="form" @submit="onSubmit"><slot :errors="{}" :isSubmitting="false" /></div>',
+            props: ['validation-schema', 'initial-values'],
+            emits: ['submit'],
+            methods: {
+              onSubmit() {
+                this.$emit('submit', { name: 'Test Account', managers: [''] })
+              }
+            }
           },
           'Field': { template: '<input />', props: ['name', 'type', 'as', 'multiple'] },
           'FieldArray': {
@@ -251,6 +267,10 @@ describe('Account_Settings.vue', () => {
                 mockRemove: vi.fn()
               }
             }
+          },
+          'VTooltip': {
+            template: '<div><slot /></div>',
+            props: ['text', 'disabled']
           }
         },
         components: { 'font-awesome-icon': FontAwesomeIcon }
@@ -259,7 +279,7 @@ describe('Account_Settings.vue', () => {
     
     await flushPromises()
     
-    const form = wrapper.find('form')
+    const form = wrapper.find('[data-testid="form"]')
     await form.trigger('submit')
     await flushPromises()
     

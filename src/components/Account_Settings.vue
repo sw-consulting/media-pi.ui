@@ -33,6 +33,8 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { UserRoleConstants } from '@/helpers/user.helpers.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import ActionButton from '@/components/ActionButton.vue'
+
 
 const props = defineProps({
   register: {
@@ -205,9 +207,14 @@ async function onSubmit(values) {
             
             <div class="manager-field-container">
               <!-- Plus button positioned to the left for first option -->
-              <button v-if="idx === 0" type="button" class="button-o-c plus-button" @click="push('')">
-                <font-awesome-icon size="1x" icon="fa-solid fa-plus" />
-              </button>
+              <ActionButton 
+                v-if="idx === 0"
+                icon="fa-solid fa-plus"
+                :item="''"
+                @click="push('')"
+                class="button-o-c plus-button"
+                tooltip-text="Добавить менеджера"
+              />
               
               <Field :name="`managers[${idx}]`" as="select" :id="'manager' + idx"
                 class="form-control input-1 manager-select" :class="{ 'is-invalid': errors.managers }"
@@ -219,10 +226,14 @@ async function onSubmit(values) {
               </Field>
               
               <!-- Minus button always after select -->
-              <button type="button" class="button-o-c ml-2" @click="remove(idx)"
-                      :disabled="fields.length === 1">
-                <font-awesome-icon size="1x" icon="fa-solid fa-minus" />
-              </button>
+              <ActionButton
+                icon="fa-solid fa-minus"
+                :item="idx"
+                @click="remove(idx)"
+                :disabled="fields.length === 1"
+                class="button-o-c ml-2"
+                tooltip-text="Удалить менеджера"
+              />
             </div>
           </div>
         </FieldArray>

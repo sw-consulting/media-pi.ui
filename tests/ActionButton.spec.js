@@ -106,6 +106,42 @@ describe('ActionButton', () => {
       const fontAwesome = wrapper.findComponent({ name: 'FontAwesomeIcon' })
       expect(fontAwesome.props('icon')).toBe('fa-solid fa-trash-can')
     })
+
+    it('applies custom CSS classes through $attrs', () => {
+      const wrapper = mount(ActionButton, {
+        props: defaultProps,
+        attrs: {
+          class: 'custom-class button-o-c'
+        },
+        global: {
+          plugins: [vuetify],
+          components: globalComponents
+        }
+      })
+      
+      const button = wrapper.find('button')
+      expect(button.classes()).toContain('anti-btn') // default class
+      expect(button.classes()).toContain('custom-class') // custom class
+      expect(button.classes()).toContain('button-o-c') // custom class
+    })
+
+    it('applies disabled classes correctly with custom classes', () => {
+      const wrapper = mount(ActionButton, {
+        props: { ...defaultProps, disabled: true },
+        attrs: {
+          class: 'custom-disabled-class'
+        },
+        global: {
+          plugins: [vuetify],
+          components: globalComponents
+        }
+      })
+      
+      const button = wrapper.find('button')
+      expect(button.classes()).toContain('anti-btn') // default class
+      expect(button.classes()).toContain('disabled-btn') // disabled class
+      expect(button.classes()).toContain('custom-disabled-class') // custom class
+    })
   })
 
   describe('interactions', () => {
@@ -188,6 +224,85 @@ describe('ActionButton', () => {
     it('has default values for optional props', () => {
       expect(ActionButton.props?.iconSize?.default).toBe('1x')
       expect(ActionButton.props?.disabled?.default).toBe(false)
+    })
+  })
+
+  describe('item prop flexibility', () => {
+    it('accepts object items', async () => {
+      const objectItem = { id: 1, name: 'Test Object' }
+      const wrapper = createWrapper({ item: objectItem })
+      const button = wrapper.find('button')
+      
+      await button.trigger('click')
+      
+      expect(wrapper.emitted('click')).toBeTruthy()
+      expect(wrapper.emitted('click')[0]).toEqual([objectItem])
+    })
+
+    it('accepts string items', async () => {
+      const stringItem = 'test-string'
+      const wrapper = createWrapper({ item: stringItem })
+      const button = wrapper.find('button')
+      
+      await button.trigger('click')
+      
+      expect(wrapper.emitted('click')).toBeTruthy()
+      expect(wrapper.emitted('click')[0]).toEqual([stringItem])
+    })
+
+    it('accepts number items', async () => {
+      const numberItem = 42
+      const wrapper = createWrapper({ item: numberItem })
+      const button = wrapper.find('button')
+      
+      await button.trigger('click')
+      
+      expect(wrapper.emitted('click')).toBeTruthy()
+      expect(wrapper.emitted('click')[0]).toEqual([numberItem])
+    })
+
+    it('accepts boolean items', async () => {
+      const booleanItem = true
+      const wrapper = createWrapper({ item: booleanItem })
+      const button = wrapper.find('button')
+      
+      await button.trigger('click')
+      
+      expect(wrapper.emitted('click')).toBeTruthy()
+      expect(wrapper.emitted('click')[0]).toEqual([booleanItem])
+    })
+
+    it('accepts array items', async () => {
+      const arrayItem = [1, 2, 3]
+      const wrapper = createWrapper({ item: arrayItem })
+      const button = wrapper.find('button')
+      
+      await button.trigger('click')
+      
+      expect(wrapper.emitted('click')).toBeTruthy()
+      expect(wrapper.emitted('click')[0]).toEqual([arrayItem])
+    })
+
+    it('accepts null items', async () => {
+      const nullItem = null
+      const wrapper = createWrapper({ item: nullItem })
+      const button = wrapper.find('button')
+      
+      await button.trigger('click')
+      
+      expect(wrapper.emitted('click')).toBeTruthy()
+      expect(wrapper.emitted('click')[0]).toEqual([nullItem])
+    })
+
+    it('accepts undefined items', async () => {
+      const undefinedItem = undefined
+      const wrapper = createWrapper({ item: undefinedItem })
+      const button = wrapper.find('button')
+      
+      await button.trigger('click')
+      
+      expect(wrapper.emitted('click')).toBeTruthy()
+      expect(wrapper.emitted('click')[0]).toEqual([undefinedItem])
     })
   })
 
