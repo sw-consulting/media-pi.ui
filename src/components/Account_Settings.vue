@@ -24,7 +24,7 @@
 import { ref, computed } from 'vue'
 import router from '@/router'
 import { storeToRefs } from 'pinia'
-import { Form, Field } from 'vee-validate'
+import { Form, Field, FieldArray } from 'vee-validate'
 import * as Yup from 'yup'
 
 import { useAccountsStore } from '@/stores/accounts.store.js'
@@ -56,8 +56,8 @@ const schema = Yup.object().shape({
   managers: Yup.array().of(Yup.number())
 })
 
-let account = ref({ name: '', managers: [] })
-const { loading, error } = storeToRefs(accountsStore)
+let account = ref({ name: '', managers: [ ] })
+const { loading, error } = storeToRefs(accountsStore) 
 const componentError = ref(null)
 const initialLoading = ref(false)
 
@@ -74,9 +74,13 @@ if (!isRegister()) {
     const validManagerIds = (usersStore.users || [])
       .filter(u => Array.isArray(u.roles) && u.roles.includes(UserRoleConstants.AccountManager))
       .map(u => u.id)
+    let filteredManagers = (loadedAccount.userIds || []).filter(id => validManagerIds.includes(id))
+    if (filteredManagers.length === 0) {
+      filteredManagers = ['']
+    }
     account.value = {
       name: loadedAccount.name || '',
-      managers: (loadedAccount.userIds || []).filter(id => validManagerIds.includes(id))
+      managers: filteredManagers
     }
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
@@ -164,7 +168,7 @@ async function onSubmit(values) {
 </script>
 
 <template>
-  <div class="settings form-2">
+  <div class="settings form-2 form-compact">
     <h1 class="primary-heading">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
     <hr class="hr" />
 
@@ -174,44 +178,50 @@ async function onSubmit(values) {
       @submit="onSubmit"
       v-slot="{ errors, isSubmitting }"
     >
-      <div class="form-group">
-        <label for="name" class="label">Название:</label>
-        <Field
-          name="name"
-          type="text"
-          id="name"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.name }"
+      <div class="form-group-1">
+        <label for="name" class="label-1">Название:</label>
+        <Field name="name" type="text" id="name" :disabled="isSubmitting"
+          class="form-control input-1" :class="{ 'is-invalid': errors.name }"
           placeholder="Введите название лицевого счёта"
-          :disabled="isSubmitting"
         />
-        <div v-if="errors.name" class="invalid-feedback">{{ errors.name }}</div>
       </div>
 
-      <div class="form-group">
-        <label for="managers" class="label">Менеджеры:</label>
-        <Field
-          v-if="canEditManagers()"
-          name="managers"
-          as="select"
-          id="managers"
-          multiple
-          class="form-control input"
-          :class="{ 'is-invalid': errors.managers }"
-          :disabled="isSubmitting || !managerOptions.length"
+<div v-if="canEditManagers()">
+  <FieldArray name="managers" v-slot="{ fields, push, remove }">
+    <div v-for="(field, idx) in fields" :key="field.key" class="form-group-1 mb-2">
+      <label v-if="idx === 0" class="label-1">Менеджеры:</label>
+      <div v-else class="label-1"></div>
+      
+      <div class="manager-field-container">
+        <!-- Plus button positioned to the left for first option -->
+        <button v-if="idx === 0" type="button" class="button-o-c plus-button" @click="push('')">
+          <font-awesome-icon size="1x" icon="fa-solid fa-plus" />
+        </button>
+        
+        <Field :name="`managers[${idx}]`" as="select" :id="'manager' + idx"
+          class="form-control input-1 manager-select" :class="{ 'is-invalid': errors.managers }"
         >
-          <option v-if="!managerOptions.length" disabled>
-            Нет доступных пользователей
-          </option>
+          <option value="">Выберите менеджера:</option>
           <option v-for="option in managerOptions" :key="option.value" :value="option.value">
             {{ option.text }}
           </option>
         </Field>
-        <ul v-else>
+        
+        <!-- Minus button always after select -->
+        <button type="button" class="button-o-c ml-2" @click="remove(idx)">
+          <font-awesome-icon size="1x" icon="fa-solid fa-minus" />
+        </button>
+      </div>
+    </div>
+  </FieldArray>
+</div>
+
+<div v-else class="form-group-1">
+        <label class="label-1">Менеджеры:</label>
+        <ul>
           <li v-for="name in selectedManagerNames" :key="name">{{ name }}</li>
           <li v-if="!selectedManagerNames.length">Менеджеры не назначены</li>
         </ul>
-        <div v-if="errors.managers" class="invalid-feedback">{{ errors.managers }}</div>
       </div>
 
       <div class="form-group mt-8">
@@ -230,12 +240,6 @@ async function onSubmit(values) {
         </button>
       </div>
 
-      <!-- Component-level errors -->
-      <div v-if="componentError" class="alert alert-danger mt-3 mb-0">
-        {{ componentError }}
-        <button @click="componentError = null" class="btn btn-link close">×</button>
-      </div>
-      
       <!-- Form validation errors -->
       <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
       <div v-if="errors.managers" class="alert alert-danger mt-3 mb-0">{{ errors.managers }}</div>
@@ -253,11 +257,5 @@ async function onSubmit(values) {
       <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
     
-    <div v-if="error && !componentError" class="text-center m-5">
-      <div class="text-danger">Ошибка при загрузке информации о счёте: {{ error }}</div>
-      <button @click="$router.go(0)" class="btn btn-primary mt-2">
-        Обновить страницу
-      </button>
-    </div>
   </div>
 </template>

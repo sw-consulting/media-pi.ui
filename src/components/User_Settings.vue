@@ -313,14 +313,9 @@ function onSubmit(values) {
       <div class="form-group">
         <label for="password" class="label">Пароль:</label>
         <div class="password-wrapper">
-          <Field
-            name="password"
-            id="password"
-            ref="password"
-            :type="showPassword ? 'text' : 'password'"
-            class="form-control input password"
-            :class="{ 'is-invalid': errors.password }"
-            placeholder="Пароль"
+          <Field name="password" id="password" ref="password" :type="showPassword ? 'text' : 'password'"
+                 class="form-control input password" :class="{ 'is-invalid': errors.password }"
+                 placeholder="Пароль"
           />
           <button
             type="button"
@@ -350,13 +345,9 @@ function onSubmit(values) {
       <div class="form-group">
         <label for="password2" class="label">Пароль ещё раз:</label>
         <div class="password-wrapper">
-          <Field
-            name="password2"
-            id="password2"
-            :type="showPassword2 ? 'text' : 'password'"
-            class="form-control input password"
-            :class="{ 'is-invalid': errors.password2 }"
-            placeholder="Пароль"
+          <Field name="password2" id="password2" :type="showPassword2 ? 'text' : 'password'" 
+                 class="form-control input password"  :class="{ 'is-invalid': errors.password2 }"
+                 placeholder="Пароль"
           />
           <button
             type="button"
@@ -402,13 +393,8 @@ function onSubmit(values) {
       </div>
       <div v-if="showAndEditCredentials() && isSelectedRoleManager" class="form-group">
         <label for="accountIds" class="label">Лицевые счета:</label>
-        <Field
-          name="accountIds"
-          as="select"
-          id="accountIds"
-          multiple
-          class="form-control input"
-          :class="{ 'is-invalid': errors.accountIds }"
+        <Field name="accountIds" as="select" id="accountIds"  multiple
+               class="form-control input" :class="{ 'is-invalid': errors.accountIds }"
         >
           <option
             v-for="option in accountOptions"
