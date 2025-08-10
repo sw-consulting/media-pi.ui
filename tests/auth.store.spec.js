@@ -364,4 +364,141 @@ describe('auth store', () => {
     })
   })
 
+  describe('Accounts Tree State Management', () => {
+    beforeEach(() => {
+      setActivePinia(createPinia())
+      vi.clearAllMocks()
+      localStorage.clear()
+    })
+
+    it('initializes with empty tree state when no user', () => {
+      const store = useAuthStore()
+      
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
+    })
+
+    it('saves tree state for current user', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+      
+      store.saveAccountsTreeState('account-123', ['root-accounts', 'account-123'])
+      
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: 'account-123',
+        expandedNodes: ['root-accounts', 'account-123']
+      })
+      
+      expect(localStorage.setItem).toHaveBeenCalledWith('accountsTreeState', expect.any(String))
+    })
+
+    it('does not save tree state when no user', () => {
+      const store = useAuthStore()
+      store.user = null
+      
+      store.saveAccountsTreeState('account-123', ['root-accounts'])
+      
+      expect(localStorage.setItem).not.toHaveBeenCalledWith('accountsTreeState', expect.any(String))
+    })
+
+    it('returns empty state when user not logged in', () => {
+      const store = useAuthStore()
+      store.user = null
+      
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
+    })
+
+    it('handles corrupted localStorage data gracefully', () => {
+      localStorage.setItem('accountsTreeState', 'invalid-json')
+      
+      setActivePinia(createPinia())
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+      
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
+    })
+
+    it('clears tree state for current user', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+      
+      // First save some state
+      store.saveAccountsTreeState('account-123', ['root-accounts'])
+      expect(store.getAccountsTreeState.selectedNode).toBe('account-123')
+      
+      // Then clear it
+      store.clearAccountsTreeState()
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
+      
+      expect(localStorage.setItem).toHaveBeenCalledWith('accountsTreeState', '{}')
+    })
+
+    it('does not clear tree state when no user', () => {
+      const store = useAuthStore()
+      store.user = null
+      
+      store.clearAccountsTreeState()
+      
+      expect(localStorage.setItem).not.toHaveBeenCalledWith('accountsTreeState', expect.any(String))
+    })
+
+    it('maintains separate state for different users', () => {
+      const store = useAuthStore()
+      
+      // User 1
+      store.user = { id: 1, email: 'user1@example.com' }
+      store.saveAccountsTreeState('account-123', ['root-accounts'])
+      const user1State = store.getAccountsTreeState
+      
+      // User 2
+      store.user = { id: 2, email: 'user2@example.com' }
+      store.saveAccountsTreeState('account-456', ['root-accounts', 'account-456'])
+      const user2State = store.getAccountsTreeState
+      
+      // Switch back to User 1
+      store.user = { id: 1, email: 'user1@example.com' }
+      
+      expect(store.getAccountsTreeState).toEqual(user1State)
+      expect(user1State.selectedNode).toBe('account-123')
+      expect(user2State.selectedNode).toBe('account-456')
+    })
+
+    it('handles null and undefined values in saveAccountsTreeState', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+      
+      store.saveAccountsTreeState(null, undefined)
+      
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
+    })
+
+    it('creates a copy of expandedNodes array to prevent mutations', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+      
+      const originalExpanded = ['root-accounts', 'account-123']
+      store.saveAccountsTreeState('account-123', originalExpanded)
+      
+      // Modify the original array
+      originalExpanded.push('new-item')
+      
+      // Stored state should not be affected
+      expect(store.getAccountsTreeState.expandedNodes).toEqual(['root-accounts', 'account-123'])
+    })
+  })
+
 })

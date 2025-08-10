@@ -310,5 +310,93 @@ describe('Accounts_Tree.vue', () => {
       expect(alertStore.error).toHaveBeenCalledWith('Не удалось перейти к редактированию лицевого счёта: Navigation failed')
     })
   })
+
+  describe('Tree State Persistence', () => {
+    beforeEach(() => {
+      authStore = { 
+        isAdministrator: true, 
+        isManager: false, 
+        isEngineer: false,
+        getAccountsTreeState: { selectedNode: null, expandedNodes: [] },
+        saveAccountsTreeState: vi.fn()
+      }
+      vi.clearAllMocks()
+    })
+
+    it('saves tree state when selection changes', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Simulate selection change
+      wrapper.vm.selectedNode = ['account-1']
+      await wrapper.vm.$nextTick()
+
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledWith('account-1', [])
+    })
+
+    it('saves tree state when expanded nodes change', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Simulate expansion change
+      wrapper.vm.expandedNodes = ['root-accounts', 'account-1']
+      await wrapper.vm.$nextTick()
+
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledWith(null, ['root-accounts', 'account-1'])
+    })
+
+    it('handles empty tree state gracefully', async () => {
+      authStore.getAccountsTreeState = { selectedNode: null, expandedNodes: [] }
+
+      const wrapper = mountTree()
+      await resolveAll()
+
+      expect(wrapper.vm.selectedNode).toEqual([])
+      expect(wrapper.vm.expandedNodes).toEqual([])
+    })
+
+    it('handles tree state with multiple selections', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Simulate multiple selection
+      wrapper.vm.selectedNode = ['account-1', 'account-2']
+      await wrapper.vm.$nextTick()
+
+      // Should only save the first selected node
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledWith('account-1', [])
+    })
+
+    it('auto-saves state on every tree interaction', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Multiple tree operations
+      wrapper.vm.selectedNode = ['account-1']
+      await wrapper.vm.$nextTick()
+      
+      wrapper.vm.expandedNodes = ['root-accounts']
+      await wrapper.vm.$nextTick()
+
+      wrapper.vm.selectedNode = ['account-2']
+      await wrapper.vm.$nextTick()
+
+      // Should have been called for each change
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledTimes(3)
+      expect(authStore.saveAccountsTreeState).toHaveBeenLastCalledWith('account-2', ['root-accounts'])
+    })
+
+    it('calls saveAccountsTreeState with correct parameters for empty selection', async () => {
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Simulate clearing selection
+      wrapper.vm.selectedNode = []
+      wrapper.vm.expandedNodes = ['root-accounts']
+      await wrapper.vm.$nextTick()
+
+      expect(authStore.saveAccountsTreeState).toHaveBeenCalledWith(null, ['root-accounts'])
+    })
+  })
 })
 

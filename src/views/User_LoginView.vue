@@ -26,9 +26,10 @@ import { ref } from 'vue'
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
 import { storeToRefs } from 'pinia'
-import router from '@/router'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+
 
 const schema = Yup.object().shape({
   login_email: Yup.string()
@@ -53,14 +54,14 @@ function onSubmit(values) {
 
   return authStore
     .login(login_email, login_password)
-    .then(() => router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id))
+    .then(() => redirectToDefaultRoute())
     .catch((error) => alertStore.error(error.message || String(error)))
 }
 </script>
 
 <template>
   <div class="settings form-1">
-    <h1 class="orange">Вход</h1>
+    <h1 class="primary-heading">Вход</h1>
     <hr class="hr" />
     <Form @submit="onSubmit" :validation-schema="schema" v-slot="{ errors, isSubmitting }">
       <div class="form-group">
@@ -110,12 +111,15 @@ function onSubmit(values) {
           </button>
         </div>
       </div>
-      <div class="form-actions">
-        <button class="button" type="submit" :disabled="isSubmitting">
+
+      <div class="form-group mt-8">
+        <button class="button primary" type="submit" :disabled="isSubmitting">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          Войти
+          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
+            Войти
         </button>
       </div>
+
       <div v-if="errors.login_email" class="alert alert-danger mt-3 mb-0">
         {{ errors.login_email }}
       </div>

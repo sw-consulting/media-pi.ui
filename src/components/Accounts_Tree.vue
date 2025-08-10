@@ -21,7 +21,7 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
@@ -38,12 +38,17 @@ const devicesStore = useDevicesStore()
 const deviceGroupsStore = useDeviceGroupsStore()
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
+const { getAccountsTreeState } = storeToRefs(authStore)
 
 const accountsCaption = useAccountsCaption(authStore)
 
 const loading = ref(true)
 const loadedNodes = ref(new Set())
 const loadingNodes = ref(new Set())
+
+// Tree state from auth store
+const selectedNode = ref([])
+const expandedNodes = ref([])
 
 // Role-based access helper functions
 const canViewUnassignedDevices = computed(() => 
@@ -54,10 +59,35 @@ const canViewAccounts = computed(() =>
   authStore.isAdministrator || authStore.isManager
 )
 
+// Restore state from auth store
+const restoreTreeState = () => {
+  const savedState = getAccountsTreeState.value
+  if (savedState.selectedNode) {
+    selectedNode.value = [savedState.selectedNode]
+  }
+  if (savedState.expandedNodes && savedState.expandedNodes.length > 0) {
+    expandedNodes.value = [...savedState.expandedNodes]
+  }
+}
+
+// Save state to auth store
+const saveTreeState = () => {
+  const selected = selectedNode.value && selectedNode.value.length > 0 ? selectedNode.value[0] : null
+  const expanded = expandedNodes.value || []
+  authStore.saveAccountsTreeState(selected, expanded)
+}
+
+// Watch for changes and auto-save
+watch([selectedNode, expandedNodes], () => {
+  saveTreeState()
+}, { deep: true })
+
 onMounted(async () => {
   try {
     // Only load accounts initially for lazy loading
     await accountsStore.getAll()
+    // Restore tree state after data is loaded
+    restoreTreeState()
   } catch (error) {
     alertStore.error('Не удалось загрузить данные: ' + (error.message || error))
   } finally {
@@ -234,7 +264,10 @@ const getAccountIdFromNodeId = (nodeId) => {
         item-title="name"
         item-value="id"
         :load-children="loadChildren"
+        v-model:selected="selectedNode"
+        v-model:opened="expandedNodes"
         open-on-click
+        selectable
       >
         <template #prepend="{ item }">
           <v-progress-circular

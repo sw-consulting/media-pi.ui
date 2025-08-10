@@ -34,6 +34,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { getRoleName, isManager } from '@/helpers/user.helpers.js'
 import { useRolesStore } from '@/stores/roles.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
+import { redirectToDefaultRoute } from '../helpers/default.route'
 
 const rolesStore = useRolesStore()
 const accountsStore = useAccountsStore()
@@ -177,7 +178,10 @@ function showAndEditCredentials() {
 }
 
 function redirectToReturnRoute() {
-  return router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
+  if (asAdmin()) {
+    return router.push('/users')
+  }
+  redirectToDefaultRoute()
 }
 
 function onSubmit(values) {
@@ -231,13 +235,13 @@ function onSubmit(values) {
       values.accountIds = values.accountIds || []
     } else {
       // Non-admin keeps existing roles
-      values.roles = user.value.roles
-      values.accountIds = user.value.accountIds
+      values.roles = undefined
+      values.accountIds = undefined
     }
     return usersStore
       .update(props.id, values, true)
       .then(() =>
-        router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
+        redirectToReturnRoute()
       )
       .catch((error) => alertStore.error(error.message || String(error)))
   }
@@ -381,28 +385,29 @@ function onSubmit(values) {
           </option>
         </select>
       </div>
+      <div v-if="showCredentials()" class="form-group">
+        <label for="crd" class="label">Роль:</label>
+        <span id="crd">
+          <em>{{ getRoleName(user) }}</em>
+        </span>
+      </div>
       <div v-if="showAndEditCredentials() && isSelectedRoleManager" class="form-group">
         <label for="accountIds" class="label">Лицевые счета:</label>
         <Field name="accountIds" as="select" id="accountIds"  multiple
                class="form-control input" :class="{ 'is-invalid': errors.accountIds }"
         >
-          <option
-            v-for="option in accountOptions"
-            :key="option.value"
-            :value="option.value"
-          >
+          <option v-for="option in accountOptions" :key="option.value"  :value="option.value" >
             {{ option.text }}
           </option>
         </Field>
         <div v-if="errors.accountIds" class="invalid-feedback">{{ errors.accountIds }}</div>
       </div>
-      <div v-if="showCredentials()" class="form-group">
-        <label for="crd" class="label">Права:</label>
-        <span id="crd"
-          ><em>{{ getRoleName(user) }}</em></span
-        >
-      </div>
 
+      <div v-if="showCredentials()" class="form-group">
+        <span v-for="option in accountOptions">
+          <em>{{ option.text }}</em>
+        </span>
+      </div>
       <div class="form-group mt-8">
         <button class="button primary" type="submit" :disabled="isSubmitting">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
@@ -410,7 +415,6 @@ function onSubmit(values) {
             {{ getButton() }}
         </button>
         <button
-          v-if="asAdmin()"
           class="button secondary"
           type="button"
           @click="redirectToReturnRoute()"

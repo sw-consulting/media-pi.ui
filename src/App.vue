@@ -85,14 +85,14 @@ function getUserName() {
         </div>
       </template>
       <v-list v-if="authStore.user">
+        <v-list-item v-if="accountsCaption">
+          <RouterLink to="/accounts" class="link">{{ accountsCaption }}</RouterLink>
+        </v-list-item>
         <v-list-item v-if="!authStore.isAdministrator">
           <RouterLink :to="'/user/edit/' + authStore.user.id" class="link">Настройки</RouterLink>
         </v-list-item>
         <v-list-item v-if="authStore.isAdministrator">
           <RouterLink to="/users" class="link">Пользователи</RouterLink>
-        </v-list-item>
-        <v-list-item v-if="accountsCaption">
-          <RouterLink to="/accounts" class="link">{{ accountsCaption }}</RouterLink>
         </v-list-item>
         <v-list-item>
           <RouterLink to="/login" @click="deauth()" class="link">Выход</RouterLink>

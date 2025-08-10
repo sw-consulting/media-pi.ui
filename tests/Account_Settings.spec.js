@@ -1,6 +1,6 @@
 import { library } from '@fortawesome/fontawesome-svg-core';
-import { faCheckDouble, faXmark } from '@fortawesome/free-solid-svg-icons';
-library.add(faCheckDouble, faXmark);
+import { faCheckDouble, faXmark, faPlus, faMinus } from '@fortawesome/free-solid-svg-icons';
+library.add(faCheckDouble, faXmark, faPlus, faMinus);
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -113,6 +113,17 @@ const mountSettings = (props = {}) => mount({
           'Field': { 
             template: '<input />', 
             props: ['name', 'type', 'as', 'multiple'] 
+          },
+          'FieldArray': {
+            template: '<div><slot :fields="mockFields" :push="mockPush" :remove="mockRemove" /></div>',
+            props: ['name'],
+            setup() {
+              return {
+                mockFields: [{ key: 0 }],
+                mockPush: vi.fn(),
+                mockRemove: vi.fn()
+              }
+            }
           }
         },
         components: {
@@ -229,7 +240,18 @@ describe('Account_Settings.vue', () => {
             template: '<form @submit="$emit(\'submit\', { name: \'Test Account\', managers: [\'\'] })"><slot :errors="{}" :isSubmitting="false" /></form>',
             emits: ['submit']
           },
-          'Field': { template: '<input />', props: ['name', 'type', 'as', 'multiple'] }
+          'Field': { template: '<input />', props: ['name', 'type', 'as', 'multiple'] },
+          'FieldArray': {
+            template: '<div><slot :fields="mockFields" :push="mockPush" :remove="mockRemove" /></div>',
+            props: ['name'],
+            setup() {
+              return {
+                mockFields: [{ key: 0 }],
+                mockPush: vi.fn(),
+                mockRemove: vi.fn()
+              }
+            }
+          }
         },
         components: { 'font-awesome-icon': FontAwesomeIcon }
       }
