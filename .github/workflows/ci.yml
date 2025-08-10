@@ -23,6 +23,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 name: ci
+on:
   push:
     branches: [ main ]
   pull_request:
