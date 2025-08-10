@@ -80,7 +80,7 @@ describe('User_LoginView.vue', () => {
     await wrapper.vm.onSubmit({ login_email: 'a', login_password: 'b' })
     await resolveAll()
     expect(loginMock).toHaveBeenCalledWith('a', 'b')
-    expect(routerPush).toHaveBeenCalledWith('/users')
+    expect(routerPush).toHaveBeenCalledWith('/accounts')
   })
 
   it('redirects non-admin to edit page', async () => {

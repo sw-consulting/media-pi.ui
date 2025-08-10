@@ -219,7 +219,8 @@ async function onSubmit(values) {
               </Field>
               
               <!-- Minus button always after select -->
-              <button type="button" class="button-o-c ml-2" @click="remove(idx)">
+              <button type="button" class="button-o-c ml-2" @click="remove(idx)"
+                      :disabled="fields.length === 1">
                 <font-awesome-icon size="1x" icon="fa-solid fa-minus" />
               </button>
             </div>

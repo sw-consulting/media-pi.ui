@@ -1,8 +1,21 @@
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
+// of this software and associated documentation files (the "Software"), const deleteAccount = async (item) => {
+  const accountId = typeof item === 'object' ? item.id : item
+  const account = accountsStore.accounts.find(a => a.id === accountId)
+  if (!account) return
+  
+  // eslint-disable-next-line no-undef
+  const confirmed = confirm('Вы уверены, что хотите удалить этот лицевой счёт?')
+  
+  if (confirmed) {
+    try {
+      await accountsStore.delete(accountId)
+    } catch (error) {
+      alertStore.error(`Ошибка при удалении лицевого счёта: ${error.message || error}`)
+    }
+  } the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
@@ -30,6 +43,7 @@ import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import ActionButton from '@/components/ActionButton.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -84,8 +98,10 @@ watch([selectedNode, expandedNodes], () => {
 
 onMounted(async () => {
   try {
-    // Only load accounts initially for lazy loading
-    await accountsStore.getAll()
+    // Only load accounts if user can view them
+    if (canViewAccounts.value) {
+      await accountsStore.getAll()
+    }
     // Restore tree state after data is loaded
     restoreTreeState()
   } catch (error) {
@@ -212,8 +228,9 @@ const createAccount = () => {
   }
 }
 
-const editAccount = (accountId) => {
+const editAccount = (item) => {
   try {
+    const accountId = typeof item === 'object' ? item.id : item
     router.push(`/account/edit/${accountId}`)
   } catch (error) {
     alertStore.error(`Не удалось перейти к редактированию лицевого счёта: ${error.message || error}`)
@@ -285,19 +302,13 @@ const getAccountIdFromNodeId = (nodeId) => {
         <template #append="{ item }">
           <!-- Action buttons for root-accounts node -->
           <div v-if="item.id === 'root-accounts' && canManageAccounts" class="tree-actions">
-            <button @click.stop="createAccount()" class="anti-btn" title="Создать лицевой счёт">
-              <font-awesome-icon size="1x" icon="fa-solid fa-plus" class="anti-btn" />
-            </button>
+            <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать лицевой счёт" @click="createAccount" />
           </div>
           
           <!-- Action buttons for account nodes -->
           <div v-else-if="item.id.startsWith('account-') && canManageAccounts" class="tree-actions">
-            <button @click.stop="editAccount(getAccountIdFromNodeId(item.id))" class="anti-btn" title="Редактировать лицевой счёт">
-              <font-awesome-icon size="1x" icon="fa-solid fa-pen" class="anti-btn" />
-            </button>
-            <button @click.stop="deleteAccount(getAccountIdFromNodeId(item.id))" class="anti-btn" title="Удалить лицевой счёт">
-              <font-awesome-icon size="1x" icon="fa-solid fa-trash-can" class="anti-btn" />
-            </button>
+            <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />
+            <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
           </div>
         </template>
       </v-treeview>

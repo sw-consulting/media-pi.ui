@@ -88,7 +88,13 @@ const mountTree = () => mount(AccountsTree, {
       'v-progress-circular': { template: '<div />' },
       'v-alert': { template: '<div />' },
       'v-icon': { template: '<div />' },
-      'font-awesome-icon': { template: '<div />' }
+      'v-tooltip': { template: '<div><slot name="activator" :props="{}"></slot></div>' },
+      'font-awesome-icon': { template: '<div />' },
+      'ActionButton': { 
+        props: ['item', 'icon', 'tooltipText'], 
+        template: '<button @click="$emit(\'click\', item)"><div /></button>',
+        emits: ['click']
+      }
     }
   }
 })

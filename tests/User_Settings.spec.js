@@ -179,7 +179,7 @@ describe('User_Settings.vue real component', () => {
     expect(routerPush).toHaveBeenCalledWith('/users')
   })
 
-  it('updates user roles when editing as non-admin', async () => {
+  it('does not update user roles when editing as non-admin', async () => {
     mockUser.value.roles = [11]
     const wrapper = mount(Parent, {
       props: { register: false, id: 1 },
@@ -191,7 +191,7 @@ describe('User_Settings.vue real component', () => {
     await resolveAll()
     expect(updateUser).toHaveBeenCalled()
     const args = updateUser.mock.calls[0]
-    expect(args[1].roles).toEqual([11])
+    expect(args[1].roles).toEqual(undefined)
     expect(routerPush).toHaveBeenCalledWith('/user/edit/2')
   })
 

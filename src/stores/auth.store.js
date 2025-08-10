@@ -62,7 +62,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (saved) {
         accountsTreeState.value = JSON.parse(saved)
       }
-    } catch (error) {
+    } catch {
       accountsTreeState.value = {}
     }
   }

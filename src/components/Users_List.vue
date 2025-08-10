@@ -30,6 +30,7 @@ import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { getRoleName } from '@/helpers/user.helpers.js'
 import { mdiMagnify } from '@mdi/js'
 import { onMounted } from 'vue'
+import ActionButton from '@/components/ActionButton.vue'
 
 import { useAuthStore } from '@/stores/auth.store.js'
 const authStore = useAuthStore()
@@ -113,12 +114,10 @@ async function deleteUser(item) {
 }
 
 const headers = [
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
   { title: 'Пользователь', align: 'start', key: 'id' },
   { title: 'E-mail', align: 'start', key: 'email' },
-  { title: 'Права', align: 'start', key: 'credentials', sortable: false },
-  { title: '', align: 'center', key: 'actions0', sortable: false, width: '5%' },
-  { title: '', align: 'center', key: 'actions1', sortable: false, width: '5%' },
-  { title: '', align: 'center', key: 'actions2', sortable: false, width: '5%' }
+  { title: 'Права', align: 'start', key: 'credentials', sortable: false }
 ]
 </script>
 
@@ -161,15 +160,11 @@ const headers = [
           <span v-html="getRoleName(item)"></span>
         </template>
 
-        <template v-slot:[`item.actions1`]="{ item }">
-          <button @click="userSettings(item)" class="anti-btn">
-            <font-awesome-icon size="1x" icon="fa-solid fa-pen" class="anti-btn" />
-          </button>
-        </template>
-        <template v-slot:[`item.actions2`]="{ item }">
-          <button @click="deleteUser(item)" class="anti-btn">
-            <font-awesome-icon size="1x" icon="fa-solid fa-trash-can" class="anti-btn" />
-          </button>
+        <template v-slot:[`item.actions`]="{ item }">
+          <div class="actions-container">
+            <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать информацию о пользователе" @click="userSettings" />
+            <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить информацию о пользователе" @click="deleteUser" />
+          </div>
         </template>
       </v-data-table>
       <div v-if="!users?.length" class="text-center m-5">Список пользователей пуст</div>

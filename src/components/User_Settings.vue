@@ -404,7 +404,7 @@ function onSubmit(values) {
       </div>
 
       <div v-if="showCredentials()" class="form-group">
-        <span v-for="option in accountOptions">
+        <span v-for="option in accountOptions" :key="option.value">
           <em>{{ option.text }}</em>
         </span>
       </div>
