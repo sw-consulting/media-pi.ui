@@ -40,12 +40,11 @@ defineEmits(['click'])
       <button 
         type="button" 
         @click="$emit('click', item)" 
-        class="anti-btn" 
-        :class="[{ 'disabled-btn': disabled }, $attrs.class]"
+        :class="['anti-btn', { 'disabled-btn': disabled }, $attrs.class]"
         v-bind="props"
         :disabled="disabled"
       >
-        <font-awesome-icon :size="iconSize" :icon="icon" class="anti-btn" :class="{ 'disabled-icon': disabled }" />
+        <font-awesome-icon :size="iconSize" :icon="icon"  />
       </button>
     </template>
   </v-tooltip>

@@ -432,21 +432,22 @@ a,
 }
 
 
-.manager-field-container {
+.field-container {
   position: relative;
   display: flex;
   align-items: center;
   width: 100%;
 }
 
-.plus-button {
+.field-container-plus {
   position: absolute;
   left: -50px;
   z-index: 1;
   min-width: 32px;
+  margin-left: 0;
 }
 
-.manager-select {
+.field-container-select {
   width: calc(100% - 30px);
 }
 

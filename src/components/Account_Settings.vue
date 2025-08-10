@@ -24,7 +24,7 @@
 import { ref, computed } from 'vue'
 import router from '@/router'
 import { storeToRefs } from 'pinia'
-import { Form, Field, FieldArray } from 'vee-validate'
+import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
 
 import { useAccountsStore } from '@/stores/accounts.store.js'
@@ -33,7 +33,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { UserRoleConstants } from '@/helpers/user.helpers.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
-import ActionButton from '@/components/ActionButton.vue'
+import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
 
 const props = defineProps({
@@ -200,43 +200,16 @@ async function onSubmit(values) {
       </div>
 
       <div v-if="canEditManagers()">
-        <FieldArray name="managers" v-slot="{ fields, push, remove }">
-          <div v-for="(field, idx) in fields" :key="field.key" class="form-group-1 mb-2">
-            <label v-if="idx === 0" class="label-1">Менеджеры:</label>
-            <div v-else class="label-1"></div>
-            
-            <div class="manager-field-container">
-              <!-- Plus button positioned to the left for first option -->
-              <ActionButton 
-                v-if="idx === 0"
-                icon="fa-solid fa-plus"
-                :item="''"
-                @click="push('')"
-                class="button-o-c plus-button"
-                tooltip-text="Добавить менеджера"
-              />
-              
-              <Field :name="`managers[${idx}]`" as="select" :id="'manager' + idx"
-                class="form-control input-1 manager-select" :class="{ 'is-invalid': errors.managers }"
-              >
-                <option value="">Выберите менеджера:</option>
-                <option v-for="option in managerOptions" :key="option.value" :value="option.value">
-                  {{ option.text }}
-                </option>
-              </Field>
-              
-              <!-- Minus button always after select -->
-              <ActionButton
-                icon="fa-solid fa-minus"
-                :item="idx"
-                @click="remove(idx)"
-                :disabled="fields.length === 1"
-                class="button-o-c ml-2"
-                tooltip-text="Удалить менеджера"
-              />
-            </div>
-          </div>
-        </FieldArray>
+        <FieldArrayWithButtons
+          name="managers"
+          label="Менеджеры"
+          field-type="select"
+          :options="managerOptions"
+          placeholder="Выберите менеджера:"
+          add-tooltip="Добавить менеджера"
+          remove-tooltip="Удалить менеджера"
+          :has-error="!!errors.managers"
+        />
       </div>
 
       <div v-else class="form-group-1">
