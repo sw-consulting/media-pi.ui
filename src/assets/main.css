@@ -1145,3 +1145,29 @@ a,
   margin: 3px;
 }
 
+/* Ro N x N  entities */
+
+.field-list-container {
+  display: flex;
+  align-items: flex-start;
+}
+.field-list-label {
+  margin-top: 0;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.field-list {
+  list-style: none; 
+  padding: 0; 
+  margin: 0;
+  flex: 1;
+}
+
+.field-list-item {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  font-size: 0.875rem;
+}

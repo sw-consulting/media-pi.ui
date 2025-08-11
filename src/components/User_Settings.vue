@@ -139,6 +139,14 @@ const accountOptions = computed(() => {
   }))
 })
 
+const userAccounts = computed(() => {
+  if (!user.value || !Array.isArray(user.value.accountIds) || user.value.accountIds.length === 0) {
+    return []
+  }
+  return accountOptions.value.filter(option => 
+    user.value.accountIds.includes(option.value)
+  )
+})
 
 if (!isRegister()) {
   ;({ user } = storeToRefs(usersStore))
@@ -335,27 +343,25 @@ function onSubmit(values) {
       </div>
       <div v-if="showCredentials()" class="form-group">
         <label for="crd" class="label">Роль:</label>
-        <span id="crd">
-          <em>{{ getRoleName(user) }}</em>
+        <span id="crd" class="field-list-item">
+          {{ getRoleName(user) }}
         </span>
       </div>
       <div v-if="showAndEditCredentials() && isSelectedRoleManager">
-        <FieldArrayWithButtons 
-          name="accountIds"
-          label="Лицевые счета"
-          :options="accountOptions"
-          :hasError="!!errors.accountIds"
-          addTooltip="Добавить лицевой счет"
-          removeTooltip="Удалить лицевой счет"
+        <FieldArrayWithButtons  name="accountIds"  label="Лицевые счета"  :options="accountOptions"
+          :hasError="!!errors.accountIds"  addTooltip="Добавить лицевой счет" removeTooltip="Удалить лицевой счет"
           placeholder="Выберите лицевой счет:"
         />
       </div>
 
-      <div v-if="showCredentials()" class="form-group">
-        <span v-for="option in accountOptions" :key="option.value">
-          <em>{{ option.text }}</em>
-        </span>
-      </div>
+      <div v-if="showCredentials()" class="form-group field-list-container">
+        <label for="fieldList" class="label field-list-label">Лицевые счета:</label>
+        <ul id="fieldList" class="field-list">
+          <li v-for="account in userAccounts" :key="account.value" class="field-list-item">
+            {{ account.text }}
+          </li>
+        </ul>
+     </div>
       <div class="form-group mt-8">
         <button class="button primary" type="submit" :disabled="isSubmitting">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
