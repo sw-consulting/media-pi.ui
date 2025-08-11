@@ -71,10 +71,10 @@ describe('devices.store', () => {
     expect(store.devices).toEqual(mockDevices)
   })
 
-  it('getAllByAccount sets devices from fetch', async () => {
+  it('getByAccount sets devices from fetch', async () => {
     const store = useDevicesStore()
     fetchWrapper.get.mockResolvedValueOnce(mockDevices)
-    await store.getAllByAccount(1)
+    await store.getByAccount(1)
     expect(store.devices).toEqual(mockDevices)
   })
 
@@ -132,11 +132,11 @@ describe('devices.store', () => {
     expect(store.loading).toBe(false)
   })
 
-  it('getAllByAccount throws error and resets devices when fetch fails', async () => {
+  it('getByAccount throws error and resets devices when fetch fails', async () => {
     const store = useDevicesStore()
-    const mockError = new Error('GetAllByAccount failed')
+    const mockError = new Error('getByAccount failed')
     fetchWrapper.get.mockRejectedValueOnce(mockError)
-    await expect(store.getAllByAccount(1)).rejects.toThrow('GetAllByAccount failed')
+    await expect(store.getByAccount(1)).rejects.toThrow('getByAccount failed')
     expect(store.error).toBe(mockError)
     expect(store.devices).toEqual([])
     expect(store.loading).toBe(false)

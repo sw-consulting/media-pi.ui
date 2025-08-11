@@ -206,7 +206,8 @@ const loadChildren = async (item) => {
 }
 
 // Action button functions
-const canManageAccounts = computed(() => authStore.isAdministrator)
+const canEditAccounts = computed(() => authStore.isAdministrator || authStore.isManager)
+const canCreateDeleteAccounts = computed(() => authStore.isAdministrator)
 
 const createAccount = () => {
   try {
@@ -289,14 +290,14 @@ const getAccountIdFromNodeId = (nodeId) => {
         
         <template #append="{ item }">
           <!-- Action buttons for root-accounts node -->
-          <div v-if="item.id === 'root-accounts' && canManageAccounts" class="tree-actions">
+          <div v-if="item.id === 'root-accounts' && canCreateDeleteAccounts" class="tree-actions">
             <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать лицевой счёт" @click="createAccount" />
           </div>
           
           <!-- Action buttons for account nodes -->
-          <div v-else-if="item.id.startsWith('account-') && canManageAccounts" class="tree-actions">
+          <div v-else-if="item.id.startsWith('account-') && canEditAccounts" class="tree-actions">
             <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />
-            <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
+            <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
           </div>
         </template>
       </v-treeview>

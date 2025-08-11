@@ -162,4 +162,25 @@ describe('users.store', () => {
     expect(store.error).toBe(mockError)
     expect(store.loading).toBe(false)
   })
+  
+  // getByAccount tests
+  it('getByAccount fetches users by account and sets users', async () => {
+    const store = useUsersStore()
+    const mockAccountUsers = [{ id: 10, name: 'UserA' }, { id: 11, name: 'UserB' }]
+    fetchWrapper.get.mockResolvedValueOnce(mockAccountUsers)
+    await store.getByAccount(123)
+    expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/by-account/123'))
+    expect(store.users).toEqual(mockAccountUsers)
+    expect(store.loading).toBe(false)
+    expect(store.error).toBeNull()
+  })
+
+  it('getByAccount handles error when fetch fails', async () => {
+    const store = useUsersStore()
+    const error = new Error('Fetch failed')
+    fetchWrapper.get.mockRejectedValueOnce(error)
+    await expect(store.getByAccount(123)).rejects.toThrow('Fetch failed')
+    expect(store.error).toBe(error)
+    expect(store.loading).toBe(false)
+  })
 })

@@ -90,6 +90,21 @@ const getUserById = (id) => {
     }
   }
 
+  async function getByAccount(accountId) {
+    loading.value = true
+    error.value = null
+    try {
+      const result = await fetchWrapper.get(`${baseUrl}/by-account/${accountId}`)
+      users.value = result
+    } catch (err) {
+      error.value = err
+      throw err
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
   async function update(id, params) {
     loading.value = true
     error.value = null
@@ -146,6 +161,7 @@ const getUserById = (id) => {
     add,
     getAll,
     getById,
+    getByAccount,
     update,
     delete: deleteUser
   }

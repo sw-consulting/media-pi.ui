@@ -37,15 +37,22 @@ import { useAccountsStore } from '@/stores/accounts.store.js'
 import { redirectToDefaultRoute } from '../helpers/default.route'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
+const alertStore = useAlertStore()
+const { alert } = storeToRefs(alertStore)
+
 const rolesStore = useRolesStore()
 const accountsStore = useAccountsStore()
+const usersStore = useUsersStore()
+const authStore = useAuthStore()
+
 
 // Load roles before component renders to avoid race condition
 await rolesStore.ensureLoaded()
 try {
-  await accountsStore.getAll()
+  if (loadAccounts()) {
+    await accountsStore.getAll()
+  }
 } catch (err) {
-  console.error('Failed to load accounts:', err);
   alertStore.error('Не удалось загрузить список аккаунтов. Попробуйте обновить страницу или обратитесь к администратору.');
 }
 
@@ -59,11 +66,6 @@ const props = defineProps({
     required: false
   }
 })
-
-const usersStore = useUsersStore()
-const authStore = useAuthStore()
-const alertStore = useAlertStore()
-const { alert } = storeToRefs(alertStore)
 
 const pwdErr =
   'Пароль должен быть не короче 8 символов и содержать хотя бы одну цифру и один специальный символ (!@#$%^&*()\\-_=+{};:,<.>)'
@@ -181,6 +183,11 @@ function getButton() {
 function showCredentials() {
   return !isRegister() && !asAdmin()
 }
+
+function loadAccounts() {
+  return authStore.isAdministrator || authStore.isAccountManager
+}
+
 
 function showAndEditCredentials() {
   return asAdmin()
@@ -354,7 +361,7 @@ function onSubmit(values) {
         />
       </div>
 
-      <div v-if="showCredentials()" class="form-group field-list-container">
+      <div v-if="authStore.isAccountManager" class="form-group field-list-container">
         <label for="fieldList" class="label field-list-label">Лицевые счета:</label>
         <ul id="fieldList" class="field-list">
           <li v-for="account in userAccounts" :key="account.value" class="field-list-item">

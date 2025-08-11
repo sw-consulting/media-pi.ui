@@ -106,11 +106,14 @@ if (!isRegister()) {
 }
 
 try {
-  await usersStore.getAll()
-} catch (err) {
-  if (authStore.isAdministrator) {
-    alertStore.error(`Не удалось загрузить список для выбора менеджеров: ${err.message || err}`)
+  if (canEditManagers()) {
+    await usersStore.getAll()
   }
+  else {
+    await usersStore.getByAccount(props.id)
+  }
+} catch (err) {
+    alertStore.error(`Не удалось загрузить список пользователей: ${err.message || err}`)
 }
 
 const managerOptions = computed(() => {
@@ -123,12 +126,7 @@ const managerOptions = computed(() => {
 })
 
 const selectedManagerNames = computed(() => {
-  const managers = isRegister() ? [] : (accountsStore.account?.userIds || [])
-  return managers
-    .map(id => {
-      const u = usersStore.getUserById ? usersStore.getUserById(id) : (usersStore.users || []).find(u => u.id === id)
-      return u ? `${u.lastName || ''} ${u.firstName || ''}`.trim() : `#${id}`
-    })
+   return canEditManagers() ? [] : (usersStore.users || [])
 })
 
 function isRegister() {
@@ -213,10 +211,11 @@ async function onSubmit(values) {
       </div>
 
       <div v-else class="form-group">
-        <label class="label">Менеджеры:</label>
-        <ul>
-          <li v-for="name in selectedManagerNames" :key="name">{{ name }}</li>
-          <li v-if="!selectedManagerNames.length">Менеджеры не назначены</li>
+        <label for="fieldList" class="label field-list-label">Менеджеры:</label>
+        <ul id="fieldList" class="field-list">
+          <li v-for="user in selectedManagerNames" :key="user.id" class="field-list-item">
+            {{ user ? `${user.lastName || ''} ${user.firstName || ''} ${user.patronymic || ''}`.trim() : `Пользователь #${user.id}` }}
+          </li>
         </ul>
       </div>
 

@@ -70,7 +70,7 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
-  async function getAllByAccount(accountId) {
+  async function getByAccount(accountId) {
     loading.value = true
     error.value = null
     try {
@@ -165,7 +165,7 @@ export const useDevicesStore = defineStore('devices', () => {
     getDeviceById,
     register,
     getAll,
-    getAllByAccount,
+    getByAccount,
     getById,
     update,
     delete: deleteDevice,
