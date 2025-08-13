@@ -232,6 +232,53 @@ export function useAccountsTreeHelper() {
     return { createAccount, editAccount, deleteAccount }
   }
 
+  /**
+   * Create device group action handlers
+   */
+  const createDeviceGroupActions = (router, alertStore, deviceGroupsStore, confirmDelete) => {
+    const createDeviceGroup = (item) => {
+      try {
+        // item.id is like 'account-123-groups', extract accountId
+        const match = item.id.match(/account-(\d+)-groups/)
+        if (match) {
+          const accountId = match[1]
+          router.push({ name: 'Создание группы устройств', params: { accountId } })
+        } else {
+          alertStore.error('Не удалось определить лицевой счёт для создания группы устройств')
+        }
+      } catch (error) {
+        alertStore.error(`Не удалось перейти к созданию группы устройств: ${error.message || error}`)
+      }
+    }
+
+    const editDeviceGroup = (item) => {
+      try {
+        const groupId = typeof item === 'object' ? item.id : item
+        router.push({ name: 'Настройки группы устройств', params: { id: groupId } })
+      } catch (error) {
+        alertStore.error(`Не удалось перейти к редактированию группы устройств: ${error.message || error}`)
+      }
+    }
+
+    const deleteDeviceGroup = async (item) => {
+      const groupId = typeof item === 'object' ? item.id : item
+      const group = deviceGroupsStore.groups.find(g => g.id === groupId)
+      if (!group) return
+      
+      const confirmed = await confirmDelete(group.name, 'группу устройств')
+      
+      if (confirmed) {
+        try {
+          await deviceGroupsStore.delete(groupId)
+        } catch (error) {
+          alertStore.error(`Ошибка при удалении группы устройств: ${error.message || error}`)
+        }
+      }
+    }
+
+    return { createDeviceGroup, editDeviceGroup, deleteDeviceGroup }
+  }
+
   // ==================== Utility Functions ====================
   
   /**
@@ -240,6 +287,16 @@ export function useAccountsTreeHelper() {
   const getAccountIdFromNodeId = (nodeId) => {
     if (nodeId && nodeId.startsWith('account-')) {
       return parseInt(nodeId.replace('account-', ''))
+    }
+    return null
+  }
+
+  /**
+   * Extract group ID from tree node ID
+   */
+  const getGroupIdFromNodeId = (nodeId) => {
+    if (nodeId && nodeId.startsWith('group-')) {
+      return parseInt(nodeId.replace('group-', ''))
     }
     return null
   }
@@ -286,9 +343,11 @@ export function useAccountsTreeHelper() {
     
     // Actions
     createAccountActions,
+    createDeviceGroupActions,
     
     // Utilities
     getAccountIdFromNodeId,
+    getGroupIdFromNodeId,
     createPermissionCheckers
   }
 }

@@ -48,7 +48,9 @@ const {
   createLoadChildrenHandler,
   createStateManager,
   createAccountActions,
+  createDeviceGroupActions,
   getAccountIdFromNodeId,
+  getGroupIdFromNodeId,
   createPermissionCheckers
 } = useAccountsTreeHelper()
 
@@ -78,6 +80,13 @@ const { createAccount, editAccount, deleteAccount } = createAccountActions(
   router, 
   alertStore, 
   accountsStore, 
+  confirmDelete
+)
+
+const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGroupActions(
+  router,
+  alertStore,
+  deviceGroupsStore,
   confirmDelete
 )
 
@@ -173,7 +182,18 @@ const treeItems = computed(() => {
           <div v-if="item.id === 'root-accounts' && canCreateDeleteAccounts" class="tree-actions">
             <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать лицевой счёт" @click="createAccount" />
           </div>
-          
+
+          <!-- Action button for Device Groups node -->
+          <div v-else-if="item.id.includes('-groups')" class="tree-actions">
+            <ActionButton icon="fa-solid fa-plus" tooltip-text="Создать группу устройств" @click="() => createDeviceGroup(item)" />
+          </div>
+
+          <!-- Action buttons for individual device group nodes -->
+          <div v-else-if="item.id.startsWith('group-') && canEditAccounts" class="tree-actions">
+            <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-pen" tooltip-text="Редактировать группу устройств" @click="editDeviceGroup" />
+            <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-trash-can" tooltip-text="Удалить группу устройств" @click="deleteDeviceGroup" />
+          </div>
+
           <!-- Action buttons for account nodes -->
           <div v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups') && canEditAccounts" class="tree-actions">
             <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />

@@ -484,6 +484,139 @@ describe('useAccountsTreeHelper', () => {
     })
   })
 
+  describe('createDeviceGroupActions', () => {
+    let router, alertStore, deviceGroupsStore, confirmDelete, actions
+
+    beforeEach(() => {
+      router = {
+        push: vi.fn()
+      }
+      alertStore = {
+        error: vi.fn()
+      }
+      deviceGroupsStore = {
+        groups: [
+          { id: 1, name: 'Group 1' },
+          { id: 2, name: 'Group 2' }
+        ],
+        delete: vi.fn().mockResolvedValue()
+      }
+      confirmDelete = vi.fn().mockResolvedValue(true)
+
+      actions = helper.createDeviceGroupActions(router, alertStore, deviceGroupsStore, confirmDelete)
+    })
+
+    describe('createDeviceGroup', () => {
+      it('should navigate to create device group page with account ID', () => {
+        const item = { id: 'account-123-groups' }
+        actions.createDeviceGroup(item)
+        expect(router.push).toHaveBeenCalledWith({ name: 'Создание группы устройств', params: { accountId: '123' } })
+      })
+
+      it('should handle invalid item id format', () => {
+        const item = { id: 'invalid-format' }
+        actions.createDeviceGroup(item)
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить лицевой счёт для создания группы устройств')
+      })
+
+      it('should handle navigation errors', () => {
+        const error = new Error('Navigation failed')
+        router.push.mockImplementation(() => { throw error })
+        const item = { id: 'account-123-groups' }
+
+        actions.createDeviceGroup(item)
+
+        expect(alertStore.error).toHaveBeenCalledWith(
+          'Не удалось перейти к созданию группы устройств: Navigation failed'
+        )
+      })
+    })
+
+    describe('editDeviceGroup', () => {
+      it('should navigate to edit device group page with object parameter', () => {
+        actions.editDeviceGroup({ id: 1 })
+        expect(router.push).toHaveBeenCalledWith({ name: 'Настройки группы устройств', params: { id: 1 } })
+      })
+
+      it('should navigate to edit device group page with primitive parameter', () => {
+        actions.editDeviceGroup(2)
+        expect(router.push).toHaveBeenCalledWith({ name: 'Настройки группы устройств', params: { id: 2 } })
+      })
+
+      it('should handle navigation errors', () => {
+        const error = new Error('Navigation failed')
+        router.push.mockImplementation(() => { throw error })
+
+        actions.editDeviceGroup(1)
+
+        expect(alertStore.error).toHaveBeenCalledWith(
+          'Не удалось перейти к редактированию группы устройств: Navigation failed'
+        )
+      })
+    })
+
+    describe('deleteDeviceGroup', () => {
+      it('should delete device group after confirmation', async () => {
+        await actions.deleteDeviceGroup({ id: 1 })
+
+        expect(confirmDelete).toHaveBeenCalledWith('Group 1', 'группу устройств')
+        expect(deviceGroupsStore.delete).toHaveBeenCalledWith(1)
+      })
+
+      it('should not delete device group if not confirmed', async () => {
+        confirmDelete.mockResolvedValue(false)
+
+        await actions.deleteDeviceGroup({ id: 1 })
+
+        expect(deviceGroupsStore.delete).not.toHaveBeenCalled()
+      })
+
+      it('should handle primitive id parameter', async () => {
+        await actions.deleteDeviceGroup(2)
+
+        expect(confirmDelete).toHaveBeenCalledWith('Group 2', 'группу устройств')
+        expect(deviceGroupsStore.delete).toHaveBeenCalledWith(2)
+      })
+
+      it('should handle missing device group', async () => {
+        await actions.deleteDeviceGroup({ id: 999 })
+
+        expect(confirmDelete).not.toHaveBeenCalled()
+        expect(deviceGroupsStore.delete).not.toHaveBeenCalled()
+      })
+
+      it('should handle deletion errors', async () => {
+        const error = new Error('Delete failed')
+        deviceGroupsStore.delete.mockRejectedValue(error)
+
+        await actions.deleteDeviceGroup({ id: 1 })
+
+        expect(alertStore.error).toHaveBeenCalledWith(
+          'Ошибка при удалении группы устройств: Delete failed'
+        )
+      })
+    })
+  })
+
+  describe('getGroupIdFromNodeId', () => {
+    it('should extract group ID from node ID', () => {
+      expect(helper.getGroupIdFromNodeId('group-123')).toBe(123)
+      expect(helper.getGroupIdFromNodeId('group-1')).toBe(1)
+    })
+
+    it('should return null for non-group node IDs', () => {
+      expect(helper.getGroupIdFromNodeId('device-123')).toBe(null)
+      expect(helper.getGroupIdFromNodeId('account-456')).toBe(null)
+      expect(helper.getGroupIdFromNodeId('root-accounts')).toBe(null)
+    })
+
+    it('should handle invalid input', () => {
+      expect(helper.getGroupIdFromNodeId('')).toBe(null)
+      expect(helper.getGroupIdFromNodeId(null)).toBe(null)
+      expect(helper.getGroupIdFromNodeId(undefined)).toBe(null)
+    })
+  })
+
   describe('getAccountIdFromNodeId', () => {
     it('should extract account ID from node ID', () => {
       expect(helper.getAccountIdFromNodeId('account-123')).toBe(123)
