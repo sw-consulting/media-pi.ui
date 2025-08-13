@@ -23,37 +23,33 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
-import { useAuthStore } from '@/stores/auth.store.js'
 import { apiUrl } from '@/helpers/config.js'
 
-const baseUrl = `${apiUrl}/users`
+const baseUrl = `${apiUrl}/devicegroups`
 
-export const useUsersStore = defineStore('users', () => {
-  const users = ref([])
-  const user = ref(null)
+export const useDeviceGroupsStore = defineStore('devicegroups', () => {
+  const groups = ref([])
+  const group = ref(null)
   const loading = ref(false)
   const error = ref(null)
 
-  // getters
-const getUserById = (id) => {
-  if (!users.value || !Array.isArray(users.value)) {
-    return null
+  const getGroupById = (id) => {
+    if (!groups.value || !Array.isArray(groups.value)) {
+      return null
+    }
+    return groups.value.find(g => g && g.id === id)
   }
-  return users.value.find(user => user && user.id === id);
-}
 
-  // actions
-  async function add(userParam) {
+  async function add(groupParam) {
     loading.value = true
     error.value = null
     try {
-      await fetchWrapper.post(baseUrl, userParam)
-      getAll() 
+      await fetchWrapper.post(baseUrl, groupParam)
+      getAll()
     } catch (err) {
       error.value = err
       throw err
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -63,13 +59,12 @@ const getUserById = (id) => {
     error.value = null
     try {
       const result = await fetchWrapper.get(baseUrl)
-      users.value = result
+      groups.value = result || []
     } catch (err) {
       error.value = err
-      users.value = []
+      groups.value = []
       throw err
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -79,28 +74,12 @@ const getUserById = (id) => {
     error.value = null
     try {
       const result = await fetchWrapper.get(`${baseUrl}/${id}`)
-      user.value = result
+      group.value = result
     } catch (err) {
       error.value = err
-      user.value = null
+      group.value = null
       throw err
-    }
-    finally {
-      loading.value = false
-    }
-  }
-
-  async function getByAccount(accountId) {
-    loading.value = true
-    error.value = null
-    try {
-      const result = await fetchWrapper.get(`${baseUrl}/by-account/${accountId}`)
-      users.value = result
-    } catch (err) {
-      error.value = err
-      throw err
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -110,31 +89,16 @@ const getUserById = (id) => {
     error.value = null
     try {
       await fetchWrapper.put(`${baseUrl}/${id}`, params)
+      getAll()
     } catch (err) {
       error.value = err
       throw err
-    }
-    finally {
+    } finally {
       loading.value = false
-    }
-
-    // update stored user if the logged in user updated their own record
-    const authStore = useAuthStore()
-    if (authStore.user && id === authStore.user.id) {
-      // update local storage
-      const updatedUser = { ...authStore.user, ...params }
-      localStorage.setItem('user', JSON.stringify(updatedUser))
-
-      // update auth user in pinia state
-      authStore.user = updatedUser
     }
   }
 
-  async function deleteUser(id) {
-    const authStore = useAuthStore()
-    if (authStore.user && id === authStore.user.id) {
-      authStore.logout()
-    }
+  async function deleteGroup(id) {
     loading.value = true
     error.value = null
     try {
@@ -143,26 +107,22 @@ const getUserById = (id) => {
     } catch (err) {
       error.value = err
       throw err
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
 
   return {
-    // state
-    users,
-    user,
+    groups,
+    group,
     loading,
     error,
-    // getters
-    getUserById,
-    // actions
+    getGroupById,
     add,
     getAll,
     getById,
-    getByAccount,
     update,
-    delete: deleteUser
+    delete: deleteGroup
   }
 })
+

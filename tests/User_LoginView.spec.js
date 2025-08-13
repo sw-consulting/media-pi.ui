@@ -1,3 +1,5 @@
+/* @vitest-environment jsdom */
+
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,7 +22,6 @@
 //
 // This file is a part of Media Pi frontend application
 
-/* @vitest-environment jsdom */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import UserLoginView from '@/views/User_LoginView.vue'
@@ -73,18 +74,18 @@ describe('User_LoginView.vue', () => {
   })
 
   it('redirects after successful login', async () => {
-    authStore.isAdmin = true
+    authStore.isAdministrator = true
     const wrapper = mount(UserLoginView, {
       global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
     })
     await wrapper.vm.onSubmit({ login_email: 'a', login_password: 'b' })
     await resolveAll()
     expect(loginMock).toHaveBeenCalledWith('a', 'b')
-    expect(routerPush).toHaveBeenCalledWith('/users')
+    expect(routerPush).toHaveBeenCalledWith('/accounts')
   })
 
   it('redirects non-admin to edit page', async () => {
-    authStore.isAdmin = false
+    authStore.isAdministrator = false
     const wrapper = mount(UserLoginView, {
       global: { stubs: { Form: FormStub, Field: FieldStub, 'font-awesome-icon': true } }
     })

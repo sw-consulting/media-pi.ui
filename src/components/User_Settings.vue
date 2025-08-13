@@ -31,13 +31,20 @@ import * as Yup from 'yup'
 import { useUsersStore } from '@/stores/users.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
-import { getRoleName } from '@/helpers/user.helpers.js'
-
+import { getRoleName, isManager } from '@/helpers/user.helpers.js'
 import { useRolesStore } from '@/stores/roles.store.js'
-const rolesStore = useRolesStore()
+import { useAccountsStore } from '@/stores/accounts.store.js'
+import { redirectToDefaultRoute } from '@/helpers/default.route'
+import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
-// Load roles before component renders to avoid race condition
-await rolesStore.ensureLoaded()
+const alertStore = useAlertStore()
+const { alert } = storeToRefs(alertStore)
+
+const rolesStore = useRolesStore()
+const accountsStore = useAccountsStore()
+const usersStore = useUsersStore()
+const authStore = useAuthStore()
+
 
 const props = defineProps({
   register: {
@@ -50,11 +57,6 @@ const props = defineProps({
   }
 })
 
-const usersStore = useUsersStore()
-const authStore = useAuthStore()
-const alertStore = useAlertStore()
-const { alert } = storeToRefs(alertStore)
-
 const pwdErr =
   'Пароль должен быть не короче 8 символов и содержать хотя бы одну цифру и один специальный символ (!@#$%^&*()\\-_=+{};:,<.>)'
 const pwdReg = /^.*(?=.{8,})((?=.*[!@#$%^&*()\-_=+{};:,<.>]){1})((?=.*\d){1}).*$/
@@ -65,6 +67,13 @@ const schema = Yup.object().shape({
   email: Yup.string()
     .required('Необходимо указать электронную почту')
     .email('Неверный формат электронной почты'),
+  accountIds: Yup.array().of(
+    Yup.mixed().test(
+      'is-number-or-empty', 
+      'Ошибка выбора лицевых счетов', 
+      value => value === '' || (typeof value === 'number' && !isNaN(value))
+    )
+  ),
   password: Yup.string().concat(
     isRegister() ? Yup.string().required('Необходимо указать пароль').matches(pwdReg, pwdErr) : null
   ),
@@ -76,11 +85,24 @@ const schema = Yup.object().shape({
     .oneOf([Yup.ref('password')], 'Пароли должны совпадать')
 })
 
+try {
+  await rolesStore.ensureLoaded() 
+  if (authStore.isAdministrator) {
+    await accountsStore.getAll()
+  }
+  else if (authStore.isAccountManager) {
+    await accountsStore.getByManager(props.id)
+  }
+} catch {
+  alertStore.error('Не удалось загрузить список лицевых счетов.');
+}
 
 const showPassword = ref(false)
 const showPassword2 = ref(false)
 
 let user = ref({
+  accountIds: [''], // Start with one empty field for FieldArray
+  roles: []
 })
 
 // Computed property for available roles as options for the combobox
@@ -113,9 +135,47 @@ const selectedRole = computed({
   }
 })
 
+const isSelectedRoleManager = computed(() => {
+  if (!selectedRole.value) return false;
+  return isManager({ roles: [selectedRole.value] });
+});
+
+const shouldShowAccountArray = computed(() => {
+  return showAndEditCredentials() && isSelectedRoleManager.value;
+});
+
+const accountOptions = computed(() => {
+  return (accountsStore.accounts || []).map(acc => ({
+    value: acc.id,
+    text: acc.name
+  }))
+})
+
+const userAccounts = computed(() => {
+  if (!user.value || !Array.isArray(user.value.accountIds) || user.value.accountIds.length === 0) {
+    return []
+  }
+  
+  const userAccountIds = user.value.accountIds.filter(id => id !== '' && id !== null && id !== undefined)
+  // Filter account options to only include those that match user's accountIds
+  const xx = (accountsStore.accounts || [])
+    .filter(acc => userAccountIds.includes(acc.id))
+    .map(acc => ({
+      value: acc.id,
+      text: acc.name
+    }))
+
+    return xx
+})
+
 if (!isRegister()) {
-  ;({ user } = storeToRefs(usersStore))
   await usersStore.getById(props.id, true)
+  const { user: storeUser } = storeToRefs(usersStore)
+  user.value = storeUser.value
+  
+  if (!user.value.accountIds || !Array.isArray(user.value.accountIds) || user.value.accountIds.length === 0) {
+    user.value.accountIds = ['']
+  }
 }
 
 function isRegister() {
@@ -127,7 +187,7 @@ function asAdmin() {
 }
 
 function getTitle() {
-  return isRegister() ? (asAdmin() ? 'Регистрация пользователя' : 'Регистрация') : 'Настройки'
+  return isRegister() ? (asAdmin() ? 'Регистрация пользователя' : 'Регистрация') : 'Настройки пользователя'
 }
 
 function getButton() {
@@ -142,6 +202,20 @@ function showAndEditCredentials() {
   return asAdmin()
 }
 
+function redirectToReturnRoute() {
+  if (asAdmin()) {
+    return router.push('/users')
+  }
+  redirectToDefaultRoute()
+}
+
+function filterAccountIds(accountIds) {
+  return (accountIds || [])
+    .filter(accountId => accountId !== '' && accountId !== null && accountId !== undefined)
+    .map(accountId => typeof accountId === 'string' ? parseInt(accountId, 10) : accountId)
+    .filter(accountId => !isNaN(accountId))
+}
+
 function onSubmit(values) {
   // Clear any previous alerts
   const alertStore = useAlertStore()
@@ -154,10 +228,11 @@ function onSubmit(values) {
       } else {
         values.roles = []
       }
+      values.accountIds = filterAccountIds(values.accountIds)
       return usersStore
         .add(values, true)
         .then(() =>
-          router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
+          redirectToReturnRoute()
         )
         .catch((error) => alertStore.error(error.message || String(error)))
     } else {
@@ -189,14 +264,15 @@ function onSubmit(values) {
       } else {
         values.roles = []
       }
+      values.accountIds = filterAccountIds(values.accountIds)
     } else {
-      // Non-admin keeps existing roles
-      values.roles = user.value.roles
+      values.roles = undefined
+      values.accountIds = undefined
     }
     return usersStore
       .update(props.id, values, true)
       .then(() =>
-        router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
+        redirectToReturnRoute()
       )
       .catch((error) => alertStore.error(error.message || String(error)))
   }
@@ -205,8 +281,8 @@ function onSubmit(values) {
 </script>
 
 <template>
-  <div class="settings form-2">
-    <h1 class="orange">{{ getTitle() }}</h1>
+  <div class="settings form-2 form-compact">
+    <h1 class="primary-heading">{{ getTitle() }}</h1>
     <hr class="hr" />
     <Form
       @submit="onSubmit"
@@ -216,169 +292,121 @@ function onSubmit(values) {
     >
       <div class="form-group">
         <label for="lastName" class="label">Фамилия:</label>
-        <Field
-          name="lastName"
-          id="lastName"
-          type="text"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.lastName }"
-          placeholder="Фамилия"
+        <Field  name="lastName" id="lastName" type="text" class="form-control input"
+          :class="{ 'is-invalid': errors.lastName }" placeholder="Фамилия"
         />
       </div>
       <div class="form-group">
         <label for="firstName" class="label">Имя:</label>
-        <Field
-          name="firstName"
-          id="firstName"
-          type="text"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.firstName }"
-          placeholder="Имя"
+        <Field name="firstName" id="firstName" type="text" class="form-control input"
+          :class="{ 'is-invalid': errors.firstName }"  placeholder="Имя"
         />
       </div>
       <div class="form-group">
         <label for="patronymic" class="label">Отчество:</label>
-        <Field
-          name="patronymic"
-          id="patronymic"
-          type="text"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.patronymic }"
-          placeholder="Отчество"
+        <Field  name="patronymic" id="patronymic" type="text" class="form-control input"
+          :class="{ 'is-invalid': errors.patronymic }" placeholder="Отчество"
         />
       </div>
       <div class="form-group">
         <label for="email" class="label">Адрес электронной почты:</label>
-        <Field
-          name="email"
-          id="email"
-          autocomplete="off"
-          type="email"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.email }"
+        <Field  name="email" id="email" autocomplete="off" type="email"
+          class="form-control input" :class="{ 'is-invalid': errors.email }"
           placeholder="Адрес электронной почты"
         />
       </div>
       <div class="form-group">
         <label for="password" class="label">Пароль:</label>
         <div class="password-wrapper">
-          <Field
-            name="password"
-            id="password"
-            ref="password"
-            :type="showPassword ? 'text' : 'password'"
-            class="form-control input password"
-            :class="{ 'is-invalid': errors.password }"
-            placeholder="Пароль"
+          <Field name="password" id="password" ref="password" :type="showPassword ? 'text' : 'password'"
+                 class="form-control input password" :class="{ 'is-invalid': errors.password }"
+                 placeholder="Пароль"
           />
-          <button
-            type="button"
-            @click="
-              (event) => {
+          <button  type="button" class="button-o" @click=" (event) => {
                 event.preventDefault()
                 showPassword = !showPassword
               }
-            "
-            class="button-o"
+            "       
           >
-            <font-awesome-icon
-              size="1x"
-              v-if="!showPassword"
-              icon="fa-solid fa-eye"
-              class="button-o-c"
-            />
-            <font-awesome-icon
-              size="1x"
-              v-if="showPassword"
-              icon="fa-solid fa-eye-slash"
-              class="button-o-c"
-            />
+            <font-awesome-icon size="1x" v-if="!showPassword" icon="fa-solid fa-eye"  class="button-o-c"/>
+            <font-awesome-icon size="1x" v-if="showPassword" icon="fa-solid fa-eye-slash" class="button-o-c" />
           </button>
         </div>
       </div>
       <div class="form-group">
         <label for="password2" class="label">Пароль ещё раз:</label>
         <div class="password-wrapper">
-          <Field
-            name="password2"
-            id="password2"
-            :type="showPassword2 ? 'text' : 'password'"
-            class="form-control input password"
-            :class="{ 'is-invalid': errors.password2 }"
-            placeholder="Пароль"
+          <Field name="password2" id="password2" :type="showPassword2 ? 'text' : 'password'" 
+                 class="form-control input password"  :class="{ 'is-invalid': errors.password2 }"
+                 placeholder="Пароль"
           />
           <button
-            type="button"
+            type="button" class="button-o"
             @click="
               (event) => {
                 event.preventDefault()
                 showPassword2 = !showPassword2
               }
-            "
-            class="button-o"
+            "            
           >
-            <font-awesome-icon
-              size="1x"
-              v-if="!showPassword2"
-              icon="fa-solid fa-eye"
-              class="button-o-c"
-            />
-            <font-awesome-icon
-              size="1x"
-              v-if="showPassword2"
-              icon="fa-solid fa-eye-slash"
-              class="button-o-c"
-            />
+            <font-awesome-icon size="1x" v-if="!showPassword2" icon="fa-solid fa-eye" class="button-o-c" />
+            <font-awesome-icon size="1x" v-if="showPassword2" icon="fa-solid fa-eye-slash" class="button-o-c" />
           </button>
         </div>
       </div>
-      <div v-if="showCredentials()" class="form-group">
-        <label for="crd" class="label">Права:</label>
-        <span id="crd"
-          ><em>{{ getRoleName(user) }}</em></span
-        >
-      </div>
 
-      <div v-if="showAndEditCredentials()" class="form-group">
+       <div v-if="showAndEditCredentials()" class="form-group">
         <label for="roleSelect" class="label">Роль:</label>
-        <select
-          id="roleSelect"
-          v-model="selectedRole"
-          class="form-control input"
-        >
-          <option
-            v-for="option in roleOptions"
-            :key="option.value"
-            :value="option.value"
-          >
+        <select id="roleSelect" v-model="selectedRole" class="form-control input">
+          <option v-for="option in roleOptions" :key="option.value" :value="option.value" >
             {{ option.text }}
           </option>
         </select>
       </div>
+      <div v-if="showCredentials()" class="form-group">
+        <label for="crd" class="label">Роль:</label>
+        <span id="crd" class="field-list-item">
+          {{ getRoleName(user) }}
+        </span>
+      </div>
+      <div v-if="shouldShowAccountArray">
+        <FieldArrayWithButtons  name="accountIds"  label="Лицевые счета"  :options="accountOptions"
+          :hasError="!!errors.accountIds"  addTooltip="Добавить лицевой счет" removeTooltip="Удалить лицевой счет"
+          placeholder="Выберите лицевой счет:"
+        />
+      </div>
 
-      <div class="form-group mt-5">
-        <button class="button" type="submit" :disabled="isSubmitting">
+      <div v-if="authStore.isManager" class="form-group field-list-container">
+        <label for="fieldList" class="label field-list-label">Лицевые счета:</label>
+        <ul id="fieldList" class="field-list">
+          <li v-for="account in userAccounts" :key="account.value" class="field-list-item">
+            {{ account.text }}
+          </li>
+        </ul>
+     </div>
+      <div class="form-group mt-8">
+        <button class="button primary" type="submit" :disabled="isSubmitting">
           <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          {{ getButton() }}
+          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
+            {{ getButton() }}
         </button>
         <button
-          v-if="asAdmin()"
-          class="button"
+          class="button secondary"
           type="button"
-          @click="
-            $router.push(authStore.isAdministrator ? '/users' : '/user/edit/' + authStore.user.id)
-          "
+          @click="redirectToReturnRoute()"
         >
-          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
+          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
           Отменить
         </button>
       </div>
+
       <div v-if="errors.lastName" class="alert alert-danger mt-3 mb-0">{{ errors.lastName }}</div>
       <div v-if="errors.firstName" class="alert alert-danger mt-3 mb-0">{{ errors.firstName }}</div>
       <div v-if="errors.patronymic" class="alert alert-danger mt-3 mb-0">
         {{ errors.patronymic }}
       </div>
       <div v-if="errors.email" class="alert alert-danger mt-3 mb-0">{{ errors.email }}</div>
+      <div v-if="errors.accountIds" class="alert alert-danger mt-3 mb-0">{{ errors.accountIds }}</div>
       <div v-if="errors.password" class="alert alert-danger mt-3 mb-0">{{ errors.password }}</div>
       <div v-if="errors.password2" class="alert alert-danger mt-3 mb-0">{{ errors.password2 }}</div>
     </Form>

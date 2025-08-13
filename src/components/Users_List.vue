@@ -27,9 +27,10 @@ import router from '@/router'
 import { storeToRefs } from 'pinia'
 import { useUsersStore } from '@/stores/users.store.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
-import { getRoleName } from '@/helpers/user.helpers.js'
+import { getRoleName, isManager } from '@/helpers/user.helpers.js'
 import { mdiMagnify } from '@mdi/js'
-import { onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
+import ActionButton from '@/components/ActionButton.vue'
 
 import { useAuthStore } from '@/stores/auth.store.js'
 const authStore = useAuthStore()
@@ -37,21 +38,34 @@ const authStore = useAuthStore()
 import { useRolesStore } from '@/stores/roles.store.js'
 const rolesStore = useRolesStore()
 
+import { useAccountsStore } from '@/stores/accounts.store.js'
+const accountsStore = useAccountsStore()
+
 const usersStore = useUsersStore()
 const { users } = storeToRefs(usersStore)
-usersStore.getAll()
 
-// Load roles when component mounts to ensure getRoleName works properly
+const enhancedUsers = computed(() => {
+  if (!users.value || !Array.isArray(users.value)) return []
+  return users.value.map(user => {
+    return {
+      ...user,
+      credentialsSortValue: getCredentialsSortValue(user)
+    }
+  })
+})
+
 onMounted(async () => {
   await rolesStore.ensureLoaded()
+  await accountsStore.getAll()
+  await usersStore.getAll()
 })
 
 import { useAlertStore } from '@/stores/alert.store.js'
+import { useConfirmation } from '@/helpers/confirmation.js'
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
 
-import { useConfirm } from 'vuetify-use-dialog'
-const confirm = useConfirm()
+const { confirmDelete } = useConfirmation()
 
 function userSettings(item) {
   const id = item.id
@@ -81,50 +95,81 @@ function filterUsers(value, query, item) {
   if (crd.toLocaleUpperCase().indexOf(q) !== -1) {
     return true
   }
+
+  const managedAccounts = getManagedAccountNames(i)
+  if (managedAccounts.some(accountName => 
+    accountName.toLocaleUpperCase().indexOf(q) !== -1
+  )) {
+    return true
+  }
+
   return false
 }
 
 async function deleteUser(item) {
-  const content = 'Удалить пользователя "' + item.firstName + ' ' + item.lastName + '" ?'
-  const result = await confirm({
-    title: 'Подтверждение',
-    confirmationText: 'Удалить',
-    cancellationText: 'Не удалять',
-    dialogProps: {
-      width: '30%',
-      minWidth: '250px'
-    },
-    confirmationButtonProps: {
-      color: 'orange-darken-3'
-    },
-    content: content
-  })
+  const userName = `${item.firstName} ${item.lastName}`
+  const confirmed = await confirmDelete(userName, 'пользователя')
 
-  if (result) {
+  if (confirmed) {
     usersStore
       .delete(item.id)
       .then(() => {
         usersStore.getAll()
       })
       .catch((error) => {
-        alertStore.error(error)
+        alertStore.error('Ошибка при удалении пользователя: ' + (error.message || error))
       })
   }
 }
 
+function getManagedAccountNames(user) {
+  if (!isManager(user) || !user.accountIds || !Array.isArray(user.accountIds)) {
+    return []
+  }
+  
+  const accounts = accountsStore.accounts || []
+  return user.accountIds
+    .map(accountId => {
+      const account = accounts.find(acc => acc.id === accountId)
+      return account ? account.name : null
+    })
+    .filter(name => name !== null)
+}
+
+function getCredentialsDisplay(user) {
+  const roleName = getRoleName(user)
+  const managedAccounts = getManagedAccountNames(user)
+  
+  if (managedAccounts.length > 0) {
+    return roleName + '<br>' + managedAccounts.join('<br>')
+  }
+  
+  return roleName
+}
+
+function getCredentialsSortValue(user) {
+  const roleName = getRoleName(user)
+  const managedAccounts = getManagedAccountNames(user)
+  
+  // Sort by role name first, then by account names (joined as string)
+  if (managedAccounts.length > 0) {
+    return roleName + ' ' + managedAccounts.sort().join(' ')
+  }
+  
+  return roleName
+}
+
 const headers = [
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
   { title: 'Пользователь', align: 'start', key: 'id' },
   { title: 'E-mail', align: 'start', key: 'email' },
-  { title: 'Права', align: 'start', key: 'credentials', sortable: false },
-  { title: '', align: 'center', key: 'actions0', sortable: false, width: '5%' },
-  { title: '', align: 'center', key: 'actions1', sortable: false, width: '5%' },
-  { title: '', align: 'center', key: 'actions2', sortable: false, width: '5%' }
+  { title: 'Права', align: 'start', key: 'credentialsSortValue' }
 ]
 </script>
 
 <template>
   <div class="settings table-2">
-    <h1 class="orange">Пользователи</h1>
+    <h1 class="primary-heading">Пользователи</h1>
     <hr class="hr" />
 
     <div class="link-crt">
@@ -139,14 +184,14 @@ const headers = [
 
     <v-card>
       <v-data-table
-        v-if="users?.length"
+        v-if="enhancedUsers?.length"
         v-model:items-per-page="authStore.users_per_page"
         items-per-page-text="Пользователей на странице"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
         v-model:page="authStore.users_page"
         :headers="headers"
-        :items="users"
+        :items="enhancedUsers"
         :search="authStore.users_search"
         v-model:sort-by="authStore.users_sort_by"
         :custom-filter="filterUsers"
@@ -157,23 +202,19 @@ const headers = [
           {{ item['lastName'] }} {{ item['firstName'] }} {{ item['patronymic'] }}
         </template>
 
-        <template v-slot:[`item.credentials`]="{ item }">
-          <span v-html="getRoleName(item)"></span>
+        <template v-slot:[`item.credentialsSortValue`]="{ item }">
+          <span v-html="getCredentialsDisplay(item)"></span>
         </template>
 
-        <template v-slot:[`item.actions1`]="{ item }">
-          <button @click="userSettings(item)" class="anti-btn">
-            <font-awesome-icon size="1x" icon="fa-solid fa-pen" class="anti-btn" />
-          </button>
-        </template>
-        <template v-slot:[`item.actions2`]="{ item }">
-          <button @click="deleteUser(item)" class="anti-btn">
-            <font-awesome-icon size="1x" icon="fa-solid fa-trash-can" class="anti-btn" />
-          </button>
+        <template v-slot:[`item.actions`]="{ item }">
+          <div class="actions-container">
+            <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать информацию о пользователе" @click="userSettings" />
+            <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить информацию о пользователе" @click="deleteUser" />
+          </div>
         </template>
       </v-data-table>
-      <div v-if="!users?.length" class="text-center m-5">Список пользователей пуст</div>
-      <div v-if="users?.length">
+      <div v-if="!enhancedUsers?.length" class="text-center m-5">Список пользователей пуст</div>
+      <div v-if="enhancedUsers?.length">
         <v-text-field
           v-model="authStore.users_search"
           :append-inner-icon="mdiMagnify"

@@ -47,7 +47,11 @@ const router = createRouter({
         if (!auth.user) {
           return '/login'
         }
-        return '/registers'
+        // Users with any role go to accounts, users with no role go to their edit form
+        if (auth.isAdministrator || auth.isManager || auth.isEngineer) {
+          return '/accounts'
+        }
+        return `/user/edit/${auth.user.id}`
       }
     },
     {
@@ -72,9 +76,20 @@ const router = createRouter({
       component: () => import('@/views/Users_View.vue')
     },
     {
-      path: '/registers',
-      name: 'Реестры',
-      component: () => import('@/views/Registers_View.vue')
+      path: '/accounts',
+      name: 'Лицевые счета и устройства',
+      component: () => import('@/views/Accounts_View.vue')
+    },
+    {
+      path: '/account/create',
+      name: 'Создание лицевого счёта',
+      component: () => import('@/views/Account_CreateView.vue')
+    },
+    {
+      path: '/account/edit/:id',
+      name: 'Настройки лицевого счёта',
+      component: () => import('@/views/Account_EditView.vue'),
+      props: true
     },
     {
       path: '/user/edit/:id',
@@ -118,6 +133,42 @@ router.beforeEach(async (to) => {
   }
 
 
+  // (3) Role-based access control
+  if (to.path === '/accounts') {
+    if (!auth.isAdministrator && !auth.isManager && !auth.isEngineer) {
+      return `/user/edit/${auth.user.id}`
+    }
+  }
+
+  if (to.path === '/users') {
+    if (!auth.isAdministrator && !auth.isManager && !auth.isEngineer) {
+      return `/user/edit/${auth.user.id}`
+    }
+  }
+
+  if (to.path === '/account/create') {
+    if (!auth.isAdministrator) {
+      return '/'
+    }
+  }
+
+  if (to.path.startsWith('/account/edit/')) {
+    if (!auth.isAdministrator && !auth.isManager) {
+      return '/'
+    }
+  }
+
+  // For user edit pages, ensure users can only edit their own profile unless they have elevated roles
+  if (to.path.startsWith('/user/edit/')) {
+    const editUserId = to.params.id
+    const currentUserId = auth.user.id.toString()
+    
+    // Allow access if editing own profile or if user has administrative roles
+    if (editUserId !== currentUserId && !auth.isAdministrator && !auth.isManager) {
+      return `/user/edit/${auth.user.id}`
+    }
+  }
+
   // (4) Handle login page access with role-priority redirect
   if (loginPages.includes(to.path)) {
     try {
@@ -135,8 +186,12 @@ router.beforeEach(async (to) => {
       return true
     }
     
-    // No need to login, redirect based on role priority
-    return '/registers'
+    // Redirect after login based on user roles
+    if (auth.isAdministrator || auth.isManager || auth.isEngineer) {
+      return '/accounts'
+    }
+    // Users with no role go to their edit form
+    return `/user/edit/${auth.user.id}`
   }
 
   // (5) Allow access to other routes

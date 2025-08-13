@@ -79,10 +79,6 @@ describe('auth store', () => {
       expect(store.users_search).toBe('')
       expect(store.users_sort_by).toEqual(['id'])
       expect(store.users_page).toBe(1)
-      expect(store.registers_per_page).toBe(10)
-      expect(store.registers_search).toBe('')
-      expect(store.registers_sort_by).toEqual([{ key: 'id', order: 'asc' }])
-      expect(store.registers_page).toBe(1)
       expect(store.returnUrl).toBeNull()
       expect(store.re_jwt).toBeNull()
       expect(store.re_tgt).toBeNull()
@@ -368,126 +364,141 @@ describe('auth store', () => {
     })
   })
 
-  describe('registers list parameters', () => {
-    it('initializes registers parameters with default values', () => {
-      const store = useAuthStore()
-      expect(store.registers_per_page).toBe(10)
-      expect(store.registers_search).toBe('')
-      expect(store.registers_sort_by).toEqual([{ key: 'id', order: 'asc' }])
-      expect(store.registers_page).toBe(1)
+  describe('Accounts Tree State Management', () => {
+    beforeEach(() => {
+      setActivePinia(createPinia())
+      vi.clearAllMocks()
+      localStorage.clear()
     })
 
-    it('allows updating registers_per_page', () => {
+    it('initializes with empty tree state when no user', () => {
       const store = useAuthStore()
-      store.registers_per_page = 25
-      expect(store.registers_per_page).toBe(25)
       
-      store.registers_per_page = 50
-      expect(store.registers_per_page).toBe(50)
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
     })
 
-    it('allows updating registers_search', () => {
+    it('saves tree state for current user', () => {
       const store = useAuthStore()
-      store.registers_search = 'test search'
-      expect(store.registers_search).toBe('test search')
+      store.user = { id: 1, email: 'test@example.com' }
       
-      store.registers_search = 'another search term'
-      expect(store.registers_search).toBe('another search term')
+      store.saveAccountsTreeState('account-123', ['root-accounts', 'account-123'])
       
-      // Test clearing search
-      store.registers_search = ''
-      expect(store.registers_search).toBe('')
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: 'account-123',
+        expandedNodes: ['root-accounts', 'account-123']
+      })
+      
+      expect(localStorage.setItem).toHaveBeenCalledWith('accountsTreeState', expect.any(String))
     })
 
-    it('allows updating registers_sort_by', () => {
+    it('does not save tree state when no user', () => {
       const store = useAuthStore()
+      store.user = null
       
-      // Test sorting by name ascending
-      store.registers_sort_by = [{ key: 'name', order: 'asc' }]
-      expect(store.registers_sort_by).toEqual([{ key: 'name', order: 'asc' }])
+      store.saveAccountsTreeState('account-123', ['root-accounts'])
       
-      // Test sorting by name descending
-      store.registers_sort_by = [{ key: 'name', order: 'desc' }]
-      expect(store.registers_sort_by).toEqual([{ key: 'name', order: 'desc' }])
-      
-      // Test sorting by date
-      store.registers_sort_by = [{ key: 'created_at', order: 'desc' }]
-      expect(store.registers_sort_by).toEqual([{ key: 'created_at', order: 'desc' }])
-      
-      // Test multiple sort criteria
-      store.registers_sort_by = [
-        { key: 'name', order: 'asc' },
-        { key: 'id', order: 'desc' }
-      ]
-      expect(store.registers_sort_by).toEqual([
-        { key: 'name', order: 'asc' },
-        { key: 'id', order: 'desc' }
-      ])
+      expect(localStorage.setItem).not.toHaveBeenCalledWith('accountsTreeState', expect.any(String))
     })
 
-    it('allows updating registers_page', () => {
+    it('returns empty state when user not logged in', () => {
       const store = useAuthStore()
-      store.registers_page = 2
-      expect(store.registers_page).toBe(2)
+      store.user = null
       
-      store.registers_page = 5
-      expect(store.registers_page).toBe(5)
-      
-      // Test resetting to first page
-      store.registers_page = 1
-      expect(store.registers_page).toBe(1)
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
     })
 
-    it('maintains registers parameters independently from users parameters', () => {
+    it('handles corrupted localStorage data gracefully', () => {
+      localStorage.setItem('accountsTreeState', 'invalid-json')
+      
+      setActivePinia(createPinia())
       const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
       
-      // Set different values for users and registers parameters
-      store.users_per_page = 20
-      store.users_search = 'user search'
-      store.users_sort_by = ['name']
-      store.users_page = 3
-      
-      store.registers_per_page = 15
-      store.registers_search = 'register search'
-      store.registers_sort_by = [{ key: 'date', order: 'desc' }]
-      store.registers_page = 2
-      
-      // Verify they are independent
-      expect(store.users_per_page).toBe(20)
-      expect(store.users_search).toBe('user search')
-      expect(store.users_sort_by).toEqual(['name'])
-      expect(store.users_page).toBe(3)
-      
-      expect(store.registers_per_page).toBe(15)
-      expect(store.registers_search).toBe('register search')
-      expect(store.registers_sort_by).toEqual([{ key: 'date', order: 'desc' }])
-      expect(store.registers_page).toBe(2)
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
     })
 
-    it('handles edge cases for registers parameters', () => {
+    it('clears tree state for current user', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+      
+      // First save some state
+      store.saveAccountsTreeState('account-123', ['root-accounts'])
+      expect(store.getAccountsTreeState.selectedNode).toBe('account-123')
+      
+      // Then clear it
+      store.clearAccountsTreeState()
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
+      
+      expect(localStorage.setItem).toHaveBeenCalledWith('accountsTreeState', '{}')
+    })
+
+    it('does not clear tree state when no user', () => {
+      const store = useAuthStore()
+      store.user = null
+      
+      store.clearAccountsTreeState()
+      
+      expect(localStorage.setItem).not.toHaveBeenCalledWith('accountsTreeState', expect.any(String))
+    })
+
+    it('maintains separate state for different users', () => {
       const store = useAuthStore()
       
-      // Test zero and negative values for per_page
-      store.registers_per_page = 0
-      expect(store.registers_per_page).toBe(0)
+      // User 1
+      store.user = { id: 1, email: 'user1@example.com' }
+      store.saveAccountsTreeState('account-123', ['root-accounts'])
+      const user1State = store.getAccountsTreeState
       
-      store.registers_per_page = -1
-      expect(store.registers_per_page).toBe(-1)
+      // User 2
+      store.user = { id: 2, email: 'user2@example.com' }
+      store.saveAccountsTreeState('account-456', ['root-accounts', 'account-456'])
+      const user2State = store.getAccountsTreeState
       
-      // Test zero and negative values for page
-      store.registers_page = 0
-      expect(store.registers_page).toBe(0)
+      // Switch back to User 1
+      store.user = { id: 1, email: 'user1@example.com' }
       
-      store.registers_page = -1
-      expect(store.registers_page).toBe(-1)
+      expect(store.getAccountsTreeState).toEqual(user1State)
+      expect(user1State.selectedNode).toBe('account-123')
+      expect(user2State.selectedNode).toBe('account-456')
+    })
+
+    it('handles null and undefined values in saveAccountsTreeState', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
       
-      // Test empty sort_by array
-      store.registers_sort_by = []
-      expect(store.registers_sort_by).toEqual([])
+      store.saveAccountsTreeState(null, undefined)
       
-      // Test null values
-      store.registers_search = null
-      expect(store.registers_search).toBeNull()
+      expect(store.getAccountsTreeState).toEqual({
+        selectedNode: null,
+        expandedNodes: []
+      })
+    })
+
+    it('creates a copy of expandedNodes array to prevent mutations', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+      
+      const originalExpanded = ['root-accounts', 'account-123']
+      store.saveAccountsTreeState('account-123', originalExpanded)
+      
+      // Modify the original array
+      originalExpanded.push('new-item')
+      
+      // Stored state should not be affected
+      expect(store.getAccountsTreeState.expandedNodes).toEqual(['root-accounts', 'account-123'])
     })
   })
+
 })

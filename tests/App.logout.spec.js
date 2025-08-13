@@ -1,3 +1,5 @@
+/* @vitest-environment jsdom */
+
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,7 +22,6 @@
 //
 // This file is a part of Media Pi frontend application
 
-/* @vitest-environment jsdom */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
@@ -50,7 +51,7 @@ const router = createRouter({
     { path: '/', component: { template: '<div>Home</div>' } },
     { path: '/login', component: { template: '<div>Login</div>' } },
     { path: '/users', component: { template: '<div>Users</div>' } },
-    { path: '/registers', component: { template: '<div>Registers</div>' } },
+    { path: '/accounts', component: { template: '<div>Accounts</div>' } },
     { path: '/user/edit/:id', component: { template: '<div>Edit User</div>' } },
     { path: '/recover', component: { template: '<div>Recover</div>' } },
     { path: '/register', component: { template: '<div>Register</div>' } }
