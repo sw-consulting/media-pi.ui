@@ -51,6 +51,7 @@ const getUserById = (id) => {
       getAll() 
     } catch (err) {
       error.value = err
+      console.error('Error adding user:', err)
       throw err
     }
     finally {

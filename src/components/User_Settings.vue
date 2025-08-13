@@ -52,8 +52,8 @@ try {
   if (loadAccounts()) {
     await accountsStore.getAll()
   }
-} catch (err) {
-  alertStore.error('Не удалось загрузить список аккаунтов. Попробуйте обновить страницу или обратитесь к администратору.');
+} catch {
+  alertStore.error('Не удалось загрузить список лицевых счетов.');
 }
 
 const props = defineProps({
@@ -77,7 +77,13 @@ const schema = Yup.object().shape({
   email: Yup.string()
     .required('Необходимо указать электронную почту')
     .email('Неверный формат электронной почты'),
-  accountIds: Yup.array().of(Yup.number()),
+  accountIds: Yup.array().of(
+    Yup.mixed().test(
+      'is-number-or-empty', 
+      'Ошибка выбора лицевых счетов', 
+      value => value === '' || (typeof value === 'number' && !isNaN(value))
+    )
+  ),
   password: Yup.string().concat(
     isRegister() ? Yup.string().required('Необходимо указать пароль').matches(pwdReg, pwdErr) : null
   ),
@@ -94,7 +100,8 @@ const showPassword = ref(false)
 const showPassword2 = ref(false)
 
 let user = ref({
-  accountIds: []
+  accountIds: [''], // Start with one empty field for FieldArray
+  roles: []
 })
 
 // Computed property for available roles as options for the combobox
@@ -127,11 +134,13 @@ const selectedRole = computed({
   }
 })
 
-// Helper to check if selected role is a manager using isManager from user.helpers.js
 const isSelectedRoleManager = computed(() => {
   if (!selectedRole.value) return false;
-  // isManager expects a user object with a roles array
   return isManager({ roles: [selectedRole.value] });
+});
+
+const shouldShowAccountArray = computed(() => {
+  return showAndEditCredentials() && isSelectedRoleManager.value;
 });
 
 const accountOptions = computed(() => {
@@ -152,16 +161,12 @@ const userAccounts = computed(() => {
 
 if (!isRegister()) {
   ;({ user } = storeToRefs(usersStore))
+  console.log('User before:', user.value)
   await usersStore.getById(props.id, true)
-  if (user.value && !Array.isArray(user.value.accountIds)) {
-    if (Array.isArray(user.value.accounts)) {
-      user.value.accountIds = user.value.accounts
-    } else {
-      user.value.accountIds = []
-    }
+  if (!Array.isArray(user.value.accountIds) || user.value.accountIds.length === 0) {
+    user.value.accountIds = ['']
   }
-} else {
-  user.value.accountIds = []
+  console.log('User after:', user.value)
 }
 
 function isRegister() {
@@ -200,6 +205,13 @@ function redirectToReturnRoute() {
   redirectToDefaultRoute()
 }
 
+function filterAccountIds(accountIds) {
+  return (accountIds || [])
+    .filter(accountId => accountId !== '' && accountId !== null && accountId !== undefined)
+    .map(accountId => typeof accountId === 'string' ? parseInt(accountId, 10) : accountId)
+    .filter(accountId => !isNaN(accountId))
+}
+
 function onSubmit(values) {
   // Clear any previous alerts
   const alertStore = useAlertStore()
@@ -212,7 +224,7 @@ function onSubmit(values) {
       } else {
         values.roles = []
       }
-      values.accountIds = values.accountIds || []
+      values.accountIds = filterAccountIds(values.accountIds)
       return usersStore
         .add(values, true)
         .then(() =>
@@ -248,9 +260,8 @@ function onSubmit(values) {
       } else {
         values.roles = []
       }
-      values.accountIds = values.accountIds || []
+      values.accountIds = filterAccountIds(values.accountIds)
     } else {
-      // Non-admin keeps existing roles
       values.roles = undefined
       values.accountIds = undefined
     }
@@ -354,7 +365,7 @@ function onSubmit(values) {
           {{ getRoleName(user) }}
         </span>
       </div>
-      <div v-if="showAndEditCredentials() && isSelectedRoleManager">
+      <div v-if="shouldShowAccountArray">
         <FieldArrayWithButtons  name="accountIds"  label="Лицевые счета"  :options="accountOptions"
           :hasError="!!errors.accountIds"  addTooltip="Добавить лицевой счет" removeTooltip="Удалить лицевой счет"
           placeholder="Выберите лицевой счет:"

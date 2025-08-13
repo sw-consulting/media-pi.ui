@@ -58,7 +58,7 @@ const schema = Yup.object().shape({
   managers: Yup.array().of(
     Yup.mixed().test(
       'is-number-or-empty', 
-      'Invalid manager selection', 
+      'Ошибка выбора пользователей', 
       value => value === '' || (typeof value === 'number' && !isNaN(value))
     )
   )
