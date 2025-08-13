@@ -1,3 +1,5 @@
+/* @vitest-environment jsdom */
+
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,7 +22,6 @@
 //
 // This file is a part of Media Pi frontend application
 
-/* @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { Form } from 'vee-validate'

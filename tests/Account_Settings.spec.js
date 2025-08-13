@@ -1,6 +1,3 @@
-import { library } from '@fortawesome/fontawesome-svg-core';
-import { faCheckDouble, faXmark, faPlus, faMinus } from '@fortawesome/free-solid-svg-icons';
-library.add(faCheckDouble, faXmark, faPlus, faMinus);
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,11 +20,16 @@ library.add(faCheckDouble, faXmark, faPlus, faMinus);
 //
 // This file is a part of Media Pi frontend application
 
-/* @vitest-environment jsdom */
+
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faCheckDouble, faXmark, faPlus, faMinus } from '@fortawesome/free-solid-svg-icons';
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import AccountSettings from '@/components/Account_Settings.vue'
+
+library.add(faCheckDouble, faXmark, faPlus, faMinus);
+
 
 let authStore
 const accountsStore = {
