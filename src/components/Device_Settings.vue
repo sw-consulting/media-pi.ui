@@ -92,12 +92,13 @@ if (props.register) {
       ipAddress: loadedDevice.ipAddress || ''
     }
   } catch (err) {
-    if (err.status === 401 || err.status === 403) {
+    const status = err?.status || err?.response?.status
+    if (status === 401 || status === 403) {
       redirectToDefaultRoute()
-    } else if (err.status === 404) {
+    } else if (status === 404) {
       alertStore.error(`Устройство с ID ${props.id} не найдено`)
     } else {
-      const errorMessage = err.message || err
+      const errorMessage = err?.message || err?.response?.data?.message || err
       alertStore.error(`Ошибка загрузки устройства: ${errorMessage}`)
     }
   } finally {
@@ -130,16 +131,17 @@ async function onSubmit (values) {
     }
     router.go(-1)
   } catch (err) {
-    if (err.status === 401 || err.status === 403) {
+    const status = err?.status || err?.response?.status
+    if (status === 401 || status === 403) {
       redirectToDefaultRoute()
-    } else if (err.status === 404) {
+    } else if (status === 404) {
       alertStore.error(`Устройство с ID ${props.id} не найдено`)
-    } else if (err.status === 409) {
+    } else if (status === 409) {
       alertStore.error('Устройство с таким IP адресом уже существует')
-    } else if (err.status === 422) {
+    } else if (status === 422) {
       alertStore.error('Проверьте корректность введённых данных')
     } else {
-      const errorMessage = err.message || err
+      const errorMessage = err?.message || err?.response?.data?.message || err
       alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} устройства: ${errorMessage}`)
     }
   }

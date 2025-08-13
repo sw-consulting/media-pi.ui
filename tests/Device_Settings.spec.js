@@ -177,5 +177,328 @@ describe('Device_Settings.vue', () => {
 
     expect(redirectToDefaultRoute).toHaveBeenCalled()
   })
+
+  // New tests for better coverage
+
+  describe('permission checks', () => {
+    it('allows engineers to create devices', async () => {
+      authStore.isAdministrator = false
+      authStore.isEngineer = true
+      authStore.isManager = false
+
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      expect(wrapper.find('h1').text()).toBe('Новое устройство')
+    })
+
+    it('allows managers to edit devices', async () => {
+      authStore.isAdministrator = false
+      authStore.isEngineer = false
+      authStore.isManager = true
+      devicesStore.device = { id: 1, name: 'Device', ipAddress: '1.2.3.4', accountId: 1 }
+      devicesStore.getById.mockResolvedValue()
+
+      const wrapper = mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(wrapper.find('h1').text()).toBe('Настройки устройства')
+    })
+
+    it('allows engineers to edit unassigned devices', async () => {
+      authStore.isAdministrator = false
+      authStore.isEngineer = true
+      authStore.isManager = false
+      devicesStore.device = { id: 1, name: 'Device', ipAddress: '1.2.3.4', accountId: null }
+      devicesStore.getById.mockResolvedValue()
+
+      const wrapper = mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(wrapper.find('h1').text()).toBe('Настройки устройства')
+    })
+  })
+
+  describe('device loading errors', () => {
+    it('handles device not found error during load', async () => {
+      devicesStore.device = null
+      devicesStore.getById.mockResolvedValue()
+
+      mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Ошибка загрузки устройства: Устройство с ID 1 не найдено')
+    })
+
+    it('handles 401/403 errors during load', async () => {
+      const { redirectToDefaultRoute } = await import('@/helpers/default.route.js')
+      const error = { status: 401 }
+      devicesStore.getById.mockRejectedValue(error)
+
+      mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(redirectToDefaultRoute).toHaveBeenCalled()
+    })
+
+    it('handles 404 errors during load', async () => {
+      const error = { status: 404 }
+      devicesStore.getById.mockRejectedValue(error)
+
+      mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Устройство с ID 1 не найдено')
+    })
+
+    it('handles other errors during load', async () => {
+      const error = { message: 'Network error' }
+      devicesStore.getById.mockRejectedValue(error)
+
+      mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Ошибка загрузки устройства: Network error')
+    })
+
+    it('handles errors without status property during load', async () => {
+      const error = new Error('Network error')
+      devicesStore.getById.mockRejectedValue(error)
+
+      mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Ошибка загрузки устройства: Network error')
+    })
+
+    it('handles axios-style errors during load', async () => {
+      const error = { response: { status: 404, data: { message: 'Not found' } } }
+      devicesStore.getById.mockRejectedValue(error)
+
+      mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Устройство с ID 1 не найдено')
+    })
+  })
+
+  describe('form submission errors', () => {
+    it('handles 401/403 errors during create', async () => {
+      const { redirectToDefaultRoute } = await import('@/helpers/default.route.js')
+      devicesStore.register.mockResolvedValue({ id: 5 })
+      devicesStore.update.mockRejectedValue({ status: 401 })
+
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(redirectToDefaultRoute).toHaveBeenCalled()
+    })
+
+    it('handles 404 errors during update', async () => {
+      devicesStore.device = { id: 1, name: 'Device', ipAddress: '1.2.3.4' }
+      devicesStore.getById.mockResolvedValue()
+      devicesStore.update.mockRejectedValue({ status: 404 })
+
+      const wrapper = mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Устройство с ID 1 не найдено')
+    })
+
+    it('handles 409 conflict errors during submission', async () => {
+      devicesStore.register.mockResolvedValue({ id: 5 })
+      devicesStore.update.mockRejectedValue({ status: 409 })
+
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Устройство с таким IP адресом уже существует')
+    })
+
+    it('handles 422 validation errors during submission', async () => {
+      devicesStore.device = { id: 1, name: 'Device', ipAddress: '1.2.3.4' }
+      devicesStore.getById.mockResolvedValue()
+      devicesStore.update.mockRejectedValue({ status: 422 })
+
+      const wrapper = mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Проверьте корректность введённых данных')
+    })
+
+    it('handles other errors during create submission', async () => {
+      devicesStore.register.mockResolvedValue({ id: 5 })
+      devicesStore.update.mockRejectedValue({ message: 'Server error' })
+
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Ошибка при создании устройства: Server error')
+    })
+
+    it('handles other errors during update submission', async () => {
+      devicesStore.device = { id: 1, name: 'Device', ipAddress: '1.2.3.4' }
+      devicesStore.getById.mockResolvedValue()
+      devicesStore.update.mockRejectedValue({ message: 'Server error' })
+
+      const wrapper = mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Ошибка при обновлении устройства: Server error')
+    })
+
+    it('handles errors without message during submission', async () => {
+      devicesStore.register.mockResolvedValue({ id: 5 })
+      devicesStore.update.mockRejectedValue({ status: 500 })
+
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith('Ошибка при создании устройства: [object Object]')
+    })
+  })
+
+  describe('form rendering and behavior', () => {
+    it('displays correct title for create mode', async () => {
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      expect(wrapper.find('h1').text()).toBe('Новое устройство')
+    })
+
+    it('displays correct title for edit mode', async () => {
+      devicesStore.device = { id: 1, name: 'Device', ipAddress: '1.2.3.4' }
+      devicesStore.getById.mockResolvedValue()
+
+      const wrapper = mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(wrapper.find('h1').text()).toBe('Настройки устройства')
+    })
+
+    it('displays correct button text for create mode', async () => {
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Создать')
+    })
+
+    it('displays correct button text for edit mode', async () => {
+      devicesStore.device = { id: 1, name: 'Device', ipAddress: '1.2.3.4' }
+      devicesStore.getById.mockResolvedValue()
+
+      const wrapper = mountSettings({ register: false, id: 1 })
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Сохранить')
+    })
+
+    it('shows validation errors', async () => {
+      const wrapper = mountSettings({ showValidationError: true })
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Необходимо указать имя')
+      expect(wrapper.text()).toContain('Необходимо указать IP адрес')
+    })
+
+    it('shows loading state when devicesStore loading is true', async () => {
+      devicesStore.loading = true
+
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Сохранение...')
+    })
+
+    it('shows alert message', async () => {
+      alertStore.alert = { type: 'alert-success', message: 'Device saved successfully' }
+
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Device saved successfully')
+    })
+
+    it('clears alert when close button is clicked', async () => {
+      alertStore.alert = { type: 'alert-success', message: 'Test alert' }
+
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+
+      const closeButton = wrapper.find('.close')
+      await closeButton.trigger('click')
+
+      expect(alertStore.clear).toHaveBeenCalled()
+    })
+
+    it('trims input values before submission', async () => {
+      devicesStore.register.mockResolvedValue({ id: 5 })
+      devicesStore.update.mockResolvedValue()
+
+      const wrapper = mountSettings({ 
+        register: true, 
+        submitName: '  Test Device  ', 
+        submitIp: '  1.2.3.4  ' 
+      })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(devicesStore.update).toHaveBeenCalledWith(5, expect.objectContaining({ 
+        name: 'Test Device', 
+        ipAddress: '1.2.3.4' 
+      }))
+    })
+
+    it('submits without accountId when not provided', async () => {
+      devicesStore.register.mockResolvedValue({ id: 5 })
+      devicesStore.update.mockResolvedValue()
+
+      const wrapper = mountSettings({ register: true, accountId: undefined })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(devicesStore.update).toHaveBeenCalledWith(5, expect.objectContaining({ 
+        name: 'Test Device', 
+        ipAddress: '1.2.3.4'
+      }))
+      expect(devicesStore.update).toHaveBeenCalledWith(5, expect.not.objectContaining({ 
+        accountId: expect.anything()
+      }))
+    })
+  })
 })
 
