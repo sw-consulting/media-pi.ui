@@ -84,6 +84,21 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
+  async function getByManager(userId) {
+    loading.value = true
+    error.value = null
+    try {
+      const result = await fetchWrapper.get(`${baseUrl}/by-manager/${userId}`)
+      accounts.value = result
+    } catch (err) {
+      error.value = err
+      throw err
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
   async function update(id, params) {
     loading.value = true
     error.value = null
@@ -121,6 +136,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     add,
     getAll,
     getById,
+    getByManager,
     update,
     delete: deleteAccount
   }

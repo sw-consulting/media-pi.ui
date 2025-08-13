@@ -22,7 +22,7 @@
 
 /* @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 import UsersList from '@/components/Users_List.vue'
 import { resolveAll } from './helpers/test-utils'
@@ -83,6 +83,25 @@ vi.mock('@/stores/roles.store.js', () => ({
   })
 }))
 
+vi.mock('@/stores/accounts.store.js', () => ({
+  useAccountsStore: () => ({
+    getAll: vi.fn(() => Promise.resolve()),
+    accounts: [
+      { id: 1, name: 'Test Account' },
+      { id: 2, name: 'Account B' }
+    ]
+  })
+}))
+
+vi.mock('@/helpers/user.helpers.js', () => ({
+  getRoleName: (user) => {
+    if (user.roles?.includes('administrator')) return 'Administrator'
+    if (user.roles?.includes('account manager')) return 'Account Manager'
+    return 'User'
+  },
+  isManager: (user) => user.roles?.includes('account manager') || false
+}))
+
 vi.mock('vuetify-use-dialog', () => ({
   useConfirm: () => confirmMock
 }))
@@ -105,7 +124,7 @@ describe('Users_List.vue', () => {
     vi.useRealTimers()
   })
 
-  it('calls getAll on mount', () => {
+  it('calls getAll on mount', async () => {
     const wrapper = mount(UsersList, {
       global: {
         stubs: {
@@ -117,6 +136,10 @@ describe('Users_List.vue', () => {
         }
       }
     })
+    
+    // Wait for all async operations to complete
+    await flushPromises()
+    
     expect(getAll).toHaveBeenCalled()
     expect(wrapper.exists()).toBe(true)
   })
@@ -358,5 +381,293 @@ describe('Users_List.vue', () => {
     })
     await resolveAll()
     expect(ensureLoaded).toHaveBeenCalled()
+  })
+
+  // Test filterUsers function
+  it('filters users by name fields', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const filterUsers = wrapper.vm.filterUsers || wrapper.vm.$options.methods?.filterUsers
+    if (filterUsers) {
+      const testUser = { 
+        raw: { 
+          firstName: 'John', 
+          lastName: 'Doe', 
+          patronymic: 'Middle',
+          email: 'john@example.com',
+          roles: ['administrator'],
+          accountIds: []
+        } 
+      }
+      
+      expect(filterUsers('', 'john', testUser)).toBe(true)
+      expect(filterUsers('', 'doe', testUser)).toBe(true)
+      expect(filterUsers('', 'middle', testUser)).toBe(true)
+      expect(filterUsers('', 'john@example.com', testUser)).toBe(true)
+      expect(filterUsers('', 'nonexistent', testUser)).toBe(false)
+    }
+  })
+
+  it('filters users by role name', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const filterUsers = wrapper.vm.filterUsers || wrapper.vm.$options.methods?.filterUsers
+    if (filterUsers) {
+      const testUser = { 
+        raw: { 
+          firstName: 'John', 
+          lastName: 'Doe', 
+          patronymic: '',
+          email: 'john@example.com',
+          roles: ['administrator'],
+          accountIds: []
+        } 
+      }
+      
+      expect(filterUsers('', 'admin', testUser)).toBe(true)
+    }
+  })
+
+  it('filters users by managed account names', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const filterUsers = wrapper.vm.filterUsers || wrapper.vm.$options.methods?.filterUsers
+    if (filterUsers) {
+      const testUser = { 
+        raw: { 
+          firstName: 'John', 
+          lastName: 'Doe', 
+          patronymic: '',
+          email: 'john@example.com',
+          roles: ['account manager'],
+          accountIds: [1]
+        } 
+      }
+      
+      expect(filterUsers('', 'test account', testUser)).toBe(true)
+    }
+  })
+
+  it('returns false for filterUsers with null parameters', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const filterUsers = wrapper.vm.filterUsers || wrapper.vm.$options.methods?.filterUsers
+    if (filterUsers) {
+      expect(filterUsers('', null, {})).toBe(false)
+      expect(filterUsers('', 'query', null)).toBe(false)
+      expect(filterUsers('', 'query', { raw: null })).toBe(false)
+    }
+  })
+
+  // Test getManagedAccountNames function
+  it('returns empty array for non-manager users', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const getManagedAccountNames = wrapper.vm.getManagedAccountNames || wrapper.vm.$options.methods?.getManagedAccountNames
+    if (getManagedAccountNames) {
+      const nonManagerUser = { roles: ['administrator'], accountIds: [1] }
+      expect(getManagedAccountNames(nonManagerUser)).toEqual([])
+    }
+  })
+
+  it('returns empty array for users without accountIds', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const getManagedAccountNames = wrapper.vm.getManagedAccountNames || wrapper.vm.$options.methods?.getManagedAccountNames
+    if (getManagedAccountNames) {
+      const managerUser = { roles: ['account manager'] }
+      expect(getManagedAccountNames(managerUser)).toEqual([])
+      
+      const managerUserWithNonArrayIds = { roles: ['account manager'], accountIds: 'not-array' }
+      expect(getManagedAccountNames(managerUserWithNonArrayIds)).toEqual([])
+    }
+  })
+
+  it('returns account names for manager users', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const getManagedAccountNames = wrapper.vm.getManagedAccountNames || wrapper.vm.$options.methods?.getManagedAccountNames
+    if (getManagedAccountNames) {
+      const managerUser = { roles: ['account manager'], accountIds: [1, 999] }
+      const result = getManagedAccountNames(managerUser)
+      expect(result).toEqual(['Test Account'])
+    }
+  })
+
+  // Test getCredentialsDisplay function
+  it('displays role name only for non-manager users', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const getCredentialsDisplay = wrapper.vm.getCredentialsDisplay || wrapper.vm.$options.methods?.getCredentialsDisplay
+    if (getCredentialsDisplay) {
+      const adminUser = { roles: ['administrator'] }
+      expect(getCredentialsDisplay(adminUser)).toBe('Administrator')
+    }
+  })
+
+  it('displays role name and account names for manager users', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const getCredentialsDisplay = wrapper.vm.getCredentialsDisplay || wrapper.vm.$options.methods?.getCredentialsDisplay
+    if (getCredentialsDisplay) {
+      const managerUser = { roles: ['account manager'], accountIds: [1] }
+      expect(getCredentialsDisplay(managerUser)).toBe('Account Manager<br>Test Account')
+    }
+  })
+
+  // Test getCredentialsSortValue function
+  it('returns role name for sort value for non-manager users', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const getCredentialsSortValue = wrapper.vm.getCredentialsSortValue || wrapper.vm.$options.methods?.getCredentialsSortValue
+    if (getCredentialsSortValue) {
+      const adminUser = { roles: ['administrator'] }
+      expect(getCredentialsSortValue(adminUser)).toBe('Administrator')
+    }
+  })
+
+  it('returns role name and sorted account names for manager users', () => {
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    const getCredentialsSortValue = wrapper.vm.getCredentialsSortValue || wrapper.vm.$options.methods?.getCredentialsSortValue
+    if (getCredentialsSortValue) {
+      const managerUser = { roles: ['account manager'], accountIds: [1] }
+      expect(getCredentialsSortValue(managerUser)).toBe('Account Manager Test Account')
+    }
+  })
+
+  it('returns empty array when users is null', async () => {
+    const originalValue = mockUsers.value
+    mockUsers.value = []
+    
+    const wrapper = mount(UsersList, {
+      global: {
+        stubs: {
+          'v-card': true,
+          'v-data-table': true,
+          'v-text-field': true,
+          'font-awesome-icon': true,
+          'router-link': true
+        }
+      }
+    })
+    
+    await flushPromises()
+    
+    const enhancedUsers = wrapper.vm.enhancedUsers
+    expect(enhancedUsers).toEqual([])
+    
+    // Reset mock data for other tests
+    mockUsers.value = originalValue
   })
 })

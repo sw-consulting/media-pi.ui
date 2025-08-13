@@ -34,7 +34,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { getRoleName, isManager } from '@/helpers/user.helpers.js'
 import { useRolesStore } from '@/stores/roles.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
-import { redirectToDefaultRoute } from '../helpers/default.route'
+import { redirectToDefaultRoute } from '@/helpers/default.route'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
 const alertStore = useAlertStore()
@@ -45,16 +45,6 @@ const accountsStore = useAccountsStore()
 const usersStore = useUsersStore()
 const authStore = useAuthStore()
 
-
-// Load roles before component renders to avoid race condition
-await rolesStore.ensureLoaded()
-try {
-  if (loadAccounts()) {
-    await accountsStore.getAll()
-  }
-} catch {
-  alertStore.error('Не удалось загрузить список лицевых счетов.');
-}
 
 const props = defineProps({
   register: {
@@ -95,6 +85,17 @@ const schema = Yup.object().shape({
     .oneOf([Yup.ref('password')], 'Пароли должны совпадать')
 })
 
+try {
+  await rolesStore.ensureLoaded() 
+  if (authStore.isAdministrator) {
+    await accountsStore.getAll()
+  }
+  else if (authStore.isAccountManager) {
+    await accountsStore.getByManager(props.id)
+  }
+} catch {
+  alertStore.error('Не удалось загрузить список лицевых счетов.');
+}
 
 const showPassword = ref(false)
 const showPassword2 = ref(false)
@@ -154,19 +155,27 @@ const userAccounts = computed(() => {
   if (!user.value || !Array.isArray(user.value.accountIds) || user.value.accountIds.length === 0) {
     return []
   }
-  return accountOptions.value.filter(option => 
-    user.value.accountIds.includes(option.value)
-  )
+  
+  const userAccountIds = user.value.accountIds.filter(id => id !== '' && id !== null && id !== undefined)
+  // Filter account options to only include those that match user's accountIds
+  const xx = (accountsStore.accounts || [])
+    .filter(acc => userAccountIds.includes(acc.id))
+    .map(acc => ({
+      value: acc.id,
+      text: acc.name
+    }))
+
+    return xx
 })
 
 if (!isRegister()) {
-  ;({ user } = storeToRefs(usersStore))
-  console.log('User before:', user.value)
   await usersStore.getById(props.id, true)
-  if (!Array.isArray(user.value.accountIds) || user.value.accountIds.length === 0) {
+  const { user: storeUser } = storeToRefs(usersStore)
+  user.value = storeUser.value
+  
+  if (!user.value.accountIds || !Array.isArray(user.value.accountIds) || user.value.accountIds.length === 0) {
     user.value.accountIds = ['']
   }
-  console.log('User after:', user.value)
 }
 
 function isRegister() {
@@ -188,11 +197,6 @@ function getButton() {
 function showCredentials() {
   return !isRegister() && !asAdmin()
 }
-
-function loadAccounts() {
-  return authStore.isAdministrator || authStore.isAccountManager
-}
-
 
 function showAndEditCredentials() {
   return asAdmin()
@@ -372,7 +376,7 @@ function onSubmit(values) {
         />
       </div>
 
-      <div v-if="authStore.isAccountManager" class="form-group field-list-container">
+      <div v-if="authStore.isManager" class="form-group field-list-container">
         <label for="fieldList" class="label field-list-label">Лицевые счета:</label>
         <ul id="fieldList" class="field-list">
           <li v-for="account in userAccounts" :key="account.value" class="field-list-item">

@@ -137,5 +137,82 @@ describe('accounts.store', () => {
     expect(store.error).toBe(mockError)
     expect(store.loading).toBe(false)
   })
+
+  // Tests for getByManager function
+  it('getByManager successfully fetches accounts for a manager', async () => {
+    const store = useAccountsStore()
+    const managerAccounts = [
+      { id: 1, name: 'Manager Account 1' },
+      { id: 3, name: 'Manager Account 3' }
+    ]
+    fetchWrapper.get.mockResolvedValueOnce(managerAccounts)
+
+    await store.getByManager(5)
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith('http://localhost:8080/api/accounts/by-manager/5')
+    expect(store.accounts).toEqual(managerAccounts)
+    expect(store.error).toBe(null)
+    expect(store.loading).toBe(false)
+  })
+
+  it('getByManager sets loading state correctly', async () => {
+    const store = useAccountsStore()
+    const managerAccounts = [{ id: 1, name: 'Account 1' }]
+    
+    // Mock a slow response to test loading state
+    let resolvePromise
+    const promise = new Promise((resolve) => {
+      resolvePromise = resolve
+    })
+    fetchWrapper.get.mockReturnValueOnce(promise)
+
+    const getByManagerPromise = store.getByManager(5)
+    
+    // Check loading state is true during the request
+    expect(store.loading).toBe(true)
+    
+    // Resolve the promise
+    resolvePromise(managerAccounts)
+    await getByManagerPromise
+    
+    // Check loading state is false after completion
+    expect(store.loading).toBe(false)
+  })
+
+  it('getByManager throws error and sets error state when fetch fails', async () => {
+    const store = useAccountsStore()
+    const mockError = new Error('GetByManager failed')
+    fetchWrapper.get.mockRejectedValueOnce(mockError)
+    
+    await expect(store.getByManager(5)).rejects.toThrow('GetByManager failed')
+    expect(store.error).toBe(mockError)
+    expect(store.loading).toBe(false)
+  })
+
+  it('getByManager handles manager with no accounts', async () => {
+    const store = useAccountsStore()
+    const emptyAccounts = []
+    fetchWrapper.get.mockResolvedValueOnce(emptyAccounts)
+
+    await store.getByManager(10)
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith('http://localhost:8080/api/accounts/by-manager/10')
+    expect(store.accounts).toEqual([])
+    expect(store.error).toBe(null)
+    expect(store.loading).toBe(false)
+  })
+
+  it('getByManager resets error state on successful call', async () => {
+    const store = useAccountsStore()
+    // Set initial error state
+    store.error = new Error('Previous error')
+    
+    const managerAccounts = [{ id: 1, name: 'Account 1' }]
+    fetchWrapper.get.mockResolvedValueOnce(managerAccounts)
+
+    await store.getByManager(5)
+
+    expect(store.error).toBe(null)
+  })
 })
 
