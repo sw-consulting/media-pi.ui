@@ -157,14 +157,20 @@ const getAccountChildren = (accountId) => {
     }))
   
   const children = []
-  if (unassigned.length > 0) {
-    children.push({ 
-      id: `account-${accountId}-unassigned`, 
-      name: 'Нераспределённые устройства', 
-      children: unassigned 
-    })
-  }
-  children.push(...groups)
+  
+  // Always add unassigned devices node (even if empty)
+  children.push({ 
+    id: `account-${accountId}-unassigned`, 
+    name: 'Нераспределённые устройства', 
+    children: unassigned 
+  })
+  
+  // Always add device groups container node (even if empty)
+  children.push({
+    id: `account-${accountId}-groups`,
+    name: 'Группы устройств',
+    children: groups
+  })
   
   return children
 }
@@ -292,7 +298,7 @@ const getAccountIdFromNodeId = (nodeId) => {
           </div>
           
           <!-- Action buttons for account nodes -->
-          <div v-else-if="item.id.startsWith('account-') && canEditAccounts" class="tree-actions">
+          <div v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups') && canEditAccounts" class="tree-actions">
             <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />
             <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
           </div>
