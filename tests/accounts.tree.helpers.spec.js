@@ -20,7 +20,7 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useAccountsTreeHelper } from '@/helpers/accounts.tree.helpers.js'
 
 describe('useAccountsTreeHelper', () => {
