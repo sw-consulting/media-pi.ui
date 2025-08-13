@@ -49,8 +49,6 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
-  faFolder,
-  faFolderOpen,
   faCircle,
   faCircleQuestion,
 } from '@fortawesome/free-regular-svg-icons'
@@ -69,8 +67,6 @@ library.add(
   faList, 
   faCheckDouble, 
   faXmark,
-  faFolder,
-  faFolderOpen,
   faCircle,
   faCircleQuestion,
   faCity,
@@ -90,7 +86,6 @@ import App from '@/App.vue'
 import router from '@/router'
 
 import { useAuthStore } from '@/stores/auth.store.js'
-import { fa } from 'vuetify/locale'
 
 export function initializeApp() {
   const vuetify = createVuetify({
