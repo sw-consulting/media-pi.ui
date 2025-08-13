@@ -21,7 +21,7 @@
 # This file is a part of Media Pi frontend application
 
 # Stage for building the frontend
-FROM node:18.18.2 AS build
+FROM node:20.19.4 AS build
 WORKDIR /app
 
 # Add build arguments with default values
