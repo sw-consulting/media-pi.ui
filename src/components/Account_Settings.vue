@@ -121,7 +121,7 @@ const managerOptions = computed(() => {
     .filter(u => Array.isArray(u.roles) && u.roles.includes(UserRoleConstants.AccountManager))
     .map(u => ({
       value: u.id,
-      text: `${u.lastName || ''} ${u.firstName || ''}`.trim()
+      text: `${u.lastName || ''} ${u.firstName || ''} ${u.patronymic || ''}`.trim()
     }))
 })
 

@@ -24,6 +24,7 @@ import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
+import { useAccountsTreeHelper } from '@/helpers/accounts.tree.helpers.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useDevicesStore } from '@/stores/devices.store.js'
@@ -40,7 +41,16 @@ const deviceGroupsStore = useDeviceGroupsStore()
 const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 const { alert } = storeToRefs(alertStore)
-const { getAccountsTreeState } = storeToRefs(authStore)
+
+// Initialize tree helper
+const {
+  buildTreeItems,
+  createLoadChildrenHandler,
+  createStateManager,
+  createAccountActions,
+  getAccountIdFromNodeId,
+  createPermissionCheckers
+} = useAccountsTreeHelper()
 
 const accountsCaption = useAccountsCaption(authStore)
 
@@ -52,36 +62,37 @@ const loadingNodes = ref(new Set())
 const selectedNode = ref([])
 const expandedNodes = ref([])
 
-// Role-based access helper functions
-const canViewUnassignedDevices = computed(() => 
-  authStore.isAdministrator || authStore.isEngineer
+// Permission checkers
+const {
+  canViewUnassignedDevices,
+  canViewAccounts,
+  canEditAccounts,
+  canCreateDeleteAccounts
+} = createPermissionCheckers(authStore)
+
+// State management
+const { restoreTreeState, saveTreeState } = createStateManager(authStore)
+
+// Action handlers
+const { createAccount, editAccount, deleteAccount } = createAccountActions(
+  router, 
+  alertStore, 
+  accountsStore, 
+  confirmDelete
 )
 
-const canViewAccounts = computed(() => 
-  authStore.isAdministrator || authStore.isManager
+// Loading handler
+const loadChildren = createLoadChildrenHandler(
+  loadedNodes,
+  loadingNodes,
+  devicesStore,
+  deviceGroupsStore,
+  alertStore
 )
-
-// Restore state from auth store
-const restoreTreeState = () => {
-  const savedState = getAccountsTreeState.value
-  if (savedState.selectedNode) {
-    selectedNode.value = [savedState.selectedNode]
-  }
-  if (savedState.expandedNodes && savedState.expandedNodes.length > 0) {
-    expandedNodes.value = [...savedState.expandedNodes]
-  }
-}
-
-// Save state to auth store
-const saveTreeState = () => {
-  const selected = selectedNode.value && selectedNode.value.length > 0 ? selectedNode.value[0] : null
-  const expanded = expandedNodes.value || []
-  authStore.saveAccountsTreeState(selected, expanded)
-}
 
 // Watch for changes and auto-save
 watch([selectedNode, expandedNodes], () => {
-  saveTreeState()
+  saveTreeState(selectedNode, expandedNodes)
 }, { deep: true })
 
 onMounted(async () => {
@@ -91,7 +102,7 @@ onMounted(async () => {
       await accountsStore.getAll()
     }
     // Restore tree state after data is loaded
-    restoreTreeState()
+    restoreTreeState(selectedNode, expandedNodes)
   } catch (error) {
     alertStore.error('Не удалось загрузить данные: ' + (error.message || error))
   } finally {
@@ -99,162 +110,17 @@ onMounted(async () => {
   }
 })
 
-// Initial tree structure (only top-level nodes with lazy loading markers)
+// Tree structure using helper
 const treeItems = computed(() => {
-  const items = []
-  
-  if (canViewUnassignedDevices.value) {
-    const hasChildren = !loadedNodes.value.has('root-unassigned')
-    items.push({
-      id: 'root-unassigned',
-      name: 'Нераспределённые устройства',
-      children: hasChildren ? [] : getUnassignedDevices()
-    })
-  }
-  
-  if (canViewAccounts.value) {
-    const accounts = (accountsStore.accounts || []).map(acc => {
-      const hasChildren = !loadedNodes.value.has(`account-${acc.id}`)
-      return {
-        id: `account-${acc.id}`,
-        name: acc.name,
-        children: hasChildren ? [] : getAccountChildren(acc.id)
-      }
-    })
-    
-    items.push({
-      id: 'root-accounts',
-      name: 'Лицевые счета',
-      children: accounts
-    })
-  }
-  
-  return items
+  return buildTreeItems(
+    canViewUnassignedDevices.value,
+    canViewAccounts.value,
+    loadedNodes.value,
+    accountsStore,
+    devicesStore,
+    deviceGroupsStore
+  )
 })
-
-// Helper function to get unassigned devices
-const getUnassignedDevices = () => {
-  return (devicesStore.devices || [])
-    .filter(d => !d.accountId || d.accountId === 0)
-    .map(d => ({ id: `device-${d.id}`, name: d.name }))
-}
-
-// Helper function to get children for a specific account
-const getAccountChildren = (accountId) => {
-  const devices = (devicesStore.devices || []).filter(d => d.accountId === accountId)
-  const unassigned = devices
-    .filter(d => !d.deviceGroupId || d.deviceGroupId === 0)
-    .map(d => ({ id: `device-${d.id}`, name: d.name }))
-  
-  const groups = (deviceGroupsStore.groups || [])
-    .filter(g => g.accountId === accountId)
-    .map(g => ({
-      id: `group-${g.id}`,
-      name: g.name,
-      children: devices
-        .filter(d => d.deviceGroupId === g.id)
-        .map(d => ({ id: `device-${d.id}`, name: d.name }))
-    }))
-  
-  const children = []
-  
-  // Always add unassigned devices node (even if empty)
-  children.push({ 
-    id: `account-${accountId}-unassigned`, 
-    name: 'Нераспределённые устройства', 
-    children: unassigned 
-  })
-  
-  // Always add device groups container node (even if empty)
-  children.push({
-    id: `account-${accountId}-groups`,
-    name: 'Группы устройств',
-    children: groups
-  })
-  
-  return children
-}
-
-// Lazy loading function with exception handling
-const loadChildren = async (item) => {
-  const nodeId = item.id
-  
-  // Prevent duplicate loading
-  if (loadedNodes.value.has(nodeId) || loadingNodes.value.has(nodeId)) {
-    return
-  }
-  
-  loadingNodes.value.add(nodeId)
-  
-  try {
-    if (nodeId === 'root-unassigned') {
-      // Load devices for unassigned root
-      await devicesStore.getAll()
-      loadedNodes.value.add(nodeId)
-      
-    } else if (nodeId.startsWith('account-')) {
-      // Load devices and groups for specific account
-      await Promise.all([
-        devicesStore.getAll(),
-        deviceGroupsStore.getAll()
-      ])
-      loadedNodes.value.add(nodeId)
-    }
-    
-    // Force reactivity update
-    treeItems.value
-    
-  } catch (error) {
-    alertStore.error(`Не удалось загрузить данные для "${item.name}": ` + (error.message || error))
-  } finally {
-    loadingNodes.value.delete(nodeId)
-  }
-}
-
-// Action button functions
-const canEditAccounts = computed(() => authStore.isAdministrator || authStore.isManager)
-const canCreateDeleteAccounts = computed(() => authStore.isAdministrator)
-
-const createAccount = () => {
-  try {
-    router.push('/account/create')
-  } catch (error) {
-    alertStore.error(`Не удалось перейти к созданию лицевого счёта: ${error.message || error}`)
-  }
-}
-
-const editAccount = (item) => {
-  try {
-    const accountId = typeof item === 'object' ? item.id : item
-    router.push(`/account/edit/${accountId}`)
-  } catch (error) {
-    alertStore.error(`Не удалось перейти к редактированию лицевого счёта: ${error.message || error}`)
-  }
-}
-
-const deleteAccount = async (item) => {
-  const accountId = typeof item === 'object' ? item.id : item
-  const account = accountsStore.accounts.find(a => a.id === accountId)
-  if (!account) return
-  
-  const confirmed = await confirmDelete(account.name, 'лицевой счёт')
-  
-  if (confirmed) {
-    try {
-      await accountsStore.delete(accountId)
-    } catch (error) {
-      alertStore.error(`Ошибка при удалении лицевого счёта: ${error.message || error}`)
-    }
-  }
-}
-
-// Helper to extract account ID from tree node ID
-const getAccountIdFromNodeId = (nodeId) => {
-  if (nodeId.startsWith('account-')) {
-    return parseInt(nodeId.replace('account-', ''))
-  }
-  return null
-}
 </script>
 
 <template>
