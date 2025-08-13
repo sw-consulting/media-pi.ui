@@ -24,14 +24,31 @@ import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
-import { useAccountsTreeHelper } from '@/helpers/accounts.tree.helpers.js'
+import { 
+  useAccountsTreeHelper, 
+  getUnassignedDevices, 
+  getAccountChildren,
+  isTopLevelUnassignedDevice,
+  isAccountAssignedDevice,
+  isDeviceInUnassignedSection,
+  isDeviceInGroupSection,
+  getDeviceFromItem,
+  getDeviceIdFromItem,
+  getAccountIdFromDeviceItem,
+  createAvailableAccountsList,
+  createAvailableDeviceGroupsList,
+  createAccountAssignmentActions,
+  createDeviceGroupAssignmentActions
+} from '@/helpers/accounts.tree.helpers.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
+import { canManageDevice } from '@/helpers/user.helpers.js'
 import ActionButton from '@/components/ActionButton.vue'
+import InlineAssignment from '@/components/InlineAssignment.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -42,6 +59,15 @@ const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 const { alert } = storeToRefs(alertStore)
 
+// State for account assignment
+const accountAssignmentState = ref({})
+
+// State for device group assignment
+const deviceGroupAssignmentState = ref({})
+
+// State for tracking devices being moved (to prevent duplication during transitions)
+const transitioningDevices = ref(new Set())
+
 // Initialize tree helper
 const {
   buildTreeItems,
@@ -49,6 +75,7 @@ const {
   createStateManager,
   createAccountActions,
   createDeviceGroupActions,
+  createDeviceActions,
   getAccountIdFromNodeId,
   getGroupIdFromNodeId,
   createPermissionCheckers
@@ -90,6 +117,14 @@ const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGr
   confirmDelete
 )
 
+const { createDevice, editDevice, deleteDevice, unassignFromGroup, unassignFromAccount } = createDeviceActions(
+  router,
+  alertStore,
+  devicesStore,
+  confirmDelete,
+  transitioningDevices 
+)
+
 // Loading handler
 const loadChildren = createLoadChildrenHandler(
   loadedNodes,
@@ -104,12 +139,51 @@ watch([selectedNode, expandedNodes], () => {
   saveTreeState(selectedNode, expandedNodes)
 }, { deep: true })
 
+// Account assignment actions
+const {
+  startAccountAssignment,
+  cancelAccountAssignment,
+  confirmAccountAssignment,
+  updateSelectedAccount
+} = createAccountAssignmentActions(
+  accountAssignmentState,
+  transitioningDevices,
+  devicesStore,
+  alertStore
+)
+
+// Device group assignment actions
+const {
+  startDeviceGroupAssignment,
+  cancelDeviceGroupAssignment,
+  confirmDeviceGroupAssignment,
+  updateSelectedDeviceGroup
+} = createDeviceGroupAssignmentActions(
+  deviceGroupAssignmentState,
+  transitioningDevices,
+  devicesStore,
+  alertStore
+)
+
+// Available accounts for assignment (only accounts user can manage)
+const availableAccounts = computed(() => {
+  return createAvailableAccountsList(accountsStore, authStore)
+})
+
+// Function to get available device groups for a specific device item
+const getAvailableDeviceGroups = (item) => {
+  const accountId = getAccountIdFromDeviceItem(item)
+  return createAvailableDeviceGroupsList(deviceGroupsStore, accountId)
+}
+
 onMounted(async () => {
   try {
     // Only load accounts if user can view them
     if (canViewAccounts.value) {
       await accountsStore.getAll()
     }
+    // Load device groups for group assignment functionality
+    await deviceGroupsStore.getAll()
     // Restore tree state after data is loaded, with loadChildren support
     await restoreTreeState(selectedNode, expandedNodes, loadChildren)
   } catch (error) {
@@ -127,7 +201,10 @@ const treeItems = computed(() => {
     loadedNodes.value,
     accountsStore,
     devicesStore,
-    deviceGroupsStore
+    deviceGroupsStore,
+    // Pass custom functions that exclude transitioning devices
+    (devicesStore) => getUnassignedDevices(devicesStore, transitioningDevices.value),
+    (accountId, devicesStore, deviceGroupsStore) => getAccountChildren(accountId, devicesStore, deviceGroupsStore, transitioningDevices.value)
   )
 })
 </script>
@@ -151,8 +228,8 @@ const treeItems = computed(() => {
         v-model:selected="selectedNode"
         v-model:opened="expandedNodes"
         open-on-click
-        selectable
       >
+
         <template #prepend="{ item }">
           <v-progress-circular
             v-if="loadingNodes.has(item.id)"
@@ -199,6 +276,81 @@ const treeItems = computed(() => {
             <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />
             <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
           </div>
+
+          <!-- Action buttons for root-unassigned node (top level unassigned devices) -->
+          <div v-else-if="item.id === 'root-unassigned' && canManageDevice(authStore.user, {})" class="tree-actions">
+            <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать устройство" @click="createDevice" />
+          </div>
+
+          <!-- Action buttons for individual device nodes -->
+          <div v-else-if="item.id.startsWith('device-')" class="tree-actions">
+            <!-- Determine context: top-level unassigned vs account-assigned -->
+            <template v-if="isTopLevelUnassignedDevice(item)">
+              <!-- Top level unassigned devices: SystemAdministrator, InstallationEngineer -->
+              <template v-if="canManageDevice(authStore.user, getDeviceFromItem(item, devicesStore))">
+                <!-- Inline account assignment selector -->
+                <InlineAssignment
+                  :item="item"
+                  :edit-mode="accountAssignmentState[getDeviceIdFromItem(item)]?.editMode || false"
+                  :selected-value="accountAssignmentState[getDeviceIdFromItem(item)]?.selectedAccountId"
+                  :available-options="availableAccounts"
+                  placeholder="Выберите лицевой счёт"
+                  start-icon="fa-solid fa-plug-circle-check"
+                  start-tooltip="Назначить лицевой счёт"
+                  confirm-tooltip="Назначить лицевой счёт"
+                  cancel-tooltip="Отменить"
+                  :loading="loading"
+                  @start-assignment="startAccountAssignment"
+                  @cancel-assignment="cancelAccountAssignment"
+                  @confirm-assignment="confirmAccountAssignment"
+                  @update-selection="(value) => updateSelectedAccount(getDeviceIdFromItem(item), value)"
+                />
+                <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
+                  :disabled="loading || accountAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  @click="editDevice" 
+                />
+                <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить устройство" 
+                  :disabled="loading || accountAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  @click="deleteDevice" 
+                />
+              </template>
+            </template>
+            <template v-else-if="isAccountAssignedDevice(item)">
+              <!-- Account-assigned devices: SystemAdministrator, AccountManager -->
+              <template v-if="canManageDevice(authStore.user, getDeviceFromItem(item, devicesStore))">
+                <!-- Inline device group assignment selector for unassigned devices -->
+                <InlineAssignment
+                  v-if="isDeviceInUnassignedSection(item)"
+                  :item="item"
+                  :edit-mode="deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.editMode || false"
+                  :selected-value="deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.selectedGroupId"
+                  :available-options="getAvailableDeviceGroups(item)"
+                  placeholder="Выберите группу"
+                  start-icon="fa-solid fa-plug-circle-plus"
+                  start-tooltip="Включить в группу"
+                  confirm-tooltip="Включить"
+                  cancel-tooltip="Отменить"
+                  :loading="loading"
+                  @start-assignment="startDeviceGroupAssignment"
+                  @cancel-assignment="cancelDeviceGroupAssignment"
+                  @confirm-assignment="confirmDeviceGroupAssignment"
+                  @update-selection="(value) => updateSelectedDeviceGroup(getDeviceIdFromItem(item), value)"
+                />
+                <ActionButton v-if="isDeviceInGroupSection(item)" :item="item" icon="fa-solid fa-plug-circle-minus" tooltip-text="Исключить из группы" 
+                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  @click="unassignFromGroup" 
+                />
+                <ActionButton v-if="isDeviceInUnassignedSection(item)" :item="item" icon="fa-solid fa-plug-circle-xmark" tooltip-text="Исключить из лицевого счёта" 
+                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  @click="unassignFromAccount" 
+                />
+                <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
+                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  @click="editDevice" 
+                />
+              </template>
+            </template>
+          </div>
         </template>
       </v-treeview>
       
@@ -239,5 +391,6 @@ const treeItems = computed(() => {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 4px;
 }
+
 </style>
 

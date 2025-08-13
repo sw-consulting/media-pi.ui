@@ -54,3 +54,33 @@ export function getRoleName(user) {
   }
   return 'Без роли'
 }
+
+export function canManageAccountById(user, accountId) {
+  if (!user || !accountId) {
+    return false
+  }
+  
+  // SystemAdministrator can manage any account
+  if (isAdministrator(user)) {
+    return true
+  }
+  
+  // Check if accountId is in user's accountIds array (only for managers)
+  return !!(isManager(user) && user.accountIds && Array.isArray(user.accountIds) && user.accountIds.includes(accountId))
+}
+
+export function canManageDevice(user, device) {
+  if (!user || !device) {
+    return false
+  }
+  
+  // If device has no accountId, only administrators and engineers can manage it
+  if (!device.accountId) {
+    return isAdministrator(user) || isEngineer(user)
+  }
+  
+  // If device has an accountId, use the account-based permission check
+  return canManageAccountById(user, device.accountId)
+}
+
+

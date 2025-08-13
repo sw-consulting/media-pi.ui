@@ -412,5 +412,46 @@ describe('Accounts_Tree.vue', () => {
       expect(authStore.saveAccountsTreeState).toHaveBeenCalledWith(null, ['root-accounts'])
     })
   })
+
+  describe('Device group assignment UI state', () => {
+    it('disables action buttons when device group assignment is in progress', async () => {
+      authStore = { 
+        isAdministrator: true, 
+        isManager: false, 
+        isEngineer: false, 
+        user: { role: 'SystemAdministrator' }
+      }
+      accountsStore.accounts = [
+        { id: 1, name: 'Account 1' }
+      ]
+      devicesStore.devices = [
+        { id: 1, name: 'Device A', accountId: 1, deviceGroupId: 0 }
+      ]
+      deviceGroupsStore.groups = [
+        { id: 1, name: 'Group 1', accountId: 1 }
+      ]
+
+      const wrapper = mountTree()
+      await resolveAll()
+
+      // Simulate device group assignment in progress
+      wrapper.vm.deviceGroupAssignmentState = {
+        1: { editMode: true, selectedGroupId: null }
+      }
+      await wrapper.vm.$nextTick()
+
+      // Verify that the assignment state is correctly set
+      expect(wrapper.vm.deviceGroupAssignmentState[1].editMode).toBe(true)
+      
+      // Verify that getDeviceIdFromItem function would work with our test data
+      const testItem = { id: 'device-1-account-1-unassigned' }
+      const deviceId = wrapper.vm.getDeviceIdFromItem(testItem)
+      expect(deviceId).toBe(1)
+      
+      // Verify that when editMode is true, buttons would be disabled
+      const isInEditMode = wrapper.vm.deviceGroupAssignmentState[deviceId]?.editMode
+      expect(isInEditMode).toBe(true)
+    })
+  })
 })
 

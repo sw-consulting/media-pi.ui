@@ -129,10 +129,11 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
-  async function assignGroup(id, params) {
+  async function assignGroup(id, groupId) {
     loading.value = true
     error.value = null
     try {
+      const params = { Id: groupId ?? 0 }
       await fetchWrapper.patch(`${baseUrl}/assign-group/${id}`, params)
       getAll()
     } catch (err) {
@@ -143,11 +144,12 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
-  async function initialAssignAccount(id, params) {
+  async function assignAccount(id, accountId) {
     loading.value = true
     error.value = null
     try {
-      await fetchWrapper.patch(`${baseUrl}/initial-assign-account/${id}`, params)
+      const params = { Id: accountId ?? 0 }
+      await fetchWrapper.patch(`${baseUrl}/assign-account/${id}`, params)
       getAll()
     } catch (err) {
       error.value = err
@@ -170,7 +172,7 @@ export const useDevicesStore = defineStore('devices', () => {
     update,
     delete: deleteDevice,
     assignGroup,
-    initialAssignAccount
+    assignAccount
   }
 })
 

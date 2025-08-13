@@ -39,13 +39,18 @@ import {
   faTrashCan,
   faUserPlus,
   faList,
+  faCheck,
   faCheckDouble,
   faXmark,
   faCity,
   faBuildingUser,
   faLayerGroup,
   faObjectGroup,
-  faTv
+  faTv,
+  faPlugCircleCheck,
+  faPlugCircleXmark,
+  faPlugCirclePlus,
+  faPlugCircleMinus
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -65,6 +70,7 @@ library.add(
   faTrashCan, 
   faUserPlus, 
   faList, 
+  faCheck,
   faCheckDouble, 
   faXmark,
   faCircle,
@@ -73,7 +79,11 @@ library.add(
   faBuildingUser,
   faLayerGroup,
   faObjectGroup,
-  faTv
+  faTv,
+  faPlugCircleCheck,
+  faPlugCircleXmark,
+  faPlugCirclePlus,
+  faPlugCircleMinus
 )
 
 import 'vuetify/styles'
