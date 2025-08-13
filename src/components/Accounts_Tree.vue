@@ -257,12 +257,9 @@ const getAccountIdFromNodeId = (nodeId) => {
     <hr class="hr" />
 
     <v-card>
-      <v-progress-linear 
-        v-if="loading" 
-        indeterminate 
-        color="primary"
-        class="mb-2"
-      />
+      <div v-if="loading" class="text-center m-5">
+        <span class="spinner-border spinner-border-lg align-center"></span>
+      </div>
       
       <v-treeview
         v-if="!loading"
