@@ -19,28 +19,11 @@
 //
 // This file is a part of Media Pi frontend application
 
-// Import split test modules
-import './tree/tree.builder.spec.js'
-import './tree/tree.loader.spec.js'
-import './tree/tree.state.spec.js'
-import './tree/account.actions.spec.js'
-import './tree/devicegroup.actions.spec.js'
-import './tree/tree.permissions.spec.js'
-
-// Import legacy integration tests for the main composable
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
-import { useAccountsTreeHelper } from '@/helpers/accounts.tree.helpers.js'
+import { createLoadChildrenHandler } from '@/helpers/tree/tree.loader.js'
 
-describe('useAccountsTreeHelper Integration', () => {
-  let helper
-
-  beforeEach(() => {
-    helper = useAccountsTreeHelper()
-  })
-
-
-
+describe('Tree Loader Functions', () => {
   describe('createLoadChildrenHandler', () => {
     let loadedNodes, loadingNodes, devicesStore, deviceGroupsStore, alertStore
     let loadChildrenHandler
@@ -58,7 +41,7 @@ describe('useAccountsTreeHelper Integration', () => {
         error: vi.fn()
       }
 
-      loadChildrenHandler = helper.createLoadChildrenHandler(
+      loadChildrenHandler = createLoadChildrenHandler(
         loadedNodes,
         loadingNodes,
         devicesStore,
@@ -130,8 +113,4 @@ describe('useAccountsTreeHelper Integration', () => {
       expect(loadingNodes.value.has('root-unassigned')).toBe(false)
     })
   })
-
-
-
-
 })
