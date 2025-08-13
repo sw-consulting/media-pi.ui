@@ -185,7 +185,7 @@ const treeItems = computed(() => {
 
           <!-- Action button for Device Groups node -->
           <div v-else-if="item.id.includes('-groups')" class="tree-actions">
-            <ActionButton icon="fa-solid fa-plus" tooltip-text="Создать группу устройств" @click="() => createDeviceGroup(item)" />
+            <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать группу устройств" @click="() => createDeviceGroup(item)" />
           </div>
 
           <!-- Action buttons for individual device group nodes -->
