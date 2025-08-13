@@ -102,11 +102,32 @@ export function useAccountsTreeHelper() {
     
     if (canViewAccounts) {
       const accounts = (accountsStore.accounts || []).map(acc => {
-        const hasChildren = !loadedNodes.has(`account-${acc.id}`)
+        const accountNodeId = `account-${acc.id}`
+        const hasChildren = !loadedNodes.has(accountNodeId)
+        
+        // If account node is loaded, check if device group containers need loading
+        let children = []
+        if (!hasChildren) {
+          const accountChildren = getAccountChildrenFn(acc.id, devicesStore, deviceGroupsStore)
+          
+          // For each child that is a device group container, check if it needs loading
+          children = accountChildren.map(child => {
+            if (child.id.includes('-groups')) {
+              const groupsNodeId = child.id
+              const groupsHasChildren = !loadedNodes.has(groupsNodeId)
+              return {
+                ...child,
+                children: groupsHasChildren ? [] : child.children
+              }
+            }
+            return child
+          })
+        }
+        
         return {
-          id: `account-${acc.id}`,
+          id: accountNodeId,
           name: acc.name,
-          children: hasChildren ? [] : getAccountChildrenFn(acc.id, devicesStore, deviceGroupsStore)
+          children: hasChildren ? [] : children
         }
       })
       
@@ -148,6 +169,11 @@ export function useAccountsTreeHelper() {
           await devicesStore.getAll()
           loadedNodes.value.add(nodeId)
           
+        } else if (nodeId.includes('-groups')) {
+          // Load device groups for device group container
+          await deviceGroupsStore.getAll()
+          loadedNodes.value.add(nodeId)
+          
         } else if (nodeId.startsWith('account-')) {
           // Load devices and groups for specific account
           await Promise.all([
@@ -171,13 +197,38 @@ export function useAccountsTreeHelper() {
    * Create state management functions for tree state
    */
   const createStateManager = (authStore) => {
-    const restoreTreeState = (selectedNode, expandedNodes) => {
+    const restoreTreeState = async (selectedNode, expandedNodes, loadChildren) => {
       const savedState = authStore.getAccountsTreeState
-      if (savedState.selectedNode) {
+      if (savedState && savedState.selectedNode) {
         selectedNode.value = [savedState.selectedNode]
       }
-      if (savedState.expandedNodes && savedState.expandedNodes.length > 0) {
-        expandedNodes.value = [...savedState.expandedNodes]
+      if (savedState && savedState.expandedNodes && savedState.expandedNodes.length > 0) {
+        // First restore only non-group nodes to avoid auto-expansion issues
+        const nonGroupNodes = savedState.expandedNodes.filter(nodeId => !nodeId.startsWith('group-'))
+        expandedNodes.value = [...nonGroupNodes]
+        
+        // Load children for all expanded nodes that need loading
+        if (loadChildren) {
+          const nodesToLoad = savedState.expandedNodes.filter(nodeId => 
+            nodeId === 'root-unassigned' || nodeId.startsWith('account-')
+          )
+          
+          for (const nodeId of nodesToLoad) {
+            try {
+              await loadChildren({ id: nodeId })
+            } catch {
+              // Ignore errors during restoration, they'll be handled when user interacts
+            }
+          }
+        }
+        
+        // After loading is complete, restore the device group expanded state
+        const groupNodes = savedState.expandedNodes.filter(nodeId => nodeId.startsWith('group-'))
+        if (groupNodes.length > 0) {
+          // Use nextTick to ensure the tree is fully rendered before expanding groups
+          await new Promise(resolve => globalThis.setTimeout(resolve, 0))
+          expandedNodes.value = [...savedState.expandedNodes]
+        }
       }
     }
 

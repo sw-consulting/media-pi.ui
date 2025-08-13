@@ -110,8 +110,8 @@ onMounted(async () => {
     if (canViewAccounts.value) {
       await accountsStore.getAll()
     }
-    // Restore tree state after data is loaded
-    restoreTreeState(selectedNode, expandedNodes)
+    // Restore tree state after data is loaded, with loadChildren support
+    await restoreTreeState(selectedNode, expandedNodes, loadChildren)
   } catch (error) {
     alertStore.error('Не удалось загрузить данные: ' + (error.message || error))
   } finally {
