@@ -56,7 +56,6 @@ const schema = Yup.object().shape({
 })
 
 let group = ref({ name: '' })
-const componentError = ref(null)
 const initialLoading = ref(false)
 
 if (!isRegister()) {
@@ -74,11 +73,10 @@ if (!isRegister()) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
     } else if (err.status === 404) {
-      componentError.value = `Группа устройств с ID ${props.id} не найдена`
-      alertStore.error(componentError.value)
+      alertStore.error(`Группа устройств с ID ${props.id} не найдена`)
     } else {
-      componentError.value = err.message || err
-      alertStore.error(`Ошибка загрузки группы устройств: ${componentError.value}`)
+      const errorMessage = err.message || err
+      alertStore.error(`Ошибка загрузки группы устройств: ${errorMessage}`)
     }
   } finally {
     initialLoading.value = false
@@ -94,7 +92,6 @@ function getButton () {
 }
 
 async function onSubmit (values) {
-  componentError.value = null
   try {
     const payload = {
       name: values.name.trim()
@@ -110,17 +107,14 @@ async function onSubmit (values) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
     } else if (err.status === 404) {
-      componentError.value = `Группа устройств с ID ${props.id} не найдена`
-      alertStore.error(componentError.value)
+      alertStore.error(`Группа устройств с ID ${props.id} не найдена`)
     } else if (err.status === 409) {
-      componentError.value = 'Группа устройств с таким названием уже существует'
-      alertStore.error(componentError.value)
+      alertStore.error('Группа устройств с таким названием уже существует')
     } else if (err.status === 422) {
-      componentError.value = 'Проверьте корректность введённых данных'
-      alertStore.error(componentError.value)
+      alertStore.error('Проверьте корректность введённых данных')
     } else {
-      componentError.value = err.message || err
-      alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} группы устройств: ${componentError.value}`)
+      const errorMessage = err.message || err
+      alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} группы устройств: ${errorMessage}`)
     }
   }
 }
