@@ -286,8 +286,19 @@ const getAccountIdFromNodeId = (nodeId) => {
             width="2"
             color="primary"
           />
-          <font-awesome-icon v-else-if="item.children && item.children.length === 0" icon="fa-regular fa-folder" size="1x" class="anti-btn" />
-          <font-awesome-icon v-else-if="item.children && item.children.length > 0" icon="fa-regular fa-folder-open" size="1x" class="anti-btn" />
+          <!-- Device icons -->
+          <font-awesome-icon v-else-if="item.id.startsWith('device-')" icon="fa-solid fa-tv" size="1x" class="anti-btn" />
+          <!-- Device Group icons -->
+          <font-awesome-icon v-else-if="item.id.startsWith('group-')" icon="fa-solid fa-object-group" size="1x" class="anti-btn" />
+          <!-- Device Groups container icons -->
+          <font-awesome-icon v-else-if="item.id.includes('-groups')" icon="fa-solid fa-layer-group" size="1x" class="anti-btn" />
+          <!-- Account icons -->
+          <font-awesome-icon v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups')" icon="fa-solid fa-building-user" size="1x" class="anti-btn" />
+          <!-- Accounts container icon -->
+          <font-awesome-icon v-else-if="item.id === 'root-accounts'" icon="fa-solid fa-city" size="1x" class="anti-btn" />
+          <!-- Unassigned devices icons -->
+          <font-awesome-icon v-else-if="item.id === 'root-unassigned' || item.id.includes('-unassigned')" icon="fa-regular fa-circle-question" size="1x" class="anti-btn" />
+          <!-- Fallback for any other nodes -->
           <font-awesome-icon v-else icon="fa-regular fa-circle" size="1x" class="anti-btn" />
         </template>
         

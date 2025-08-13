@@ -40,14 +40,19 @@ import {
   faUserPlus,
   faList,
   faCheckDouble,
-  faXmark
+  faXmark,
+  faCity,
+  faBuildingUser,
+  faLayerGroup,
+  faObjectGroup,
+  faTv
 } from '@fortawesome/free-solid-svg-icons'
 
-import {
-  // Regular icons (for tree items)
+  import {
   faFolder,
   faFolderOpen,
-  faCircle
+  faCircle,
+  faCircleQuestion,
 } from '@fortawesome/free-regular-svg-icons'
 
 library.add(
@@ -66,7 +71,13 @@ library.add(
   faXmark,
   faFolder,
   faFolderOpen,
-  faCircle
+  faCircle,
+  faCircleQuestion,
+  faCity,
+  faBuildingUser,
+  faLayerGroup,
+  faObjectGroup,
+  faTv
 )
 
 import 'vuetify/styles'
@@ -79,6 +90,7 @@ import App from '@/App.vue'
 import router from '@/router'
 
 import { useAuthStore } from '@/stores/auth.store.js'
+import { fa } from 'vuetify/locale'
 
 export function initializeApp() {
   const vuetify = createVuetify({
