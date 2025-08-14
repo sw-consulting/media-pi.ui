@@ -56,7 +56,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository_owner }}/logibooks.ui
+            ghcr.io/${{ github.repository_owner }}/media-pi.ui
           tags: |
             type=semver,pattern={{version}},enable=${{ contains(github.ref, 'refs/tags/v') }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ contains(github.ref, 'refs/tags/v') }}
@@ -64,12 +64,12 @@ jobs:
             type=sha,enable=true
           labels: |
             org.opencontainers.image.vendor=sw.consulting
-            org.opencontainers.image.title=Logibooks UI
+            org.opencontainers.image.title=Media Pi UI
             org.opencontainers.image.source==${{ github.repositoryUrl }}
-            org.opencontainers.image.description=Logibooks UI container
+            org.opencontainers.image.description=Media Pi UI container
           annotations: |
             org.opencontainers.image.licenses=BSD-2-Clause
-            org.opencontainers.image.description=Logibooks UI container
+            org.opencontainers.image.description=Media Pi UI container
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6

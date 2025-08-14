@@ -81,7 +81,7 @@ function getUserName() {
     <v-navigation-drawer v-model="drawer" elevation="4">
       <template v-slot:prepend>
         <div class="pa-2" v-if="height > 480">
-          <img alt="Mediapi" class="logo" src="@/assets/logo.png" />
+          <img alt="Mediapi" class="logo" src="@/assets/logo.svg" />
         </div>
       </template>
       <v-list v-if="authStore.user">
@@ -131,10 +131,21 @@ function getUserName() {
   min-width: 480px;
 }
 
+.v-app-bar {
+  background: linear-gradient(65deg, #94c6ef 0%, #e3f2fd 100%);
+  box-shadow: 0 2px 8px rgba(144,202,249,0.08);
+}
+
+.v-navigation-drawer {
+  background: linear-gradient(145deg, #94c6ef 0%, #e3f2fd 100%);
+  box-shadow: 2px 0 8px rgba(144,202,249,0.08);
+}
+
 .logo {
   margin: 1rem;
   display: block;
   width: 75%;
+  background: transparent;
 }
 
 .version-info {

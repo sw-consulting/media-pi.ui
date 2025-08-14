@@ -21,7 +21,7 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi } from 'vitest'
-import { UserRoleConstants, isAdministrator, isManager, isEngineer, getRoleName } from '@/helpers/user.helpers.js'
+import { UserRoleConstants, isAdministrator, isManager, isEngineer, getRoleName, canManageAccountById, canManageDevice } from '@/helpers/user.helpers.js'
 
 // Mock the roles store
 const mockRolesStore = {
@@ -92,6 +92,131 @@ describe('User Role Helpers', () => {
     it('should return fallback text for unknown role', () => {
       const unknownRoleUser = { roles: [999] }
       expect(getRoleName(unknownRoleUser)).toBe('Роль 999')
+    })
+  })
+
+  describe('canManageAccountById', () => {
+    const adminUser = { roles: [UserRoleConstants.SystemAdministrator], accountIds: [1, 2] }
+    const managerUser = { roles: [UserRoleConstants.AccountManager], accountIds: [1, 3] }
+    const engineerUser = { roles: [UserRoleConstants.InstallationEngineer], accountIds: [2] }
+    const userWithoutAccounts = { roles: [UserRoleConstants.AccountManager] }
+    const userWithEmptyAccounts = { roles: [UserRoleConstants.AccountManager], accountIds: [] }
+
+    it('should allow SystemAdministrator to manage any account', () => {
+      expect(canManageAccountById(adminUser, 1)).toBe(true)
+      expect(canManageAccountById(adminUser, 5)).toBe(true)
+      expect(canManageAccountById(adminUser, 999)).toBe(true)
+    })
+
+    it('should allow managers to manage accounts in their accountIds array', () => {
+      expect(canManageAccountById(managerUser, 1)).toBe(true)
+      expect(canManageAccountById(managerUser, 3)).toBe(true)
+    })
+
+    it('should not allow engineers to manage accounts even if in their accountIds array', () => {
+      expect(canManageAccountById(engineerUser, 2)).toBe(false)
+    })
+
+    it('should not allow users to manage accounts not in their accountIds array', () => {
+      expect(canManageAccountById(managerUser, 2)).toBe(false)
+      expect(canManageAccountById(managerUser, 5)).toBe(false)
+      expect(canManageAccountById(engineerUser, 1)).toBe(false)
+      expect(canManageAccountById(engineerUser, 3)).toBe(false)
+    })
+
+    it('should return false for users without accountIds', () => {
+      expect(canManageAccountById(userWithoutAccounts, 1)).toBe(false)
+      expect(canManageAccountById(userWithEmptyAccounts, 1)).toBe(false)
+    })
+
+    it('should return false for invalid inputs', () => {
+      expect(canManageAccountById(null, 1)).toBe(false)
+      expect(canManageAccountById(undefined, 1)).toBe(false)
+      expect(canManageAccountById(managerUser, null)).toBe(false)
+      expect(canManageAccountById(managerUser, undefined)).toBe(false)
+      expect(canManageAccountById(null, null)).toBe(false)
+    })
+
+    it('should handle non-array accountIds gracefully', () => {
+      const userWithInvalidAccountIds = { roles: [UserRoleConstants.AccountManager], accountIds: 'not-an-array' }
+      expect(canManageAccountById(userWithInvalidAccountIds, 1)).toBe(false)
+    })
+  })
+
+  describe('canManageDevice', () => {
+    const adminUser = { roles: [UserRoleConstants.SystemAdministrator] }
+    const managerUser = { roles: [UserRoleConstants.AccountManager], accountIds: [1, 3] }
+    const engineerUser = { roles: [UserRoleConstants.InstallationEngineer], accountIds: [2] }
+    const userWithoutAccounts = { roles: [UserRoleConstants.AccountManager] }
+
+    it('should allow administrators to manage any device', () => {
+      const deviceWithAccount = { accountId: 1 }
+      const deviceWithoutAccount = {}
+      
+      expect(canManageDevice(adminUser, deviceWithAccount)).toBe(true)
+      expect(canManageDevice(adminUser, deviceWithoutAccount)).toBe(true)
+    })
+
+    it('should allow engineers to manage devices without accountId', () => {
+      const deviceWithoutAccount = {}
+      
+      expect(canManageDevice(engineerUser, deviceWithoutAccount)).toBe(true)
+    })
+
+    it('should not allow managers to manage devices without accountId', () => {
+      const deviceWithoutAccount = {}
+      
+      expect(canManageDevice(managerUser, deviceWithoutAccount)).toBe(false)
+    })
+
+    it('should allow managers to manage devices with accountId they can manage', () => {
+      const deviceWithAccount1 = { accountId: 1 }
+      const deviceWithAccount3 = { accountId: 3 }
+      
+      expect(canManageDevice(managerUser, deviceWithAccount1)).toBe(true)
+      expect(canManageDevice(managerUser, deviceWithAccount3)).toBe(true)
+    })
+
+    it('should not allow managers to manage devices with accountId they cannot manage', () => {
+      const deviceWithAccount2 = { accountId: 2 }
+      const deviceWithAccount5 = { accountId: 5 }
+      
+      expect(canManageDevice(managerUser, deviceWithAccount2)).toBe(false)
+      expect(canManageDevice(managerUser, deviceWithAccount5)).toBe(false)
+    })
+
+    it('should not allow engineers to manage devices with accountId', () => {
+      const deviceWithAccount1 = { accountId: 1 }
+      const deviceWithAccount2 = { accountId: 2 }
+      
+      expect(canManageDevice(engineerUser, deviceWithAccount1)).toBe(false)
+      expect(canManageDevice(engineerUser, deviceWithAccount2)).toBe(false)
+    })
+
+    it('should return false for users without accountIds when device has accountId', () => {
+      const deviceWithAccount = { accountId: 1 }
+      
+      expect(canManageDevice(userWithoutAccounts, deviceWithAccount)).toBe(false)
+    })
+
+    it('should return false for invalid inputs', () => {
+      const validDevice = { accountId: 1 }
+      
+      expect(canManageDevice(null, validDevice)).toBe(false)
+      expect(canManageDevice(undefined, validDevice)).toBe(false)
+      expect(canManageDevice(managerUser, null)).toBe(false)
+      expect(canManageDevice(managerUser, undefined)).toBe(false)
+      expect(canManageDevice(null, null)).toBe(false)
+    })
+
+    it('should handle devices with null or undefined accountId as devices without accountId', () => {
+      const deviceWithNullAccount = { accountId: null }
+      const deviceWithUndefinedAccount = { accountId: undefined }
+      
+      expect(canManageDevice(engineerUser, deviceWithNullAccount)).toBe(true)
+      expect(canManageDevice(engineerUser, deviceWithUndefinedAccount)).toBe(true)
+      expect(canManageDevice(managerUser, deviceWithNullAccount)).toBe(false)
+      expect(canManageDevice(managerUser, deviceWithUndefinedAccount)).toBe(false)
     })
   })
 })

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title>Media π</title>
+  <defs>
+    <linearGradient id="mediaPiGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <linearGradient id="mediaPiGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <style><![CDATA[
+      .word { font-family: 'Poppins','Inter','Segoe UI','Arial',sans-serif; letter-spacing: 1px; }
+    ]]></style>
+  </defs>
+  <!-- Capital M at 170px size -->
+  <text x="80" y="210" class="word" font-size="170" font-weight="800" fill="url(#mediaPiGrad)">
+    Media
+  </text>
+  <!-- Pi separately, adjusted to ~200px to visually match M's height -->
+  <text x="640" y="210" class="word" font-size="230" font-weight="800" fill="url(#mediaPiGrad2)">
+    π
+  </text>
+</svg>

@@ -39,15 +39,23 @@ import {
   faTrashCan,
   faUserPlus,
   faList,
+  faCheck,
   faCheckDouble,
-  faXmark
+  faXmark,
+  faCity,
+  faBuildingUser,
+  faLayerGroup,
+  faObjectGroup,
+  faTv,
+  faPlugCircleCheck,
+  faPlugCircleXmark,
+  faPlugCirclePlus,
+  faPlugCircleMinus
 } from '@fortawesome/free-solid-svg-icons'
 
-import {
-  // Regular icons (for tree items)
-  faFolder,
-  faFolderOpen,
-  faCircle
+  import {
+  faCircle,
+  faCircleQuestion,
 } from '@fortawesome/free-regular-svg-icons'
 
 library.add(
@@ -62,11 +70,20 @@ library.add(
   faTrashCan, 
   faUserPlus, 
   faList, 
+  faCheck,
   faCheckDouble, 
   faXmark,
-  faFolder,
-  faFolderOpen,
-  faCircle
+  faCircle,
+  faCircleQuestion,
+  faCity,
+  faBuildingUser,
+  faLayerGroup,
+  faObjectGroup,
+  faTv,
+  faPlugCircleCheck,
+  faPlugCircleXmark,
+  faPlugCirclePlus,
+  faPlugCircleMinus
 )
 
 import 'vuetify/styles'

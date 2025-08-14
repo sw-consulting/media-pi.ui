@@ -96,6 +96,30 @@ const router = createRouter({
       name: 'Настройки',
       component: () => import('@/views/User_EditView.vue'),
       props: true
+    },
+    {
+      path: '/devicegroup/create/:accountId',
+      name: 'Создание группы устройств',
+      component: () => import('@/views/DeviceGroup_CreateView.vue'),
+      props: true
+    },
+    {
+      path: '/devicegroup/edit/:id',
+      name: 'Настройки группы устройств',
+      component: () => import('@/views/DeviceGroup_EditView.vue'),
+      props: true
+    },
+    {
+      path: '/device/create',
+      name: 'Создание устройства',
+      component: () => import('@/views/Device_CreateView.vue'),
+      props: true
+    },
+    {
+      path: '/device/edit/:id',
+      name: 'Настройки устройства',
+      component: () => import('@/views/Device_EditView.vue'),
+      props: true
     }
   ]
 })
@@ -154,6 +178,30 @@ router.beforeEach(async (to) => {
 
   if (to.path.startsWith('/account/edit/')) {
     if (!auth.isAdministrator && !auth.isManager) {
+      return '/'
+    }
+  }
+
+  if (to.path.startsWith('/devicegroup/create/')) {
+    if (!auth.isAdministrator && !auth.isManager) {
+      return '/'
+    }
+  }
+
+  if (to.path.startsWith('/devicegroup/edit/')) {
+    if (!auth.isAdministrator && !auth.isManager) {
+      return '/'
+    }
+  }
+
+  if (to.path.startsWith('/device/create/')) {
+    if (!auth.isAdministrator && !auth.isEngineer) {
+      return '/'
+    }
+  }
+
+  if (to.path.startsWith('/device/edit/')) {
+    if (!auth.isAdministrator && !auth.isManager && !auth.isEngineer) {
       return '/'
     }
   }

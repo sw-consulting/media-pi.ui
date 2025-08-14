@@ -21,28 +21,26 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
-defineProps({
-  item: { required: true },
-  icon: { type: String, required: true },
-  tooltipText: { type: String, required: true },
-  iconSize: { type: String, default: '1x' },
-  disabled: { type: Boolean, default: false }
-})
+import DeviceGroupSettings from '@/components/DeviceGroup_Settings.vue'
 
-defineEmits(['click'])
+const props = defineProps({
+  id: {
+    type: String,
+    required: true
+  }
+})
+const id = parseInt(props.id, 10)
 </script>
+
 <template>
-  <v-tooltip :text="tooltipText" :disabled="disabled">
-    <template v-slot:activator="{ props }">
-      <button 
-        type="button" 
-        @click="$emit('click', item)" 
-        :class="['anti-btn', { 'disabled-btn': disabled }, $attrs.class]"
-        v-bind="props"
-        :disabled="disabled"
-      >
-        <font-awesome-icon :size="iconSize" :icon="icon"  class="button-o-c"/>
-      </button>
+  <Suspense>
+    <DeviceGroupSettings :register="false" :id="id" />
+    <template #fallback>
+      <div class="text-center m-5">
+        <span class="spinner-border spinner-border-lg align-center"></span>
+        <div class="mt-2">Загрузка информации о группе устройств...</div>
+      </div>
     </template>
-  </v-tooltip>
+  </Suspense>
 </template>
+

@@ -1,8 +1,7 @@
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
+// of this software and associated documentation files (the "Software")
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
@@ -20,29 +19,37 @@
 //
 // This file is a part of Media Pi frontend application
 
-<script setup>
-defineProps({
-  item: { required: true },
-  icon: { type: String, required: true },
-  tooltipText: { type: String, required: true },
-  iconSize: { type: String, default: '1x' },
-  disabled: { type: Boolean, default: false }
-})
+import { computed } from 'vue'
 
-defineEmits(['click'])
-</script>
-<template>
-  <v-tooltip :text="tooltipText" :disabled="disabled">
-    <template v-slot:activator="{ props }">
-      <button 
-        type="button" 
-        @click="$emit('click', item)" 
-        :class="['anti-btn', { 'disabled-btn': disabled }, $attrs.class]"
-        v-bind="props"
-        :disabled="disabled"
-      >
-        <font-awesome-icon :size="iconSize" :icon="icon"  class="button-o-c"/>
-      </button>
-    </template>
-  </v-tooltip>
-</template>
+/**
+ * Tree Permission Functions
+ * Handles user permissions for tree operations
+ */
+
+/**
+ * Create permission checkers
+ */
+export const createPermissionCheckers = (authStore) => {
+  const canViewUnassignedDevices = computed(() => 
+    authStore.isAdministrator || authStore.isEngineer
+  )
+
+  const canViewAccounts = computed(() => 
+    authStore.isAdministrator || authStore.isManager
+  )
+
+  const canEditAccounts = computed(() => 
+    authStore.isAdministrator || authStore.isManager
+  )
+
+  const canCreateDeleteAccounts = computed(() => 
+    authStore.isAdministrator
+  )
+
+  return {
+    canViewUnassignedDevices,
+    canViewAccounts,
+    canEditAccounts,
+    canCreateDeleteAccounts
+  }
+}
