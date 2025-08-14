@@ -98,39 +98,6 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
     }
   }
 
-  // Assignment actions (stubs for now)
-  const assignToAccount = async (item) => {
-    try {
-      const deviceId = getDeviceIdFromNodeId(item?.id) || (typeof item === 'object' ? item.id : item)
-      if (!deviceId) {
-        alertStore.error('Не удалось определить ID устройства для назначения')
-        return
-      }
-
-      // TODO: Implement account assignment dialog
-      console.log('assignToAccount - Device ID:', deviceId)
-      alertStore.error('Функция назначения лицевого счёта пока не реализована')
-    } catch (error) {
-      alertStore.error(`Ошибка при назначении лицевого счёта: ${error.message || error}`)
-    }
-  }
-
-  const assignToGroup = async (item) => {
-    try {
-      const deviceId = getDeviceIdFromNodeId(item?.id) || (typeof item === 'object' ? item.id : item)
-      if (!deviceId) {
-        alertStore.error('Не удалось определить ID устройства для включения в группу')
-        return
-      }
-
-      // TODO: Implement group assignment dialog
-      console.log('assignToGroup - Device ID:', deviceId)
-      alertStore.error('Функция включения в группу пока не реализована')
-    } catch (error) {
-      alertStore.error(`Ошибка при включении в группу: ${error.message || error}`)
-    }
-  }
-
   const unassignFromGroup = async (item) => {
     try {
       const deviceId = getDeviceIdFromNodeId(item?.id)
@@ -139,25 +106,17 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
         return
       }
 
-      const device = devicesStore.devices?.find(d => d.id === deviceId)
-      if (!device) {
-        return // Device not found, silently return
+      // Linear state change: mark device as transitioning to prevent duplication
+      if (transitioningDevices) {
+        transitioningDevices.value.add(deviceId)
       }
 
-      const confirmed = await confirmDelete(device.name, 'исключить из группы устройство')
-      if (confirmed) {
-        // Linear state change: mark device as transitioning to prevent duplication
+      try {
+        await devicesStore.assignGroup(deviceId, 0)
+      } finally {
+        // Remove from transitioning state after operation (success or failure)
         if (transitioningDevices) {
-          transitioningDevices.value.add(deviceId)
-        }
-
-        try {
-          await devicesStore.assignGroup(deviceId, 0)
-        } finally {
-          // Remove from transitioning state after operation (success or failure)
-          if (transitioningDevices) {
-            transitioningDevices.value.delete(deviceId)
-          }
+          transitioningDevices.value.delete(deviceId)
         }
       }
     } catch (error) {
@@ -196,8 +155,6 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
     createDevice,
     editDevice,
     deleteDevice,
-    assignToAccount,
-    assignToGroup,
     unassignFromGroup,
     unassignFromAccount
   }

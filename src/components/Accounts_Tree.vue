@@ -177,13 +177,14 @@ const getAvailableDeviceGroups = (item) => {
 }
 
 onMounted(async () => {
+  loading.value = true
   try {
-    // Only load accounts if user can view them
-    if (canViewAccounts.value) {
-      await accountsStore.getAll()
-    }
+    // Для getAll backend сам интеллектуально фильтрует и отдаёт каждому своё 
+    await accountsStore.getAll()
     // Load device groups for group assignment functionality
-    await deviceGroupsStore.getAll()
+    if (authStore.isAdministrator || authStore.isManager) {
+      await deviceGroupsStore.getAll()
+    }
     // Restore tree state after data is loaded, with loadChildren support
     await restoreTreeState(selectedNode, expandedNodes, loadChildren)
   } catch (error) {
@@ -210,7 +211,7 @@ const treeItems = computed(() => {
 </script>
 
 <template>
-  <div class="settings table-2">
+  <div class="settings table-3">
     <h1 class="primary-heading">{{ accountsCaption || 'Информация не доступна' }}</h1>
     <hr class="hr" />
 
@@ -390,6 +391,15 @@ const treeItems = computed(() => {
 .tree-actions .anti-btn:hover {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 4px;
+}
+
+:deep(.v-treeview-item:hover) {
+  border: 2px solid #1976d2;
+  color:  #104981;
+  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
+  border-radius: 6px;
+  background: none !important;
+  transition: box-shadow 0.2s, border-color 0.2s;
 }
 
 </style>

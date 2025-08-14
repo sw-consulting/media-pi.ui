@@ -195,27 +195,8 @@ describe('Device Actions Functions', () => {
       })
     })
 
-    describe('assignment actions', () => {
-      it('should have assignToAccount function', () => {
-        expect(typeof actions.assignToAccount).toBe('function')
-      })
-
-      it('should have assignToGroup function', () => {
-        expect(typeof actions.assignToGroup).toBe('function')
-      })
-
-      it('should have unassignFromGroup function', () => {
-        expect(typeof actions.unassignFromGroup).toBe('function')
-      })
-
-      it('should have unassignFromAccount function', () => {
-        expect(typeof actions.unassignFromAccount).toBe('function')
-      })
-    })
-
     describe('unassignFromGroup', () => {
       beforeEach(() => {
-        confirmDelete.mockResolvedValue(true)
         devicesStore.assignGroup.mockResolvedValue()
       })
 
@@ -224,7 +205,6 @@ describe('Device Actions Functions', () => {
 
         await actions.unassignFromGroup(deviceItem)
 
-        expect(confirmDelete).toHaveBeenCalledWith('Test Device 1', 'исключить из группы устройство')
         expect(devicesStore.assignGroup).toHaveBeenCalledWith(1, 0)
       })
 
@@ -236,26 +216,6 @@ describe('Device Actions Functions', () => {
         // Verify device was marked as transitioning during operation
         expect(transitioningDevices.value.has(1)).toBe(false) // Should be removed after operation
         expect(devicesStore.assignGroup).toHaveBeenCalledWith(1, 0)
-      })
-
-      it('should handle confirmation rejection', async () => {
-        confirmDelete.mockResolvedValue(false)
-        const deviceItem = { id: 'device-1-account-456-group-789' }
-
-        await actions.unassignFromGroup(deviceItem)
-
-        expect(confirmDelete).toHaveBeenCalled()
-        expect(devicesStore.assignGroup).not.toHaveBeenCalled()
-      })
-
-      it('should handle device not found gracefully', async () => {
-        devicesStore.devices = []
-        const deviceItem = { id: 'device-999-account-456-group-789' }
-
-        await actions.unassignFromGroup(deviceItem)
-
-        expect(confirmDelete).not.toHaveBeenCalled()
-        expect(devicesStore.assignGroup).not.toHaveBeenCalled()
       })
 
       it('should handle invalid device ID', async () => {
@@ -293,6 +253,207 @@ describe('Device Actions Functions', () => {
         await actionsWithoutTransitioning.unassignFromGroup(deviceItem)
 
         expect(devicesStore.assignGroup).toHaveBeenCalledWith(1, 0)
+      })
+
+      it('should handle missing device item parameter', async () => {
+        await actions.unassignFromGroup(null)
+
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить ID устройства для исключения из группы')
+        expect(devicesStore.assignGroup).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('unassignFromAccount', () => {
+      beforeEach(() => {
+        devicesStore.assignAccount = vi.fn().mockResolvedValue()
+      })
+
+      it('should unassign device from account successfully', async () => {
+        const deviceItem = { id: 'device-1-account-456' }
+
+        await actions.unassignFromAccount(deviceItem)
+
+        expect(devicesStore.assignAccount).toHaveBeenCalledWith(1, 0)
+      })
+
+      it('should use linear state change pattern with transitioning devices', async () => {
+        const deviceItem = { id: 'device-1-account-456' }
+
+        await actions.unassignFromAccount(deviceItem)
+
+        // Verify device was marked as transitioning during operation
+        expect(transitioningDevices.value.has(1)).toBe(false) // Should be removed after operation
+        expect(devicesStore.assignAccount).toHaveBeenCalledWith(1, 0)
+      })
+
+      it('should handle device not found gracefully', async () => {
+        devicesStore.devices = []
+        const deviceItem = { id: 'device-999-account-456' }
+
+        await actions.unassignFromAccount(deviceItem)
+
+        // unassignFromAccount doesn't check if device exists in store, it just calls API
+        expect(devicesStore.assignAccount).toHaveBeenCalledWith(999, 0)
+      })
+
+      it('should handle invalid device ID', async () => {
+        const deviceItem = { id: 'invalid-item' }
+
+        await actions.unassignFromAccount(deviceItem)
+
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить ID устройства для исключения из лицевого счёта')
+        expect(devicesStore.assignAccount).not.toHaveBeenCalled()
+      })
+
+      it('should handle API errors and clean up transitioning state', async () => {
+        const error = new Error('API Error')
+        devicesStore.assignAccount.mockRejectedValue(error)
+        const deviceItem = { id: 'device-1-account-456' }
+
+        await actions.unassignFromAccount(deviceItem)
+
+        expect(alertStore.error).toHaveBeenCalledWith('Ошибка при исключении из лицевого счёта: API Error')
+        // Verify device was removed from transitioning state even after error
+        expect(transitioningDevices.value.has(1)).toBe(false)
+      })
+
+      it('should work without transitioning devices set', async () => {
+        // Test with actions created without transitioningDevices
+        const actionsWithoutTransitioning = createDeviceActions(
+          router,
+          alertStore,
+          devicesStore,
+          confirmDelete
+          // No transitioningDevices parameter
+        )
+        const deviceItem = { id: 'device-1-account-456' }
+
+        await actionsWithoutTransitioning.unassignFromAccount(deviceItem)
+
+        expect(devicesStore.assignAccount).toHaveBeenCalledWith(1, 0)
+      })
+
+      it('should handle missing device item parameter', async () => {
+        await actions.unassignFromAccount(null)
+
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить ID устройства для исключения из лицевого счёта')
+        expect(devicesStore.assignAccount).not.toHaveBeenCalled()
+      })
+
+      it('should handle undefined device item parameter', async () => {
+        await actions.unassignFromAccount(undefined)
+
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить ID устройства для исключения из лицевого счёта')
+        expect(devicesStore.assignAccount).not.toHaveBeenCalled()
+      })
+    })
+
+    // Additional edge case tests for better coverage
+    describe('Edge Cases and Error Handling', () => {
+      it('should handle empty device store gracefully in editDevice', () => {
+        devicesStore.devices = []
+        
+        actions.editDevice({ id: 'device-123' })
+        
+        expect(router.push).toHaveBeenCalledWith('/device/edit/123')
+      })
+
+      it('should handle zero device ID in editDevice', () => {
+        actions.editDevice({ id: 0 })
+        
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить ID устройства для редактирования')
+      })
+
+      it('should handle string device ID in editDevice', () => {
+        actions.editDevice({ id: '123' })
+        
+        expect(router.push).toHaveBeenCalledWith('/device/edit/123')
+      })
+
+      it('should handle createDevice with item parameter', () => {
+        actions.createDevice({ id: 'some-item' })
+        
+        expect(router.push).toHaveBeenCalledWith({ name: 'Создание устройства' })
+      })
+
+      it('should handle deleteDevice with zero ID', async () => {
+        await actions.deleteDevice({ id: 0 })
+
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить ID устройства для удаления')
+      })
+
+      it('should handle deleteDevice with empty string ID', async () => {
+        await actions.deleteDevice({ id: '' })
+
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить ID устройства для удаления')
+      })
+
+      it('should handle unassignFromGroup with empty string ID', async () => {
+        await actions.unassignFromGroup({ id: '' })
+
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить ID устройства для исключения из группы')
+      })
+
+      it('should handle concurrent operations on same device', async () => {
+        const deviceItem = { id: 'device-1-account-456' }
+        
+        // Start first operation
+        const promise1 = actions.unassignFromAccount(deviceItem)
+        
+        // Start second operation on same device before first completes
+        const promise2 = actions.unassignFromAccount(deviceItem)
+        
+        await Promise.all([promise1, promise2])
+        
+        // Both operations should complete
+        expect(devicesStore.assignAccount).toHaveBeenCalledTimes(2)
+      })
+    })
+  })
+
+  // Additional utility function tests for complete coverage
+  describe('Utility Functions Edge Cases', () => {
+    describe('getDeviceIdFromNodeId edge cases', () => {
+      it('should handle device prefix with no ID', () => {
+        expect(getDeviceIdFromNodeId('device-')).toBe(null)
+      })
+
+      it('should handle device prefix with non-numeric ID', () => {
+        expect(getDeviceIdFromNodeId('device-abc')).toBe(null)
+      })
+
+      it('should handle device prefix with negative ID', () => {
+        expect(getDeviceIdFromNodeId('device--1')).toBe(null)
+      })
+
+      it('should handle device prefix with zero ID', () => {
+        expect(getDeviceIdFromNodeId('device-0')).toBe(0)
+      })
+
+      it('should handle device prefix with float ID', () => {
+        expect(getDeviceIdFromNodeId('device-1.5')).toBe(null)
+      })
+    })
+
+    describe('getAccountIdFromDeviceContext edge cases', () => {
+      it('should handle account prefix with no ID', () => {
+        expect(getAccountIdFromDeviceContext('account--unassigned')).toBe(null)
+      })
+
+      it('should handle account prefix with non-numeric ID', () => {
+        expect(getAccountIdFromDeviceContext('account-abc-groups')).toBe(null)
+      })
+
+      it('should handle account prefix with zero ID', () => {
+        expect(getAccountIdFromDeviceContext('account-0-unassigned')).toBe(0)
+      })
+
+      it('should handle malformed account context', () => {
+        expect(getAccountIdFromDeviceContext('account-123')).toBe(null)
+      })
+
+      it('should handle account prefix with float ID', () => {
+        expect(getAccountIdFromDeviceContext('account-1.5-groups')).toBe(null)
       })
     })
   })
