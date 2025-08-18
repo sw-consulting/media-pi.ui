@@ -22,8 +22,6 @@
  * @since 2025
  */
 
-import { getDeviceIdFromNodeId } from './id.extraction.helpers.js'
-
 /**
  * Determines if a device item is a top-level unassigned device
  * 

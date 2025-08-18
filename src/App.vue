@@ -146,12 +146,12 @@ function getUserRole() {
 }
 
 .v-app-bar {
-  background: linear-gradient(65deg, #94c6ef 0%, #e3f2fd 100%);
+  background: linear-gradient(65deg, #8abdfc 0%, #bdddfd 100%);
   box-shadow: 0 2px 8px rgba(144,202,249,0.08);
 }
 
 .v-navigation-drawer {
-  background: linear-gradient(145deg, #94c6ef 0%, #e3f2fd 100%);
+  background: linear-gradient(145deg,#8abdfc 0%, #bdddfd 100%);
   box-shadow: 2px 0 8px rgba(144,202,249,0.08);
 }
 

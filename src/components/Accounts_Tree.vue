@@ -262,117 +262,120 @@ const treeItems = computed(() => {
             color="primary"
           />
           <!-- Device icons -->
-          <font-awesome-icon v-else-if="item.id.startsWith('device-')" icon="fa-solid fa-tv" size="1x" class="anti-btn" />
+          <font-awesome-icon v-else-if="item.id.startsWith('device-')" icon="fa-solid fa-tv" size="1x" class="node-icon" />
           <!-- Device Group icons -->
-          <font-awesome-icon v-else-if="item.id.startsWith('group-')" icon="fa-solid fa-object-group" size="1x" class="anti-btn" />
+          <font-awesome-icon v-else-if="item.id.startsWith('group-')" icon="fa-solid fa-object-group" size="1x" class="node-icon" />
           <!-- Device Groups container icons -->
-          <font-awesome-icon v-else-if="item.id.includes('-groups')" icon="fa-solid fa-layer-group" size="1x" class="anti-btn" />
+          <font-awesome-icon v-else-if="item.id.includes('-groups')" icon="fa-solid fa-layer-group" size="1x" class="node-icon" />
           <!-- Account icons -->
-          <font-awesome-icon v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups')" icon="fa-solid fa-building-user" size="1x" class="anti-btn" />
+          <font-awesome-icon v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups')" icon="fa-solid fa-building-user" size="1x" class="node-icon" />
           <!-- Accounts container icon -->
-          <font-awesome-icon v-else-if="item.id === 'root-accounts'" icon="fa-solid fa-city" size="1x" class="anti-btn" />
+          <font-awesome-icon v-else-if="item.id === 'root-accounts'" icon="fa-solid fa-city" size="1x" class="node-icon" />
           <!-- Unassigned devices icons -->
-          <font-awesome-icon v-else-if="item.id === 'root-unassigned' || item.id.includes('-unassigned')" icon="fa-regular fa-circle-question" size="1x" class="anti-btn" />
+          <font-awesome-icon v-else-if="item.id === 'root-unassigned' || item.id.includes('-unassigned')" icon="fa-regular fa-circle-question" size="1x" class="node-icon" />
           <!-- Fallback for any other nodes -->
-          <font-awesome-icon v-else icon="fa-regular fa-circle" size="1x" class="anti-btn" />
+          <font-awesome-icon v-else icon="fa-regular fa-circle" size="1x" class="node-icon" />
         </template>
         
         <template #append="{ item }">
-          <!-- Action buttons for root-accounts node -->
-          <div v-if="item.id === 'root-accounts' && canCreateDeleteAccounts" class="tree-actions">
-            <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать лицевой счёт" @click="createAccount" />
-          </div>
+          <!-- Control Panel for each item -->
+          <div class="control-panel">
+            <!-- Action buttons for root-accounts node -->
+            <div v-if="item.id === 'root-accounts' && canCreateDeleteAccounts" class="tree-actions">
+              <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать лицевой счёт" @click="createAccount" />
+            </div>
 
-          <!-- Action button for Device Groups node -->
-          <div v-else-if="item.id.includes('-groups') && canManageAccount(authStore.user, getAccountFromItem(item, accountsStore))" class="tree-actions">
-            <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать группу устройств" @click="() => createDeviceGroup(item)" />
-          </div>
+            <!-- Action button for Device Groups node -->
+            <div v-else-if="item.id.includes('-groups') && canManageAccount(authStore.user, getAccountFromItem(item, accountsStore))" class="tree-actions">
+              <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать группу устройств" @click="() => createDeviceGroup(item)" />
+            </div>
 
-          <!-- Action buttons for individual device group nodes -->
-          <div v-else-if="item.id.startsWith('group-') && canManageDeviceGroup(authStore.user, getDeviceGroupFromItem(item, deviceGroupsStore))" class="tree-actions">
-            <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-pen" tooltip-text="Редактировать группу устройств" @click="editDeviceGroup" />
-            <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-trash-can" tooltip-text="Удалить группу устройств" @click="deleteDeviceGroup" />
-          </div>
+            <!-- Action buttons for individual device group nodes -->
+            <div v-else-if="item.id.startsWith('group-') && canManageDeviceGroup(authStore.user, getDeviceGroupFromItem(item, deviceGroupsStore))" class="tree-actions">
+              <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-pen" tooltip-text="Редактировать группу устройств" @click="editDeviceGroup" />
+              <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-trash-can" tooltip-text="Удалить группу устройств" @click="deleteDeviceGroup" />
+            </div>
 
-          <!-- Action buttons for account nodes -->
-          <div v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups') && canManageAccount(authStore.user, getAccountFromItem(item, accountsStore))" class="tree-actions">
-            <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />
-            <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
-          </div>
+            <!-- Action buttons for account nodes -->
+            <div v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups') && canManageAccount(authStore.user, getAccountFromItem(item, accountsStore))" class="tree-actions">
+              <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />
+              <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
+            </div>
 
-          <!-- Action buttons for root-unassigned node (top level unassigned devices) -->
-          <div v-else-if="item.id === 'root-unassigned' && canManageDevice(authStore.user, {})" class="tree-actions">
-            <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Зарегистрировать устройство" @click="createDevice" />
-          </div>
+            <!-- Action buttons for root-unassigned node (top level unassigned devices) -->
+            <div v-else-if="item.id === 'root-unassigned' && canManageDevice(authStore.user, {})" class="tree-actions">
+              <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Зарегистрировать устройство" @click="createDevice" />
+            </div>
 
-          <!-- Action buttons for individual device nodes -->
-          <div v-else-if="item.id.startsWith('device-')" class="tree-actions">
-            <!-- Determine context: top-level unassigned vs account-assigned -->
-            <template v-if="isTopLevelUnassignedDevice(item)">
-              <!-- Top level unassigned devices: SystemAdministrator, InstallationEngineer -->
-              <template v-if="canManageDevice(authStore.user, getDeviceFromItem(item, devicesStore))">
-                <!-- Inline account assignment selector -->
-                <InlineAssignment
-                  :item="item"
-                  :edit-mode="accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode || false"
-                  :selected-value="accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.selectedAccountId"
-                  :available-options="availableAccounts"
-                  placeholder="Выберите лицевой счёт"
-                  start-icon="fa-solid fa-plug-circle-check"
-                  start-tooltip="Назначить лицевой счёт"
-                  confirm-tooltip="Назначить лицевой счёт"
-                  cancel-tooltip="Отменить"
-                  :loading="loading"
-                  @start-assignment="startAccountAssignment"
-                  @cancel-assignment="cancelAccountAssignment"
-                  @confirm-assignment="confirmAccountAssignment"
-                  @update-selection="(value) => updateSelectedAccount(getDeviceIdFromNodeId(item.id), value)"
-                />
-                <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
-                  :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                  @click="editDevice" 
-                />
-                <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить устройство" 
-                  :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                  @click="deleteDevice" 
-                />
+            <!-- Action buttons for individual device nodes -->
+            <div v-else-if="item.id.startsWith('device-')" class="tree-actions">
+              <!-- Determine context: top-level unassigned vs account-assigned -->
+              <template v-if="isTopLevelUnassignedDevice(item)">
+                <!-- Top level unassigned devices: SystemAdministrator, InstallationEngineer -->
+                <template v-if="canManageDevice(authStore.user, getDeviceFromItem(item, devicesStore))">
+                  <!-- Inline account assignment selector -->
+                  <InlineAssignment
+                    :item="item"
+                    :edit-mode="accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode || false"
+                    :selected-value="accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.selectedAccountId"
+                    :available-options="availableAccounts"
+                    placeholder="Выберите лицевой счёт"
+                    start-icon="fa-solid fa-plug-circle-check"
+                    start-tooltip="Назначить лицевой счёт"
+                    confirm-tooltip="Назначить лицевой счёт"
+                    cancel-tooltip="Отменить"
+                    :loading="loading"
+                    @start-assignment="startAccountAssignment"
+                    @cancel-assignment="cancelAccountAssignment"
+                    @confirm-assignment="confirmAccountAssignment"
+                    @update-selection="(value) => updateSelectedAccount(getDeviceIdFromNodeId(item.id), value)"
+                  />
+                  <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
+                    :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="editDevice" 
+                  />
+                  <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить устройство" 
+                    :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="deleteDevice" 
+                  />
+                </template>
               </template>
-            </template>
-            <template v-else-if="isAccountAssignedDevice(item)">
-              <!-- Account-assigned devices: SystemAdministrator, AccountManager -->
-              <template v-if="canManageDevice(authStore.user, getDeviceFromItem(item, devicesStore))">
-                <!-- Inline device group assignment selector for unassigned devices -->
-                <InlineAssignment
-                  v-if="isDeviceInUnassignedSection(item)"
-                  :item="item"
-                  :edit-mode="deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode || false"
-                  :selected-value="deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.selectedGroupId"
-                  :available-options="getAvailableDeviceGroups(item)"
-                  placeholder="Выберите группу"
-                  start-icon="fa-solid fa-plug-circle-plus"
-                  start-tooltip="Включить в группу"
-                  confirm-tooltip="Включить"
-                  cancel-tooltip="Отменить"
-                  :loading="loading"
-                  @start-assignment="startDeviceGroupAssignment"
-                  @cancel-assignment="cancelDeviceGroupAssignment"
-                  @confirm-assignment="confirmDeviceGroupAssignment"
-                  @update-selection="(value) => updateSelectedDeviceGroup(getDeviceIdFromNodeId(item.id), value)"
-                />
-                <ActionButton v-if="isDeviceInGroupSection(item)" :item="item" icon="fa-solid fa-plug-circle-minus" tooltip-text="Исключить из группы" 
-                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                  @click="unassignFromGroup" 
-                />
-                <ActionButton v-if="isDeviceInUnassignedSection(item) && canCreateDeleteAccounts" :item="item" icon="fa-solid fa-plug-circle-xmark" tooltip-text="Исключить из лицевого счёта" 
-                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                  @click="unassignFromAccount" 
-                />
-                <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
-                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                  @click="editDevice" 
-                />
+              <template v-else-if="isAccountAssignedDevice(item)">
+                <!-- Account-assigned devices: SystemAdministrator, AccountManager -->
+                <template v-if="canManageDevice(authStore.user, getDeviceFromItem(item, devicesStore))">
+                  <!-- Inline device group assignment selector for unassigned devices -->
+                  <InlineAssignment
+                    v-if="isDeviceInUnassignedSection(item)"
+                    :item="item"
+                    :edit-mode="deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode || false"
+                    :selected-value="deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.selectedGroupId"
+                    :available-options="getAvailableDeviceGroups(item)"
+                    placeholder="Выберите группу"
+                    start-icon="fa-solid fa-plug-circle-plus"
+                    start-tooltip="Включить в группу"
+                    confirm-tooltip="Включить"
+                    cancel-tooltip="Отменить"
+                    :loading="loading"
+                    @start-assignment="startDeviceGroupAssignment"
+                    @cancel-assignment="cancelDeviceGroupAssignment"
+                    @confirm-assignment="confirmDeviceGroupAssignment"
+                    @update-selection="(value) => updateSelectedDeviceGroup(getDeviceIdFromNodeId(item.id), value)"
+                  />
+                  <ActionButton v-if="isDeviceInGroupSection(item)" :item="item" icon="fa-solid fa-plug-circle-minus" tooltip-text="Исключить из группы" 
+                    :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="unassignFromGroup" 
+                  />
+                  <ActionButton v-if="isDeviceInUnassignedSection(item) && canCreateDeleteAccounts" :item="item" icon="fa-solid fa-plug-circle-xmark" tooltip-text="Исключить из лицевого счёта" 
+                    :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="unassignFromAccount" 
+                  />
+                  <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
+                    :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="editDevice" 
+                  />
+                </template>
               </template>
-            </template>
+            </div>
           </div>
         </template>
       </v-treeview>
@@ -396,23 +399,63 @@ const treeItems = computed(() => {
 </template>
 
 <style scoped>
-.tree-actions {
+.control-panel {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
   margin-left: 8px;
 }
 
-.tree-actions .anti-btn {
+.tree-actions {
+  display: flex;
+  gap: 2px;
   padding: 2px 6px;
-  margin: 0 2px;
-  font-size: 12px;
+  background: linear-gradient(135deg, #75b2fd 0%, #bdddfd 100%);
+  border: 1px solid #153754;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  min-height: 24px;
+  align-items: center;
+}
+
+.tree-actions:hover {
+  background: linear-gradient(135deg, #75b2fd 0%, #bdddfd 100%);
+  border: 2px solid #1976d2;
+  box-shadow: 0 2px 6px rgba(25, 118, 210, 0.15);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
+.tree-actions .anti-btn {
+  padding: 2px 4px;
+  margin: 0;
+  font-size: 11px;
   min-width: auto;
-  height: auto;
+  height: 18px;
+  background: transparent;
+  border-radius: 3px;
+  color: #495057;
+  transition: all 0.15s ease;
 }
 
 .tree-actions .anti-btn:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
+  background-color: rgba(25, 118, 210, 0.1);
+  color: #1976d2;
+  transform: scale(1.1);
+}
+
+.tree-actions .anti-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.node-icon {
+  color: #4a647b;
+  transition: color 0.2s ease;
+}
+
+:deep(.v-treeview-item) {
+  padding-right: 8px !important;
 }
 
 :deep(.v-treeview-item:hover) {
@@ -422,6 +465,16 @@ const treeItems = computed(() => {
   border-radius: 6px;
   background: none !important;
   transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+:deep(.v-treeview-item:hover .node-icon) {
+  color: #1976d2;
+}
+
+:deep(.v-treeview-item:hover .tree-actions) {
+  background: linear-gradient(135deg, #a3caf9 0%, #e9f3fc 100%);
+  border: 2px solid #1976d2;
+  box-shadow: 0 3px 8px rgba(25, 118, 210, 0.2);
 }
 
 </style>
