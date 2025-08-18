@@ -91,7 +91,7 @@ export default [
       },
     },
     rules: {
-      'vue/comment-directive': 'off', 
+      'vue/comment-directive': 'off',
     },
   },
   // Overrides for test files
@@ -106,7 +106,6 @@ export default [
         module: 'readonly',
         require: 'readonly',
         global: 'readonly',
-        setTimeout: 'readonly',
       }
     },
   },
