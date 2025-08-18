@@ -104,22 +104,25 @@ describe('Device Item Helper Functions', () => {
     beforeEach(() => {
       mockDevicesStore = {
         devices: [
-          { deviceId: 123, name: 'Device 1' },
-          { deviceId: 456, name: 'Device 2' }
-        ]
+          { id: 123, name: 'Device 1', accountId: null },
+          { id: 456, name: 'Device 2', accountId: 123 }
+        ],
+        getDeviceById(id) {
+          return this.devices.find(device => device.id === id)
+        }
       }
     })
 
     it('should return device object for valid device item', () => {
       const item = { id: 'device-123' }
       const result = getDeviceFromItem(item, mockDevicesStore)
-      expect(result).toEqual({ deviceId: 123, name: 'Device 1' })
+      expect(result).toEqual({ id: 123, name: 'Device 1', accountId: null })
     })
 
     it('should return device object for device with context', () => {
       const item = { id: 'device-456-account-789' }
       const result = getDeviceFromItem(item, mockDevicesStore)
-      expect(result).toEqual({ deviceId: 456, name: 'Device 2' })
+      expect(result).toEqual({ id: 456, name: 'Device 2', accountId: 123 })
     })
 
     it('should return empty object for non-device item', () => {

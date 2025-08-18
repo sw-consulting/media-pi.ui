@@ -22,6 +22,8 @@
  * @since 2025
  */
 
+import { getDeviceIdFromNodeId } from './id.extraction.helpers.js'
+
 /**
  * Determines if a device item is a top-level unassigned device
  * 
@@ -145,19 +147,11 @@ export const isDeviceInGroupSection = (item) => {
  * )
  */
 export const getDeviceFromItem = (item, devicesStore) => {
-  if (!item || !item.id.startsWith('device-')) {
+  const deviceId = getDeviceIdFromNodeId(item?.id)
+  if (deviceId === null) {
     return {}
   }
-  
-  // Extract device ID from the tree node ID
-  // Device IDs in tree are like: device-123 or device-123-account-456
-  const deviceIdMatch = item.id.match(/device-(\d+)/)
-  if (!deviceIdMatch) {
-    return {}
-  }
-  
-  const deviceId = parseInt(deviceIdMatch[1])
-  const device = devicesStore.devices?.find(d => d.deviceId === deviceId)
+  const device = devicesStore.getDeviceById(deviceId)
   return device || {}
 }
 

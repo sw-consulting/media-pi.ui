@@ -148,8 +148,8 @@ export function getRoleName(user) {
     const rolesStore = useRolesStore()
     return rolesStore.getNameByRoleId(minRoleId)
   }
-  return 'Без роли'  // Russian: "No role"
-}
+  return 'Без роли'
+} 
 
 /**
  * Checks if a user can manage a specific account by ID
@@ -183,9 +183,70 @@ export function canManageAccountById(user, accountId) {
   if (isAdministrator(user)) {
     return true
   }
-  
   // Account Managers can manage accounts they're assigned to
   return !!(isManager(user) && user.accountIds && Array.isArray(user.accountIds) && user.accountIds.includes(accountId))
+}
+
+/**
+ * Checks if a user can manage a specific account object
+ * 
+ * Account management permissions are based on role and account assignments:
+ * - System Administrators can manage any account
+ * - Account Managers can manage accounts in their accountIds array
+ * - Other roles cannot manage accounts
+ * 
+ * @param {Object} user - User object with roles and accountIds
+ * @param {Object} account - Account object with id property
+ * @returns {boolean} True if user can manage the specified account
+ * 
+ * @example
+ * // Show account actions based on permissions
+ * if (canManageAccount(currentUser, account)) {
+ *   showAccountEditButton()
+ * }
+ * 
+ * // Filter accounts list for current user
+ * const manageableAccounts = accounts.filter(account => 
+ *   canManageAccount(currentUser, account)
+ * )
+ */
+export function canManageAccount(user, account) {
+  if (!user || !account) {
+    return false
+  }
+  
+  return canManageAccountById(user, account.id)
+}
+
+/**
+ * Checks if a user can manage a specific device group
+ * 
+ * Device group management permissions follow account-based access control:
+ * - System Administrators can manage any device group
+ * - Account Managers can manage device groups in their assigned accounts
+ * - Other roles cannot manage device groups
+ * 
+ * @param {Object} user - User object with roles and accountIds
+ * @param {Object} deviceGroup - Device group object with accountId property
+ * @returns {boolean} True if user can manage the specified device group
+ * 
+ * @example
+ * // Show device group actions based on permissions
+ * if (canManageDeviceGroup(currentUser, deviceGroup)) {
+ *   showDeviceGroupEditButton()
+ * }
+ * 
+ * // Filter device groups list for current user
+ * const manageableGroups = deviceGroups.filter(group => 
+ *   canManageDeviceGroup(currentUser, group)
+ * )
+ */
+export function canManageDeviceGroup(user, deviceGroup) {
+  if (!user || !deviceGroup) {
+    return false
+  }
+  
+  return canManageAccountById(user, deviceGroup.accountId)
 }
 
 /**
@@ -231,5 +292,4 @@ export function canManageDevice(user, device) {
   // Assigned devices use account-based permission checking
   return canManageAccountById(user, device.accountId)
 }
-
 

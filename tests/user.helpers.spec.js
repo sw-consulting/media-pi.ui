@@ -21,7 +21,7 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi } from 'vitest'
-import { UserRoleConstants, isAdministrator, isManager, isEngineer, getRoleName, canManageAccountById, canManageDevice } from '@/helpers/user.helpers.js'
+import { UserRoleConstants, isAdministrator, isManager, isEngineer, getRoleName, canManageAccountById, canManageAccount, canManageDeviceGroup, canManageDevice } from '@/helpers/user.helpers.js'
 
 // Mock the roles store - only mocking what getRoleName actually uses
 vi.mock('@/stores/roles.store.js', () => ({
@@ -218,6 +218,80 @@ describe('User Role Helpers', () => {
       expect(canManageDevice(engineerUser, deviceWithUndefinedAccount)).toBe(true)
       expect(canManageDevice(managerUser, deviceWithNullAccount)).toBe(false)
       expect(canManageDevice(managerUser, deviceWithUndefinedAccount)).toBe(false)
+    })
+  })
+
+  describe('canManageAccount', () => {
+    const adminUser = { roles: [UserRoleConstants.SystemAdministrator], accountIds: [1, 2] }
+    const managerUser = { roles: [UserRoleConstants.AccountManager], accountIds: [1, 3] }
+    const engineerUser = { roles: [UserRoleConstants.InstallationEngineer], accountIds: [2] }
+    
+    const account1 = { id: 1 }
+    const account2 = { id: 2 }
+    const account3 = { id: 3 }
+
+    it('should allow administrators to manage any account', () => {
+      expect(canManageAccount(adminUser, account1)).toBe(true)
+      expect(canManageAccount(adminUser, account2)).toBe(true)
+    })
+
+    it('should allow managers to manage accounts in their accountIds', () => {
+      expect(canManageAccount(managerUser, account1)).toBe(true)
+      expect(canManageAccount(managerUser, account3)).toBe(true)
+    })
+
+    it('should not allow managers to manage accounts not in their accountIds', () => {
+      expect(canManageAccount(managerUser, account2)).toBe(false)
+    })
+
+    it('should not allow engineers to manage any accounts', () => {
+      expect(canManageAccount(engineerUser, account1)).toBe(false)
+      expect(canManageAccount(engineerUser, account2)).toBe(false)
+    })
+
+    it('should handle null/undefined inputs', () => {
+      expect(canManageAccount(null, account1)).toBe(false)
+      expect(canManageAccount(undefined, account1)).toBe(false)
+      expect(canManageAccount(managerUser, null)).toBe(false)
+      expect(canManageAccount(managerUser, undefined)).toBe(false)
+      expect(canManageAccount(null, null)).toBe(false)
+    })
+  })
+
+  describe('canManageDeviceGroup', () => {
+    const adminUser = { roles: [UserRoleConstants.SystemAdministrator], accountIds: [1, 2] }
+    const managerUser = { roles: [UserRoleConstants.AccountManager], accountIds: [1, 3] }
+    const engineerUser = { roles: [UserRoleConstants.InstallationEngineer], accountIds: [2] }
+    
+    const deviceGroup1 = { id: 101, accountId: 1 }
+    const deviceGroup2 = { id: 102, accountId: 2 }
+    const deviceGroup3 = { id: 103, accountId: 3 }
+
+    it('should allow administrators to manage any device group', () => {
+      expect(canManageDeviceGroup(adminUser, deviceGroup1)).toBe(true)
+      expect(canManageDeviceGroup(adminUser, deviceGroup2)).toBe(true)
+    })
+
+    it('should allow managers to manage device groups in their accountIds', () => {
+      expect(canManageDeviceGroup(managerUser, deviceGroup1)).toBe(true)
+      expect(canManageDeviceGroup(managerUser, deviceGroup3)).toBe(true)
+    })
+
+    it('should not allow managers to manage device groups not in their accountIds', () => {
+      expect(canManageDeviceGroup(managerUser, deviceGroup2)).toBe(false)
+    })
+
+    it('should not allow engineers to manage device groups', () => {
+      expect(canManageDeviceGroup(engineerUser, deviceGroup1)).toBe(false)
+      expect(canManageDeviceGroup(engineerUser, deviceGroup2)).toBe(false)
+    })
+
+    it('should handle null/undefined inputs', () => {
+      expect(canManageDeviceGroup(null, deviceGroup1)).toBe(false)
+      expect(canManageDeviceGroup(undefined, deviceGroup1)).toBe(false)
+      expect(canManageDeviceGroup(managerUser, null)).toBe(false)
+      expect(canManageDeviceGroup(managerUser, undefined)).toBe(false)
+      expect(canManageDeviceGroup(null, null)).toBe(false)
     })
   })
 })

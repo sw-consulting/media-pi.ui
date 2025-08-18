@@ -20,6 +20,28 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
+/**
+ * Accounts Tree Component Permission Model
+ * 
+ * This component implements role-based permissions for tree operations:
+ * 
+ * SystemAdministrator:
+ * - Full access to all operations
+ * - Can create/delete accounts and device groups
+ * - Can manage all devices and assignments
+ * 
+ * AccountManager:
+ * - Can view and edit accounts they manage
+ * - Can create, edit, and delete device groups
+ * - Can assign/unassign devices to/from device groups
+ * - Can edit devices in their accounts
+ * - Cannot create/delete accounts
+ * 
+ * InstallationEngineer:
+ * - Can view and manage unassigned devices
+ * - Can assign devices to accounts
+ * - Cannot access account-specific operations
+ */
 import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -261,14 +283,14 @@ const treeItems = computed(() => {
           </div>
 
           <!-- Action button for Device Groups node -->
-          <div v-else-if="item.id.includes('-groups')" class="tree-actions">
+          <div v-else-if="item.id.includes('-groups') && canEditAccounts" class="tree-actions">
             <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать группу устройств" @click="() => createDeviceGroup(item)" />
           </div>
 
           <!-- Action buttons for individual device group nodes -->
           <div v-else-if="item.id.startsWith('group-') && canEditAccounts" class="tree-actions">
             <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-pen" tooltip-text="Редактировать группу устройств" @click="editDeviceGroup" />
-            <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-trash-can" tooltip-text="Удалить группу устройств" @click="deleteDeviceGroup" />
+            <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-trash-can" tooltip-text="Удалить группу устройств" @click="deleteDeviceGroup" />
           </div>
 
           <!-- Action buttons for account nodes -->
@@ -340,7 +362,7 @@ const treeItems = computed(() => {
                   :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                   @click="unassignFromGroup" 
                 />
-                <ActionButton v-if="isDeviceInUnassignedSection(item)" :item="item" icon="fa-solid fa-plug-circle-xmark" tooltip-text="Исключить из лицевого счёта" 
+                <ActionButton v-if="isDeviceInUnassignedSection(item) && canCreateDeleteAccounts" :item="item" icon="fa-solid fa-plug-circle-xmark" tooltip-text="Исключить из лицевого счёта" 
                   :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                   @click="unassignFromAccount" 
                 />
