@@ -116,7 +116,7 @@ export const createStateManager = (authStore) => {
       const groupNodes = savedState.expandedNodes.filter(nodeId => nodeId.startsWith('group-'))
       if (groupNodes.length > 0) {
         // Use setTimeout to ensure tree rendering is complete before expanding groups
-        await new Promise(resolve => globalThis.setTimeout(resolve, 0))
+        await new Promise(resolve => setTimeout(resolve, 0))
         expandedNodes.value = [...savedState.expandedNodes]
       }
     }
