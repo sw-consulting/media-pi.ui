@@ -41,7 +41,7 @@ export const useRolesStore = defineStore('roles', () => {
     try {
       const res = await fetchWrapper.get(baseUrl)
       roles.value = res || []
-      roleMap.value = new Map(roles.value.map(t => [t.id, t]))
+      roleMap.value = new Map(roles.value.map(t => [t.roleId, t]))
     } catch (err) {
       error.value = err
       throw err
@@ -59,7 +59,12 @@ export const useRolesStore = defineStore('roles', () => {
 
   function getName(id) {
     const role = roleMap.value.get(id)
-    return role ? role.name : `Роль ${id}`
+    return role ? role.name : `Роль #${id}`
+  }
+
+  function getNameByRoleId(roleId) {
+    const role = roleMap.value.get(roleId)
+    return role ? role.name : `Роль ${roleId}`
   }
 
   return { 
@@ -68,5 +73,7 @@ export const useRolesStore = defineStore('roles', () => {
     error, 
     getAll, 
     ensureLoaded, 
-    getName }
+    getName,
+    getNameByRoleId
+  }
 })

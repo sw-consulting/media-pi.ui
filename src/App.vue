@@ -26,6 +26,10 @@ import { version } from '@/../package'
 import { onMounted } from 'vue'
 import { useStatusStore } from '@/stores/status.store.js'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
+import { getRoleName } from '@/helpers/user.helpers.js'
+
+import { useRolesStore } from '@/stores/roles.store.js'
+const rolesStore = useRolesStore()
 
 import { useDisplay } from 'vuetify'
 const { height } = useDisplay()
@@ -38,6 +42,8 @@ const accountsCaption = useAccountsCaption(authStore)
 const statusStore = useStatusStore()
 statusStore.fetchStatus().catch(() => {})
  onMounted(() => {
+  statusStore.fetchStatus().catch(() => {})
+  rolesStore.ensureLoaded().catch(() => {})
  })
 
 import { drawer, toggleDrawer } from '@/helpers/drawer.js'
@@ -55,6 +61,14 @@ function getUserName() {
         ' ' +
         authStore.user.patronymic
     : ''
+}
+
+function getUserRole() {
+  if (!authStore.user || authStore.user === undefined) {
+    return 'Media Pi'
+  }
+  /* getRoleName requires rolesStore.ensureLoaded */
+  return getRoleName(authStore.user)
 }
 
  
@@ -75,13 +89,13 @@ function getUserName() {
       <template v-slot:prepend>
         <v-app-bar-nav-icon @click.stop="toggleDrawer()" color="blue-darken-2"></v-app-bar-nav-icon>
       </template>
-      <v-app-bar-title class="orange">Media Pi {{ getUserName() }} </v-app-bar-title>
+      <v-app-bar-title class="orange">{{ getUserRole() }}{{ getUserName() }} </v-app-bar-title>
       <v-spacer />
     </v-app-bar>
     <v-navigation-drawer v-model="drawer" elevation="4">
       <template v-slot:prepend>
         <div class="pa-2" v-if="height > 480">
-          <img alt="Mediapi" class="logo" src="@/assets/logo.png" />
+          <img alt="Media Pi" class="logo" src="@/assets/logo.svg" />
         </div>
       </template>
       <v-list v-if="authStore.user">
@@ -131,10 +145,21 @@ function getUserName() {
   min-width: 480px;
 }
 
+.v-app-bar {
+  background: linear-gradient(65deg, #8abdfc 0%, #bdddfd 100%);
+  box-shadow: 0 2px 8px rgba(144,202,249,0.08);
+}
+
+.v-navigation-drawer {
+  background: linear-gradient(145deg,#8abdfc 0%, #bdddfd 100%);
+  box-shadow: 2px 0 8px rgba(144,202,249,0.08);
+}
+
 .logo {
   margin: 1rem;
   display: block;
   width: 75%;
+  background: transparent;
 }
 
 .version-info {

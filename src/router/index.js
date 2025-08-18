@@ -23,6 +23,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import { getDefaultRoute } from '@/helpers/default.route.js'
 
 const publicPages = ['/recover', '/register']
 const loginPages = ['/login']
@@ -96,6 +97,30 @@ const router = createRouter({
       name: 'Настройки',
       component: () => import('@/views/User_EditView.vue'),
       props: true
+    },
+    {
+      path: '/devicegroup/create/:accountId',
+      name: 'Создание группы устройств',
+      component: () => import('@/views/DeviceGroup_CreateView.vue'),
+      props: true
+    },
+    {
+      path: '/devicegroup/edit/:id',
+      name: 'Настройки группы устройств',
+      component: () => import('@/views/DeviceGroup_EditView.vue'),
+      props: true
+    },
+    {
+      path: '/device/create',
+      name: 'Создание устройства',
+      component: () => import('@/views/Device_CreateView.vue'),
+      props: true
+    },
+    {
+      path: '/device/edit/:id',
+      name: 'Настройки устройства',
+      component: () => import('@/views/Device_EditView.vue'),
+      props: true
     }
   ]
 })
@@ -105,97 +130,78 @@ router.beforeEach(async (to) => {
   const alert = useAlertStore()
   alert.clear()
 
+  // Handle password recovery or registration completion
   if (auth.re_jwt) {
-    return auth
-      .re()
-      .then(() => {
-        return auth.re_tgt == 'register' ? '/users/' : '/user/edit/' + auth.user.id
-      })
-      .catch((error) => {
-        router.push('/login').then(() => {
-          alert.error(
-            auth.re_tgt === 'register'
-              ? 'Не удалось завершить регистрацию. '
-              : 'Не удалось восстановить пароль. ' + error
-          )
-        })
-      })
+    try {
+      await auth.re()
+      return auth.re_tgt == 'register' ? '/users/' : '/user/edit/' + auth.user.id
+    } catch (error) {
+      auth.logout()
+      auth.returnUrl = null
+      alert.error(
+        auth.re_tgt === 'register'
+          ? 'Не удалось завершить регистрацию. '
+          : 'Не удалось восстановить пароль. ' + error
+      )
+      return '/login'
+    }
   }
 
-  // (1) Route to public pages
+  // Public pages are always accessible
   if (publicPages.includes(to.path)) {
     return true
   }
 
-  // (2) No user and (implied) auth required
-  if (!auth.user) {
-    return routeToLogin(to, auth)
-  }
-
-
-  // (3) Role-based access control
-  if (to.path === '/accounts') {
-    if (!auth.isAdministrator && !auth.isManager && !auth.isEngineer) {
-      return `/user/edit/${auth.user.id}`
-    }
-  }
-
-  if (to.path === '/users') {
-    if (!auth.isAdministrator && !auth.isManager && !auth.isEngineer) {
-      return `/user/edit/${auth.user.id}`
-    }
-  }
-
-  if (to.path === '/account/create') {
-    if (!auth.isAdministrator) {
-      return '/'
-    }
-  }
-
-  if (to.path.startsWith('/account/edit/')) {
-    if (!auth.isAdministrator && !auth.isManager) {
-      return '/'
-    }
-  }
-
-  // For user edit pages, ensure users can only edit their own profile unless they have elevated roles
-  if (to.path.startsWith('/user/edit/')) {
-    const editUserId = to.params.id
-    const currentUserId = auth.user.id.toString()
-    
-    // Allow access if editing own profile or if user has administrative roles
-    if (editUserId !== currentUserId && !auth.isAdministrator && !auth.isManager) {
-      return `/user/edit/${auth.user.id}`
-    }
-  }
-
-  // (4) Handle login page access with role-priority redirect
+  // For login pages, check server availability and redirect if already logged in
   if (loginPages.includes(to.path)) {
     try {
       await auth.check()
+      // User is logged in and server is available
+      if (auth.user) {
+        // Handle permission redirects
+        if (auth.permissionRedirect) {
+          auth.permissionRedirect = false
+          return true
+        }
+        // Otherwise redirect to role-appropriate home
+        return getDefaultRoute()
+      }
     } catch {
-      return true
+      // Server unavailable but it's OK for login page
     }
-    if (!auth.user) {
-      return true
-    }
-    
-    // If this is a permission redirect, don't auto-redirect based on role
-    if (auth.permissionRedirect) {
-      auth.permissionRedirect = false
-      return true
-    }
-    
-    // Redirect after login based on user roles
-    if (auth.isAdministrator || auth.isManager || auth.isEngineer) {
-      return '/accounts'
-    }
-    // Users with no role go to their edit form
-    return `/user/edit/${auth.user.id}`
+    // Allow access to login page if not logged in or server check failed
+    return true
   }
 
-  // (5) Allow access to other routes
-  return true
+  // For all other routes, verify authentication and permissions
+  try {
+    // Verify server availability and session validity
+    await auth.check()
+    
+    // If no user after check, route to login
+    if (!auth.user) {
+      return routeToLogin(to, auth)
+    }
+
+    // Check role-specific permissions
+    if (to.meta.requiresAdmin && !auth.isAdmin) {
+      return routeToLogin(to, auth)
+    }
+
+    if (to.meta.requiresLogist && !auth.isLogist) {
+      return routeToLogin(to, auth)
+    }
+
+    // User is authenticated and has proper permissions
+    return true
+  } catch (error) {
+    // Server unavailable or other error
+    console.error('Authentication check failed:', error)
+    auth.logout()
+    auth.returnUrl = to.fullPath
+    alert.error('Сервер недоступен. Пожалуйста, попробуйте позже.')
+    return '/login'
+  }
 })
 
 export default router

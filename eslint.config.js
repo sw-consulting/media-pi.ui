@@ -91,7 +91,7 @@ export default [
       },
     },
     rules: {
-      'vue/comment-directive': 'off', 
+      'vue/comment-directive': 'off',
     },
   },
   // Overrides for test files

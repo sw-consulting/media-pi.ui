@@ -1,34 +1,59 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// This file is a part of Media Pi frontend application
+/**
+ * Configuration Module
+ * This file is a part of Media Pi frontend application
+ * 
+ * Provides centralized configuration management for the Media Pi frontend application.
+ * Supports runtime configuration through RUNTIME_CONFIG global variable and build-time
+ * configuration through Vite environment variables.
+ * 
+ * Configuration Priority (highest to lowest):
+ * 1. Runtime configuration (window.RUNTIME_CONFIG)
+ * 2. Build-time environment variables (import.meta.env.VITE_*)
+ * 3. Default fallback values
+ * 
+ * This approach allows for flexible deployment scenarios where configuration
+ * can be modified without rebuilding the application.
+ * 
+ * @module Config
+ * @author Maxim Samsonov
+ * @since 2025
+ */
 
+/**
+ * Main configuration object containing all application settings
+ * 
+ * @type {Object}
+ * @property {string} apiUrl - Base URL for API endpoints
+ * @property {boolean} enableLog - Whether to enable console logging
+ */
 export const config = {
-  apiUrl: window.RUNTIME_CONFIG?.apiUrl ||
-          import.meta.env.VITE_API_URL ||
-          'http://localhost:8080/api',
-  enableLog: window.RUNTIME_CONFIG?.enableLog ||
-             import.meta.env.VITE_ENABLE_LOG ||
-             true
+  // API endpoint configuration with fallback chain
+  apiUrl: window.RUNTIME_CONFIG?.apiUrl ||          // Runtime config (highest priority)
+          import.meta.env.VITE_API_URL ||           // Build-time env variable
+          'http://localhost:8080/api',              // Default fallback
+
+  // Logging configuration with fallback chain
+  enableLog: window.RUNTIME_CONFIG?.enableLog ||   // Runtime config (highest priority)
+             import.meta.env.VITE_ENABLE_LOG ||    // Build-time env variable
+             true                                   // Default fallback (enabled)
 }
 
-// Export individual config values for backward compatibility
+/**
+ * API base URL for making HTTP requests
+ * @type {string}
+ * @example
+ * // Usage in fetch calls
+ * fetch(`${apiUrl}/users`)
+ */
 export const apiUrl = config.apiUrl
+
+/**
+ * Global logging enablement flag
+ * @type {boolean}
+ * @example
+ * // Conditional logging
+ * if (enableLog) {
+ *   console.log('Debug information')
+ * }
+ */
 export const enableLog = config.enableLog

@@ -41,7 +41,7 @@ defineEmits(['click'])
         v-bind="props"
         :disabled="disabled"
       >
-        <font-awesome-icon :size="iconSize" :icon="icon"  />
+        <font-awesome-icon :size="iconSize" :icon="icon"  class="button-o-c"/>
       </button>
     </template>
   </v-tooltip>

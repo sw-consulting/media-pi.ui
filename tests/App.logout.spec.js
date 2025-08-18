@@ -30,6 +30,25 @@ import App from '@/App.vue'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useStatusStore } from '@/stores/status.store.js'
 
+// Mock the roles store to prevent HTTP requests
+vi.mock('@/stores/roles.store.js', () => ({
+  useRolesStore: vi.fn(() => ({
+    ensureLoaded: vi.fn().mockResolvedValue(),
+    roles: [],
+    loading: false,
+    error: null
+  }))
+}))
+
+// Mock the getRoleName function to return consistent test data while keeping other functions
+vi.mock('@/helpers/user.helpers.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    getRoleName: vi.fn(() => 'Test Role')
+  }
+})
+
 // Mock ResizeObserver
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
@@ -162,15 +181,15 @@ describe('App Logout Functionality', () => {
 
   it('should show user name in app bar when logged in', () => {
     const appBarTitle = wrapper.find('.orange')
-    expect(appBarTitle.text()).toContain('Media Pi  | Doe John Smith')
+    expect(appBarTitle.text()).toContain('Test Role | Doe John Smith')
   })
 
   it('should not show user name in app bar when logged out', async () => {
     // Logout the user
-    authStore.user.value = null
+    authStore.user = null
     await wrapper.vm.$nextTick()
 
     const appBarTitle = wrapper.find('.orange')
-    expect(appBarTitle.text()).toBe('Media Pi  | Doe John Smith')
+    expect(appBarTitle.text()).toBe('Media Pi')
   })
 })

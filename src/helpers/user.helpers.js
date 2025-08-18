@@ -1,56 +1,295 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// This file is a part of Media Pi frontend application
+/**
+ * User Role and Permission Helper Functions
+ * This file is a part of Media Pi frontend application
+ * 
+ * Provides utilities for user role management, permission checking, and access control
+ * throughout the Media Pi application. This module centralizes the business logic
+ * for determining what actions users can perform based on their roles and assignments.
+ * 
+ * Role Hierarchy:
+ * - System Administrator (ID: 1): Full access to all accounts and devices
+ * - Account Manager (ID: 11): Access to assigned accounts and their devices
+ * - Installation Engineer (ID: 21): Access to unassigned devices and assigned accounts
+ * 
+ * Permission Model:
+ * - Administrators have global access
+ * - Managers have scoped access to their assigned accounts
+ * - Engineers have access to unassigned devices and can work within assigned accounts
+ * - Users without roles have minimal access (profile editing only)
+ * 
+ * @module UserHelpers
+ * @author Maxim Samsonov
+ * @since 2025
+ */
 
 import { useRolesStore } from '@/stores/roles.store.js'
 
+/**
+ * System role constants defining the role hierarchy
+ * 
+ * These constants match the backend role definitions and should be kept
+ * in sync with server-side role management. The numeric values determine
+ * the role hierarchy for permission calculations.
+ * 
+ * @type {Object}
+ * @readonly
+ * 
+ * @example
+ * // Check if user has administrator role
+ * if (user.roles.includes(UserRoleConstants.SystemAdministrator)) {
+ *   // Grant admin access
+ * }
+ */
 export const UserRoleConstants = {
-  SystemAdministrator: 1,
-  AccountManager: 11,
-  InstallationEngineer: 21
+  SystemAdministrator: 1,     // Highest privilege level
+  AccountManager: 11,         // Account-scoped privileges
+  InstallationEngineer: 21    // Device and installation privileges
 }
 
+/**
+ * Checks if a user has System Administrator privileges
+ * 
+ * System Administrators have the highest level of access and can perform
+ * any operation in the system including user management, global settings,
+ * and access to all accounts and devices.
+ * 
+ * @param {Object} user - User object with roles array
+ * @returns {boolean} True if user is a System Administrator
+ * 
+ * @example
+ * // Check before allowing user management
+ * if (isAdministrator(currentUser)) {
+ *   showUserManagementPanel()
+ * }
+ * 
+ * // In a component guard
+ * const canAccessAdminPanel = computed(() => isAdministrator(authStore.user))
+ */
 export function isAdministrator(user) {
   return user && Array.isArray(user.roles) && user.roles.includes(UserRoleConstants.SystemAdministrator)
 }
 
+/**
+ * Checks if a user has Account Manager privileges
+ * 
+ * Account Managers have access to specific accounts assigned to them.
+ * They can manage users, devices, and settings within their assigned accounts
+ * but cannot access global system settings or other accounts.
+ * 
+ * @param {Object} user - User object with roles array
+ * @returns {boolean} True if user is an Account Manager
+ * 
+ * @example
+ * // Check before showing account-specific features
+ * if (isManager(currentUser)) {
+ *   showAccountManagementTools()
+ * }
+ * 
+ * // Filter available accounts based on role
+ * const accessibleAccounts = computed(() => {
+ *   if (isManager(user)) return user.accountIds
+ *   return []
+ * })
+ */
 export function isManager(user) {
   return user && Array.isArray(user.roles) && user.roles.includes(UserRoleConstants.AccountManager)
 }
 
+/**
+ * Checks if a user has Installation Engineer privileges
+ * 
+ * Installation Engineers can work with devices and installations.
+ * They have access to unassigned devices and can work within accounts
+ * they're assigned to, but cannot manage user accounts or global settings.
+ * 
+ * @param {Object} user - User object with roles array
+ * @returns {boolean} True if user is an Installation Engineer
+ * 
+ * @example
+ * // Show device installation tools
+ * if (isEngineer(currentUser)) {
+ *   showDeviceInstallationPanel()
+ * }
+ * 
+ * // Check device access permissions
+ * const canInstallDevice = computed(() => 
+ *   isEngineer(user) || isAdministrator(user)
+ * )
+ */
 export function isEngineer(user) {
   return user && Array.isArray(user.roles) && user.roles.includes(UserRoleConstants.InstallationEngineer)
 }
 
+/**
+ * Gets the display name for a user's primary role
+ * 
+ * Returns the localized name of the user's highest-priority role (lowest numeric ID).
+ * If the user has multiple roles, returns the name of the most privileged one.
+ * Uses the roles store to get current role definitions.
+ * 
+ * @param {Object} user - User object with roles array
+ * @returns {string} Localized role name or "Без роли" if no roles
+ * 
+ * @example
+ * // Display user role in a table
+ * <td>{{ getRoleName(user) }}</td>
+ * 
+ * // Show role-based welcome message
+ * const welcomeMessage = computed(() => 
+ *   `Добро пожаловать, ${getRoleName(currentUser)}`
+ * )
+ */
 export function getRoleName(user) {
   if (user && Array.isArray(user.roles) && user.roles.length > 0) {
-    // Find the role with minimal roleId
+    // Find the role with minimal roleId (highest priority)
     const minRoleId = Math.min(...user.roles)
-    // Find the role name by roleId
+    
+    // Retrieve role name from the roles store
     const rolesStore = useRolesStore()
-    if (rolesStore.roles && rolesStore.roles.length > 0) {
-      const role = rolesStore.roles.find(r => r.roleId === minRoleId)
-      return role ? role.name : `Роль ${minRoleId}`
-    }
-    return `Роль ${minRoleId}`
+    return rolesStore.getNameByRoleId(minRoleId)
   }
   return 'Без роли'
+} 
+
+/**
+ * Checks if a user can manage a specific account by ID
+ * 
+ * Determines access permissions based on role and account assignments:
+ * - System Administrators can manage any account
+ * - Account Managers can manage accounts in their accountIds array
+ * - Other roles cannot manage accounts
+ * 
+ * @param {Object} user - User object with roles and accountIds
+ * @param {number} accountId - ID of the account to check access for
+ * @returns {boolean} True if user can manage the specified account
+ * 
+ * @example
+ * // Check before allowing account editing
+ * if (canManageAccountById(currentUser, account.id)) {
+ *   showAccountEditButton()
+ * }
+ * 
+ * // Filter accounts list based on permissions
+ * const manageableAccounts = accounts.filter(account => 
+ *   canManageAccountById(currentUser, account.id)
+ * )
+ */
+export function canManageAccountById(user, accountId) {
+  if (!user || !accountId) {
+    return false
+  }
+  
+  // System Administrators can manage any account
+  if (isAdministrator(user)) {
+    return true
+  }
+  // Account Managers can manage accounts they're assigned to
+  return !!(isManager(user) && user.accountIds && Array.isArray(user.accountIds) && user.accountIds.includes(accountId))
 }
+
+/**
+ * Checks if a user can manage a specific account object
+ * 
+ * Account management permissions are based on role and account assignments:
+ * - System Administrators can manage any account
+ * - Account Managers can manage accounts in their accountIds array
+ * - Other roles cannot manage accounts
+ * 
+ * @param {Object} user - User object with roles and accountIds
+ * @param {Object} account - Account object with id property
+ * @returns {boolean} True if user can manage the specified account
+ * 
+ * @example
+ * // Show account actions based on permissions
+ * if (canManageAccount(currentUser, account)) {
+ *   showAccountEditButton()
+ * }
+ * 
+ * // Filter accounts list for current user
+ * const manageableAccounts = accounts.filter(account => 
+ *   canManageAccount(currentUser, account)
+ * )
+ */
+export function canManageAccount(user, account) {
+  if (!user || !account) {
+    return false
+  }
+  
+  return canManageAccountById(user, account.id)
+}
+
+/**
+ * Checks if a user can manage a specific device group
+ * 
+ * Device group management permissions follow account-based access control:
+ * - System Administrators can manage any device group
+ * - Account Managers can manage device groups in their assigned accounts
+ * - Other roles cannot manage device groups
+ * 
+ * @param {Object} user - User object with roles and accountIds
+ * @param {Object} deviceGroup - Device group object with accountId property
+ * @returns {boolean} True if user can manage the specified device group
+ * 
+ * @example
+ * // Show device group actions based on permissions
+ * if (canManageDeviceGroup(currentUser, deviceGroup)) {
+ *   showDeviceGroupEditButton()
+ * }
+ * 
+ * // Filter device groups list for current user
+ * const manageableGroups = deviceGroups.filter(group => 
+ *   canManageDeviceGroup(currentUser, group)
+ * )
+ */
+export function canManageDeviceGroup(user, deviceGroup) {
+  if (!user || !deviceGroup) {
+    return false
+  }
+  
+  return canManageAccountById(user, deviceGroup.accountId)
+}
+
+/**
+ * Checks if a user can manage a specific device
+ * 
+ * Device management permissions depend on the device's account assignment:
+ * - Unassigned devices: Only Administrators and Engineers can manage
+ * - Assigned devices: Use account-based permissions (canManageAccountById)
+ * 
+ * This enables the workflow where Engineers install devices (unassigned)
+ * and then assign them to accounts that Managers can then control.
+ * 
+ * @param {Object} user - User object with roles and accountIds
+ * @param {Object} device - Device object with optional accountId
+ * @returns {boolean} True if user can manage the specified device
+ * 
+ * @example
+ * // Show device actions based on permissions
+ * if (canManageDevice(currentUser, device)) {
+ *   showDeviceEditButton()
+ * }
+ * 
+ * // Filter device list for current user
+ * const accessibleDevices = devices.filter(device => 
+ *   canManageDevice(currentUser, device)
+ * )
+ * 
+ * // Check before device assignment
+ * if (canManageDevice(engineer, unassignedDevice)) {
+ *   allowDeviceAssignment()
+ * }
+ */
+export function canManageDevice(user, device) {
+  if (!user || !device) {
+    return false
+  }
+  
+  // Unassigned devices can be managed by Administrators and Engineers
+  if (!device.accountId) {
+    return isAdministrator(user) || isEngineer(user)
+  }
+  
+  // Assigned devices use account-based permission checking
+  return canManageAccountById(user, device.accountId)
+}
+

@@ -66,7 +66,6 @@ const schema = Yup.object().shape({
 
 let account = ref({ name: '', managers: [''] })
 const { loading } = storeToRefs(accountsStore) 
-const componentError = ref(null)
 const initialLoading = ref(false)
 
 if (!isRegister()) {
@@ -94,11 +93,9 @@ if (!isRegister()) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
     } else if (err.status === 404) {
-      componentError.value = `Лицевой счёт с ID ${props.id} не найден`
-      alertStore.error(componentError.value)
+      alertStore.error(`Лицевой счёт с ID ${props.id} не найден`)
     } else {
-      componentError.value = err.message || err
-      alertStore.error(`Ошибка загрузки лицевого счёта: ${componentError.value}`)
+      alertStore.error(`Ошибка загрузки лицевого счёта: ${err.message || err}`)
     }
   } finally {
     initialLoading.value = false
@@ -121,7 +118,7 @@ const managerOptions = computed(() => {
     .filter(u => Array.isArray(u.roles) && u.roles.includes(UserRoleConstants.AccountManager))
     .map(u => ({
       value: u.id,
-      text: `${u.lastName || ''} ${u.firstName || ''}`.trim()
+      text: `${u.lastName || ''} ${u.firstName || ''} ${u.patronymic || ''}`.trim()
     }))
 })
 
@@ -142,7 +139,6 @@ function getButton() {
 }
 
 async function onSubmit(values) {
-  componentError.value = null
   try {
     // Filter out empty string values and convert to numbers
     const filteredManagers = (values.managers || [])
@@ -165,14 +161,11 @@ async function onSubmit(values) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
     } else if (err.status === 409) {
-      componentError.value = 'Лицевой счёт с таким названием уже существует'
-      alertStore.error(componentError.value)
+      alertStore.error('Лицевой счёт с таким названием уже существует')
     } else if (err.status === 422) {
-      componentError.value = 'Проверьте корректность введённых данных'
-      alertStore.error(componentError.value)
+      alertStore.error('Проверьте корректность введённых данных')
     } else {
-      componentError.value = err.message || err
-      alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} лицевого счёта: ${componentError.value}`)
+      alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} лицевого счёта: ${err.message || err}`)
     }
   }
 }

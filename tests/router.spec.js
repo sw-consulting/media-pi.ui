@@ -41,6 +41,10 @@ vi.mock('@/views/User_RegisterView.vue', () => ({ default: { template: '<div />'
 vi.mock('@/views/Users_View.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/User_EditView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/Accounts_View.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/DeviceGroup_CreateView.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/DeviceGroup_EditView.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/Device_CreateView.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/Device_EditView.vue', () => ({ default: { template: '<div />' } }))
 
 import router from '@/router'
 

@@ -102,14 +102,14 @@ describe('devices.store', () => {
   it('assignGroup calls fetchWrapper.patch', async () => {
     const store = useDevicesStore()
     fetchWrapper.patch.mockResolvedValueOnce({})
-    await store.assignGroup(1, { deviceGroupId: 2 })
+    await store.assignGroup(1, 2)
     expect(fetchWrapper.patch).toHaveBeenCalled()
   })
 
-  it('initialAssignAccount calls fetchWrapper.patch', async () => {
+  it('assignAccount calls fetchWrapper.patch', async () => {
     const store = useDevicesStore()
     fetchWrapper.patch.mockResolvedValueOnce({})
-    await store.initialAssignAccount(1, { accountId: 2 })
+    await store.assignAccount(1, 2)
     expect(fetchWrapper.patch).toHaveBeenCalled()
   })
 
@@ -174,18 +174,58 @@ describe('devices.store', () => {
     const store = useDevicesStore()
     const mockError = new Error('Assign failed')
     fetchWrapper.patch.mockRejectedValueOnce(mockError)
-    await expect(store.assignGroup(1, { deviceGroupId: 2 })).rejects.toThrow('Assign failed')
+    await expect(store.assignGroup(1, 2)).rejects.toThrow('Assign failed')
     expect(store.error).toBe(mockError)
     expect(store.loading).toBe(false)
   })
 
-  it('initialAssignAccount throws error and sets error state when fetch fails', async () => {
+  it('assignAccount throws error and sets error state when fetch fails', async () => {
     const store = useDevicesStore()
-    const mockError = new Error('InitialAssign failed')
+    const mockError = new Error('Assign failed')
     fetchWrapper.patch.mockRejectedValueOnce(mockError)
-    await expect(store.initialAssignAccount(1, { accountId: 2 })).rejects.toThrow('InitialAssign failed')
+    await expect(store.assignAccount(1, 2)).rejects.toThrow('Assign failed')
     expect(store.error).toBe(mockError)
     expect(store.loading).toBe(false)
+  })
+
+  it('assignGroup handles null groupId by setting Id to 0', async () => {
+    const store = useDevicesStore()
+    fetchWrapper.patch.mockResolvedValueOnce({})
+    await store.assignGroup(1, null)
+    expect(fetchWrapper.patch).toHaveBeenCalledWith(
+      expect.stringContaining('/assign-group/1'),
+      { Id: 0 }
+    )
+  })
+
+  it('assignAccount handles null accountId by setting Id to 0', async () => {
+    const store = useDevicesStore()
+    fetchWrapper.patch.mockResolvedValueOnce({})
+    await store.assignAccount(1, null)
+    expect(fetchWrapper.patch).toHaveBeenCalledWith(
+      expect.stringContaining('/assign-account/1'),
+      { Id: 0 }
+    )
+  })
+
+  it('assignGroup creates correct DTO structure', async () => {
+    const store = useDevicesStore()
+    fetchWrapper.patch.mockResolvedValueOnce({})
+    await store.assignGroup(1, 5)
+    expect(fetchWrapper.patch).toHaveBeenCalledWith(
+      expect.stringContaining('/assign-group/1'),
+      { Id: 5 }
+    )
+  })
+
+  it('assignAccount creates correct DTO structure', async () => {
+    const store = useDevicesStore()
+    fetchWrapper.patch.mockResolvedValueOnce({})
+    await store.assignAccount(1, 3)
+    expect(fetchWrapper.patch).toHaveBeenCalledWith(
+      expect.stringContaining('/assign-account/1'),
+      { Id: 3 }
+    )
   })
 })
 

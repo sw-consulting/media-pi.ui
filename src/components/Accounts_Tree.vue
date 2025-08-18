@@ -20,17 +20,60 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
+/**
+ * Accounts Tree Component Permission Model
+ * 
+ * This component implements role-based permissions for tree operations:
+ * 
+ * SystemAdministrator:
+ * - Full access to all operations
+ * - Can create/delete accounts and device groups
+ * - Can manage all devices and assignments
+ * 
+ * AccountManager:
+ * - Can view and edit accounts they manage
+ * - Can create, edit, and delete device groups
+ * - Can assign/unassign devices to/from device groups
+ * - Can edit devices in their accounts
+ * - Cannot create/delete accounts
+ * 
+ * InstallationEngineer:
+ * - Can view and manage unassigned devices
+ * - Can assign devices to accounts
+ * - Cannot access account-specific operations
+ */
 import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
+import { 
+  useAccountsTreeHelper, 
+  getUnassignedDevices, 
+  getAccountChildren,
+  isTopLevelUnassignedDevice,
+  isAccountAssignedDevice,
+  isDeviceInUnassignedSection,
+  isDeviceInGroupSection,
+  getDeviceIdFromNodeId,
+  getAccountIdFromNodeId,
+  getGroupIdFromNodeId,
+  createAvailableAccountsList,
+  createAvailableDeviceGroupsList,
+  createAccountAssignmentActions,
+  createDeviceGroupAssignmentActions
+} from '@/helpers/accounts.tree.helpers.js'
+import { getDeviceFromItem } from '@/helpers/tree/device.actions.js'
+import { getAccountFromItem } from '@/helpers/tree/account.actions.js'
+import { getDeviceGroupFromItem } from '@/helpers/tree/devicegroup.actions.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
+import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpers/user.helpers.js'
 import ActionButton from '@/components/ActionButton.vue'
+import InlineAssignment from '@/components/InlineAssignment.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -40,7 +83,26 @@ const deviceGroupsStore = useDeviceGroupsStore()
 const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 const { alert } = storeToRefs(alertStore)
-const { getAccountsTreeState } = storeToRefs(authStore)
+
+// State for account assignment
+const accountAssignmentState = ref({})
+
+// State for device group assignment
+const deviceGroupAssignmentState = ref({})
+
+// State for tracking devices being moved (to prevent duplication during transitions)
+const transitioningDevices = ref(new Set())
+
+// Initialize tree helper
+const {
+  buildTreeItems,
+  createLoadChildrenHandler,
+  createStateManager,
+  createAccountActions,
+  createDeviceGroupActions,
+  createDeviceActions,
+  createPermissionCheckers
+} = useAccountsTreeHelper()
 
 const accountsCaption = useAccountsCaption(authStore)
 
@@ -52,46 +114,101 @@ const loadingNodes = ref(new Set())
 const selectedNode = ref([])
 const expandedNodes = ref([])
 
-// Role-based access helper functions
-const canViewUnassignedDevices = computed(() => 
-  authStore.isAdministrator || authStore.isEngineer
+// Permission checkers
+const {
+  canViewUnassignedDevices,
+  canViewAccounts,
+  canCreateDeleteAccounts
+} = createPermissionCheckers(authStore)
+
+// State management
+const { restoreTreeState, saveTreeState } = createStateManager(authStore)
+
+// Action handlers
+const { createAccount, editAccount, deleteAccount } = createAccountActions(
+  router, 
+  alertStore, 
+  accountsStore, 
+  confirmDelete
 )
 
-const canViewAccounts = computed(() => 
-  authStore.isAdministrator || authStore.isManager
+const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGroupActions(
+  router,
+  alertStore,
+  deviceGroupsStore,
+  confirmDelete
 )
 
-// Restore state from auth store
-const restoreTreeState = () => {
-  const savedState = getAccountsTreeState.value
-  if (savedState.selectedNode) {
-    selectedNode.value = [savedState.selectedNode]
-  }
-  if (savedState.expandedNodes && savedState.expandedNodes.length > 0) {
-    expandedNodes.value = [...savedState.expandedNodes]
-  }
-}
+const { createDevice, editDevice, deleteDevice, unassignFromGroup, unassignFromAccount } = createDeviceActions(
+  router,
+  alertStore,
+  devicesStore,
+  confirmDelete,
+  transitioningDevices 
+)
 
-// Save state to auth store
-const saveTreeState = () => {
-  const selected = selectedNode.value && selectedNode.value.length > 0 ? selectedNode.value[0] : null
-  const expanded = expandedNodes.value || []
-  authStore.saveAccountsTreeState(selected, expanded)
-}
+// Loading handler
+const loadChildren = createLoadChildrenHandler(
+  loadedNodes,
+  loadingNodes,
+  devicesStore,
+  deviceGroupsStore,
+  alertStore
+)
 
 // Watch for changes and auto-save
 watch([selectedNode, expandedNodes], () => {
-  saveTreeState()
+  saveTreeState(selectedNode, expandedNodes)
 }, { deep: true })
 
+// Account assignment actions
+const {
+  startAccountAssignment,
+  cancelAccountAssignment,
+  confirmAccountAssignment,
+  updateSelectedAccount
+} = createAccountAssignmentActions(
+  accountAssignmentState,
+  transitioningDevices,
+  devicesStore,
+  alertStore
+)
+
+// Device group assignment actions
+const {
+  startDeviceGroupAssignment,
+  cancelDeviceGroupAssignment,
+  confirmDeviceGroupAssignment,
+  updateSelectedDeviceGroup
+} = createDeviceGroupAssignmentActions(
+  deviceGroupAssignmentState,
+  transitioningDevices,
+  devicesStore,
+  alertStore
+)
+
+// Available accounts for assignment (only accounts user can manage)
+const availableAccounts = computed(() => {
+  return createAvailableAccountsList(accountsStore, authStore)
+})
+
+// Function to get available device groups for a specific device item
+const getAvailableDeviceGroups = (item) => {
+  const accountId = getAccountIdFromNodeId(item.id)
+  return createAvailableDeviceGroupsList(deviceGroupsStore, accountId)
+}
+
 onMounted(async () => {
+  loading.value = true
   try {
-    // Only load accounts if user can view them
-    if (canViewAccounts.value) {
-      await accountsStore.getAll()
+    // Для getAll backend сам интеллектуально фильтрует и отдаёт каждому своё 
+    await accountsStore.getAll()
+    // Load device groups for group assignment functionality
+    if (authStore.isAdministrator || authStore.isManager) {
+      await deviceGroupsStore.getAll()
     }
-    // Restore tree state after data is loaded
-    restoreTreeState()
+    // Restore tree state after data is loaded, with loadChildren support
+    await restoreTreeState(selectedNode, expandedNodes, loadChildren)
   } catch (error) {
     alertStore.error('Не удалось загрузить данные: ' + (error.message || error))
   } finally {
@@ -99,170 +216,31 @@ onMounted(async () => {
   }
 })
 
-// Initial tree structure (only top-level nodes with lazy loading markers)
+// Tree structure using helper
 const treeItems = computed(() => {
-  const items = []
-  
-  if (canViewUnassignedDevices.value) {
-    const hasChildren = !loadedNodes.value.has('root-unassigned')
-    items.push({
-      id: 'root-unassigned',
-      name: 'Нераспределённые устройства',
-      children: hasChildren ? [] : getUnassignedDevices()
-    })
-  }
-  
-  if (canViewAccounts.value) {
-    const accounts = (accountsStore.accounts || []).map(acc => {
-      const hasChildren = !loadedNodes.value.has(`account-${acc.id}`)
-      return {
-        id: `account-${acc.id}`,
-        name: acc.name,
-        children: hasChildren ? [] : getAccountChildren(acc.id)
-      }
-    })
-    
-    items.push({
-      id: 'root-accounts',
-      name: 'Лицевые счета',
-      children: accounts
-    })
-  }
-  
-  return items
+  return buildTreeItems(
+    canViewUnassignedDevices.value,
+    canViewAccounts.value,
+    loadedNodes.value,
+    accountsStore,
+    devicesStore,
+    deviceGroupsStore,
+    // Pass custom functions that exclude transitioning devices
+    (devicesStore) => getUnassignedDevices(devicesStore, transitioningDevices.value),
+    (accountId, devicesStore, deviceGroupsStore) => getAccountChildren(accountId, devicesStore, deviceGroupsStore, transitioningDevices.value)
+  )
 })
-
-// Helper function to get unassigned devices
-const getUnassignedDevices = () => {
-  return (devicesStore.devices || [])
-    .filter(d => !d.accountId || d.accountId === 0)
-    .map(d => ({ id: `device-${d.id}`, name: d.name }))
-}
-
-// Helper function to get children for a specific account
-const getAccountChildren = (accountId) => {
-  const devices = (devicesStore.devices || []).filter(d => d.accountId === accountId)
-  const unassigned = devices
-    .filter(d => !d.deviceGroupId || d.deviceGroupId === 0)
-    .map(d => ({ id: `device-${d.id}`, name: d.name }))
-  
-  const groups = (deviceGroupsStore.groups || [])
-    .filter(g => g.accountId === accountId)
-    .map(g => ({
-      id: `group-${g.id}`,
-      name: g.name,
-      children: devices
-        .filter(d => d.deviceGroupId === g.id)
-        .map(d => ({ id: `device-${d.id}`, name: d.name }))
-    }))
-  
-  const children = []
-  if (unassigned.length > 0) {
-    children.push({ 
-      id: `account-${accountId}-unassigned`, 
-      name: 'Нераспределённые устройства', 
-      children: unassigned 
-    })
-  }
-  children.push(...groups)
-  
-  return children
-}
-
-// Lazy loading function with exception handling
-const loadChildren = async (item) => {
-  const nodeId = item.id
-  
-  // Prevent duplicate loading
-  if (loadedNodes.value.has(nodeId) || loadingNodes.value.has(nodeId)) {
-    return
-  }
-  
-  loadingNodes.value.add(nodeId)
-  
-  try {
-    if (nodeId === 'root-unassigned') {
-      // Load devices for unassigned root
-      await devicesStore.getAll()
-      loadedNodes.value.add(nodeId)
-      
-    } else if (nodeId.startsWith('account-')) {
-      // Load devices and groups for specific account
-      await Promise.all([
-        devicesStore.getAll(),
-        deviceGroupsStore.getAll()
-      ])
-      loadedNodes.value.add(nodeId)
-    }
-    
-    // Force reactivity update
-    treeItems.value
-    
-  } catch (error) {
-    alertStore.error(`Не удалось загрузить данные для "${item.name}": ` + (error.message || error))
-  } finally {
-    loadingNodes.value.delete(nodeId)
-  }
-}
-
-// Action button functions
-const canEditAccounts = computed(() => authStore.isAdministrator || authStore.isManager)
-const canCreateDeleteAccounts = computed(() => authStore.isAdministrator)
-
-const createAccount = () => {
-  try {
-    router.push('/account/create')
-  } catch (error) {
-    alertStore.error(`Не удалось перейти к созданию лицевого счёта: ${error.message || error}`)
-  }
-}
-
-const editAccount = (item) => {
-  try {
-    const accountId = typeof item === 'object' ? item.id : item
-    router.push(`/account/edit/${accountId}`)
-  } catch (error) {
-    alertStore.error(`Не удалось перейти к редактированию лицевого счёта: ${error.message || error}`)
-  }
-}
-
-const deleteAccount = async (item) => {
-  const accountId = typeof item === 'object' ? item.id : item
-  const account = accountsStore.accounts.find(a => a.id === accountId)
-  if (!account) return
-  
-  const confirmed = await confirmDelete(account.name, 'лицевой счёт')
-  
-  if (confirmed) {
-    try {
-      await accountsStore.delete(accountId)
-    } catch (error) {
-      alertStore.error(`Ошибка при удалении лицевого счёта: ${error.message || error}`)
-    }
-  }
-}
-
-// Helper to extract account ID from tree node ID
-const getAccountIdFromNodeId = (nodeId) => {
-  if (nodeId.startsWith('account-')) {
-    return parseInt(nodeId.replace('account-', ''))
-  }
-  return null
-}
 </script>
 
 <template>
-  <div class="settings table-2">
+  <div class="settings table-3">
     <h1 class="primary-heading">{{ accountsCaption || 'Информация не доступна' }}</h1>
     <hr class="hr" />
 
     <v-card>
-      <v-progress-linear 
-        v-if="loading" 
-        indeterminate 
-        color="primary"
-        class="mb-2"
-      />
+      <div v-if="loading" class="text-center m-5">
+        <span class="spinner-border spinner-border-lg align-center"></span>
+      </div>
       
       <v-treeview
         v-if="!loading"
@@ -273,8 +251,8 @@ const getAccountIdFromNodeId = (nodeId) => {
         v-model:selected="selectedNode"
         v-model:opened="expandedNodes"
         open-on-click
-        selectable
       >
+
         <template #prepend="{ item }">
           <v-progress-circular
             v-if="loadingNodes.has(item.id)"
@@ -283,21 +261,121 @@ const getAccountIdFromNodeId = (nodeId) => {
             width="2"
             color="primary"
           />
-          <font-awesome-icon v-else-if="item.children && item.children.length === 0" icon="fa-regular fa-folder" size="1x" class="anti-btn" />
-          <font-awesome-icon v-else-if="item.children && item.children.length > 0" icon="fa-regular fa-folder-open" size="1x" class="anti-btn" />
-          <font-awesome-icon v-else icon="fa-regular fa-circle" size="1x" class="anti-btn" />
+          <!-- Device icons -->
+          <font-awesome-icon v-else-if="item.id.startsWith('device-')" icon="fa-solid fa-tv" size="1x" class="node-icon" />
+          <!-- Device Group icons -->
+          <font-awesome-icon v-else-if="item.id.startsWith('group-')" icon="fa-solid fa-object-group" size="1x" class="node-icon" />
+          <!-- Device Groups container icons -->
+          <font-awesome-icon v-else-if="item.id.includes('-groups')" icon="fa-solid fa-layer-group" size="1x" class="node-icon" />
+          <!-- Account icons -->
+          <font-awesome-icon v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups')" icon="fa-solid fa-building-user" size="1x" class="node-icon" />
+          <!-- Accounts container icon -->
+          <font-awesome-icon v-else-if="item.id === 'root-accounts'" icon="fa-solid fa-city" size="1x" class="node-icon" />
+          <!-- Unassigned devices icons -->
+          <font-awesome-icon v-else-if="item.id === 'root-unassigned' || item.id.includes('-unassigned')" icon="fa-regular fa-circle-question" size="1x" class="node-icon" />
+          <!-- Fallback for any other nodes -->
+          <font-awesome-icon v-else icon="fa-regular fa-circle" size="1x" class="node-icon" />
         </template>
         
         <template #append="{ item }">
-          <!-- Action buttons for root-accounts node -->
-          <div v-if="item.id === 'root-accounts' && canCreateDeleteAccounts" class="tree-actions">
-            <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать лицевой счёт" @click="createAccount" />
-          </div>
-          
-          <!-- Action buttons for account nodes -->
-          <div v-else-if="item.id.startsWith('account-') && canEditAccounts" class="tree-actions">
-            <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />
-            <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
+          <!-- Control Panel for each item -->
+          <div class="control-panel">
+            <!-- Action buttons for root-accounts node -->
+            <div v-if="item.id === 'root-accounts' && canCreateDeleteAccounts" class="tree-actions">
+              <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать лицевой счёт" @click="createAccount" />
+            </div>
+
+            <!-- Action button for Device Groups node -->
+            <div v-else-if="item.id.includes('-groups') && canManageAccount(authStore.user, getAccountFromItem(item, accountsStore))" class="tree-actions">
+              <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать группу устройств" @click="() => createDeviceGroup(item)" />
+            </div>
+
+            <!-- Action buttons for individual device group nodes -->
+            <div v-else-if="item.id.startsWith('group-') && canManageDeviceGroup(authStore.user, getDeviceGroupFromItem(item, deviceGroupsStore))" class="tree-actions">
+              <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-pen" tooltip-text="Редактировать группу устройств" @click="editDeviceGroup" />
+              <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-trash-can" tooltip-text="Удалить группу устройств" @click="deleteDeviceGroup" />
+            </div>
+
+            <!-- Action buttons for account nodes -->
+            <div v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups') && canManageAccount(authStore.user, getAccountFromItem(item, accountsStore))" class="tree-actions">
+              <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />
+              <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
+            </div>
+
+            <!-- Action buttons for root-unassigned node (top level unassigned devices) -->
+            <div v-else-if="item.id === 'root-unassigned' && canManageDevice(authStore.user, {})" class="tree-actions">
+              <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Зарегистрировать устройство" @click="createDevice" />
+            </div>
+
+            <!-- Action buttons for individual device nodes -->
+            <div v-else-if="item.id.startsWith('device-')" class="tree-actions">
+              <!-- Determine context: top-level unassigned vs account-assigned -->
+              <template v-if="isTopLevelUnassignedDevice(item)">
+                <!-- Top level unassigned devices: SystemAdministrator, InstallationEngineer -->
+                <template v-if="canManageDevice(authStore.user, getDeviceFromItem(item, devicesStore))">
+                  <!-- Inline account assignment selector -->
+                  <InlineAssignment
+                    :item="item"
+                    :edit-mode="accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode || false"
+                    :selected-value="accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.selectedAccountId"
+                    :available-options="availableAccounts"
+                    placeholder="Выберите лицевой счёт"
+                    start-icon="fa-solid fa-plug-circle-check"
+                    start-tooltip="Назначить лицевой счёт"
+                    confirm-tooltip="Назначить лицевой счёт"
+                    cancel-tooltip="Отменить"
+                    :loading="loading"
+                    @start-assignment="startAccountAssignment"
+                    @cancel-assignment="cancelAccountAssignment"
+                    @confirm-assignment="confirmAccountAssignment"
+                    @update-selection="(value) => updateSelectedAccount(getDeviceIdFromNodeId(item.id), value)"
+                  />
+                  <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
+                    :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="editDevice" 
+                  />
+                  <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить устройство" 
+                    :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="deleteDevice" 
+                  />
+                </template>
+              </template>
+              <template v-else-if="isAccountAssignedDevice(item)">
+                <!-- Account-assigned devices: SystemAdministrator, AccountManager -->
+                <template v-if="canManageDevice(authStore.user, getDeviceFromItem(item, devicesStore))">
+                  <!-- Inline device group assignment selector for unassigned devices -->
+                  <InlineAssignment
+                    v-if="isDeviceInUnassignedSection(item)"
+                    :item="item"
+                    :edit-mode="deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode || false"
+                    :selected-value="deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.selectedGroupId"
+                    :available-options="getAvailableDeviceGroups(item)"
+                    placeholder="Выберите группу"
+                    start-icon="fa-solid fa-plug-circle-plus"
+                    start-tooltip="Включить в группу"
+                    confirm-tooltip="Включить"
+                    cancel-tooltip="Отменить"
+                    :loading="loading"
+                    @start-assignment="startDeviceGroupAssignment"
+                    @cancel-assignment="cancelDeviceGroupAssignment"
+                    @confirm-assignment="confirmDeviceGroupAssignment"
+                    @update-selection="(value) => updateSelectedDeviceGroup(getDeviceIdFromNodeId(item.id), value)"
+                  />
+                  <ActionButton v-if="isDeviceInGroupSection(item)" :item="item" icon="fa-solid fa-plug-circle-minus" tooltip-text="Исключить из группы" 
+                    :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="unassignFromGroup" 
+                  />
+                  <ActionButton v-if="isDeviceInUnassignedSection(item) && canCreateDeleteAccounts" :item="item" icon="fa-solid fa-plug-circle-xmark" tooltip-text="Исключить из лицевого счёта" 
+                    :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="unassignFromAccount" 
+                  />
+                  <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
+                    :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                    @click="editDevice" 
+                  />
+                </template>
+              </template>
+            </div>
           </div>
         </template>
       </v-treeview>
@@ -321,23 +399,83 @@ const getAccountIdFromNodeId = (nodeId) => {
 </template>
 
 <style scoped>
-.tree-actions {
+.control-panel {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
   margin-left: 8px;
 }
 
-.tree-actions .anti-btn {
+.tree-actions {
+  display: flex;
+  gap: 2px;
   padding: 2px 6px;
-  margin: 0 2px;
-  font-size: 12px;
+  background: linear-gradient(135deg, #75b2fd 0%, #bdddfd 100%);
+  border: 1px solid #153754;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  min-height: 24px;
+  align-items: center;
+}
+
+.tree-actions:hover {
+  background: linear-gradient(135deg, #75b2fd 0%, #bdddfd 100%);
+  border: 2px solid #1976d2;
+  box-shadow: 0 2px 6px rgba(25, 118, 210, 0.15);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
+.tree-actions .anti-btn {
+  padding: 2px 4px;
+  margin: 0;
+  font-size: 11px;
   min-width: auto;
-  height: auto;
+  height: 18px;
+  background: transparent;
+  border-radius: 3px;
+  color: #495057;
+  transition: all 0.15s ease;
 }
 
 .tree-actions .anti-btn:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
+  background-color: rgba(25, 118, 210, 0.1);
+  color: #1976d2;
+  transform: scale(1.1);
 }
+
+.tree-actions .anti-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.node-icon {
+  color: #4a647b;
+  transition: color 0.2s ease;
+}
+
+:deep(.v-treeview-item) {
+  padding-right: 8px !important;
+}
+
+:deep(.v-treeview-item:hover) {
+  border: 2px solid #1976d2;
+  color:  #104981;
+  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
+  border-radius: 6px;
+  background: none !important;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+:deep(.v-treeview-item:hover .node-icon) {
+  color: #1976d2;
+}
+
+:deep(.v-treeview-item:hover .tree-actions) {
+  background: linear-gradient(135deg, #a3caf9 0%, #e9f3fc 100%);
+  border: 2px solid #1976d2;
+  box-shadow: 0 3px 8px rgba(25, 118, 210, 0.2);
+}
+
 </style>
 
