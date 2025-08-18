@@ -46,11 +46,7 @@ export function getRoleName(user) {
     const minRoleId = Math.min(...user.roles)
     // Find the role name by roleId
     const rolesStore = useRolesStore()
-    if (rolesStore.roles && rolesStore.roles.length > 0) {
-      const role = rolesStore.roles.find(r => r.roleId === minRoleId)
-      return role ? role.name : `Роль ${minRoleId}`
-    }
-    return `Роль ${minRoleId}`
+    return rolesStore.getNameByRoleId(minRoleId)
   }
   return 'Без роли'
 }

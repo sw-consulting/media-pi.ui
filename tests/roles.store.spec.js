@@ -65,7 +65,7 @@ describe('roles.store', () => {
     
     expect(store.getName(1)).toBe('SystemAdministrator')
     expect(store.getName(11)).toBe('AccountManager')
-    expect(store.getName(999)).toBe('Роль 999') // Fallback for unknown role
+    expect(store.getName(999)).toBe('Роль #999') // Fallback for unknown role
   })
 
   it('ensureLoaded calls getAll only once', async () => {

@@ -24,21 +24,31 @@ import router from '@/router'
 import { useAuthStore } from '@/stores/auth.store.js'
 
 /**
+ * Determines the route to navigate to after successful login
+ * based on user roles and permissions
+ * @returns {string} The path to redirect to
+ */
+export function getDefaultRoute() {
+  const auth = useAuthStore()
+  
+  if (!auth.user) {
+    return('/login')
+  }
+  // Users with any role go to accounts, users with no role go to their edit form
+  if (auth.isAdministrator || auth.isManager || auth.isEngineer) {
+    return('/accounts')
+  } else {
+    return(`/user/edit/${auth.user.id}`)
+  }
+}
+
+/**
  * Redirects user to the application's default route.
  * Users with any role go to /accounts
  * Users without a role go to their edit page
  */
 export function redirectToDefaultRoute() {
-  const auth = useAuthStore()
-  
-  if (!auth.user) {
-    router.push('/login')
-    return
-  }
-  // Users with any role go to accounts, users with no role go to their edit form
-  if (auth.isAdministrator || auth.isManager || auth.isEngineer) {
-    router.push('/accounts')
-  } else {
-    router.push(`/user/edit/${auth.user.id}`)
-  }
+  router.push(getDefaultRoute())
+  return 
 }
+

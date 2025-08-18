@@ -23,17 +23,18 @@
 import { describe, it, expect, vi } from 'vitest'
 import { UserRoleConstants, isAdministrator, isManager, isEngineer, getRoleName, canManageAccountById, canManageDevice } from '@/helpers/user.helpers.js'
 
-// Mock the roles store
-const mockRolesStore = {
-  roles: [
-    { id: 1, roleId: 1, name: 'Администратор' },
-    { id: 11, roleId: 11, name: 'Менеджер' },
-    { id: 21, roleId: 21, name: 'Инженер' }
-  ]
-}
-
+// Mock the roles store - only mocking what getRoleName actually uses
 vi.mock('@/stores/roles.store.js', () => ({
-  useRolesStore: () => mockRolesStore
+  useRolesStore: () => ({
+    getNameByRoleId: (roleId) => {
+      const roleNames = {
+        1: 'Администратор',
+        11: 'Менеджер', 
+        21: 'Инженер'
+      }
+      return roleNames[roleId] || `Роль ${roleId}`
+    }
+  })
 }))
 
 describe('User Role Helpers', () => {

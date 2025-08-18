@@ -58,7 +58,7 @@ const successAlert = vi.hoisted(() => vi.fn())
 const errorAlert = vi.hoisted(() => vi.fn())
 const clearAlert = vi.hoisted(() => vi.fn())
 const ensureLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()))
-const getName = vi.hoisted(() => vi.fn((id) => `Role ${id}`))
+const getName = vi.hoisted(() => vi.fn((id) => `Role #${id}`))
 
 vi.mock('@/stores/users.store.js', () => ({
   useUsersStore: () => ({
@@ -93,11 +93,14 @@ vi.mock('@/stores/roles.store.js', () => ({
   useRolesStore: () => ({
     ensureLoaded,
     getName,
-    roles: [
-      { id: 1, roleId: 1, name: 'Администратор' },
-      { id: 11, roleId: 11, name: 'Менеджер' },
-      { id: 21, roleId: 21, name: 'Инженер' }
-    ]
+    getNameByRoleId: (roleId) => {
+      const roleNames = {
+        1: 'Администратор',
+        11: 'Менеджер', 
+        21: 'Инженер'
+      }
+      return roleNames[roleId] || `Роль ${roleId}`
+    }
   })
 }))
 
@@ -193,6 +196,7 @@ describe('User_Settings.vue real component', () => {
       global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
     })
     await resolveAll()
+    
     const child = wrapper.findComponent(UserSettings)
     await child.vm.$.setupState.onSubmit({ firstName: 'D' })
     await resolveAll()
