@@ -25,7 +25,7 @@
  * @since 2025
  */
 
-import { getDeviceIdFromItem } from './device.item.helpers.js'
+import { getDeviceIdFromNodeId } from './id.extraction.helpers.js'
 
 /**
  * Creates account assignment action handlers for inline device assignment
@@ -92,7 +92,7 @@ export function createAccountAssignmentActions(
    * </v-btn>
    */
   const startAccountAssignment = (item) => {
-    const deviceId = getDeviceIdFromItem(item)
+    const deviceId = getDeviceIdFromNodeId(item.id)
     if (!deviceId) {
       alertStore.error('Не удалось определить ID устройства для назначения')
       return
@@ -129,7 +129,7 @@ export function createAccountAssignmentActions(
    * </v-btn>
    */
   const cancelAccountAssignment = (item) => {
-    const deviceId = getDeviceIdFromItem(item)
+    const deviceId = getDeviceIdFromNodeId(item.id)
     if (deviceId && accountAssignmentState.value[deviceId]) {
       // Ensure proper reactivity by creating a new object
       accountAssignmentState.value = {
@@ -170,7 +170,7 @@ export function createAccountAssignmentActions(
    * </v-btn>
    */
   const confirmAccountAssignment = async (item) => {
-    const deviceId = getDeviceIdFromItem(item)
+    const deviceId = getDeviceIdFromNodeId(item.id)
     if (!deviceId || !accountAssignmentState.value[deviceId]?.selectedAccountId) {
       alertStore.error('Не выбран лицевой счёт для назначения')
       return

@@ -20,7 +20,8 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createAccountActions, getAccountIdFromNodeId } from '@/helpers/tree/account.actions.js'
+import { createAccountActions } from '@/helpers/tree/account.actions.js'
+import { getAccountIdFromNodeId } from '@/helpers/tree/id.extraction.helpers.js'
 
 describe('Account Actions Functions', () => {
   describe('createAccountActions', () => {

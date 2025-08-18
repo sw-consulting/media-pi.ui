@@ -26,8 +26,6 @@ import {
   isDeviceInUnassignedSection,
   isDeviceInGroupSection,
   getDeviceFromItem,
-  getDeviceIdFromItem,
-  getGroupIdFromDeviceItem,
   createAvailableAccountsList
 } from '@/helpers/tree/device.item.helpers.js'
 
@@ -139,53 +137,6 @@ describe('Device Item Helper Functions', () => {
     it('should return empty object for null item', () => {
       const result = getDeviceFromItem(null, mockDevicesStore)
       expect(result).toEqual({})
-    })
-  })
-
-  describe('getDeviceIdFromItem', () => {
-    it('should extract device ID from simple device item', () => {
-      const item = { id: 'device-123' }
-      expect(getDeviceIdFromItem(item)).toBe(123)
-    })
-
-    it('should extract device ID from device item with context', () => {
-      const item = { id: 'device-456-account-789' }
-      expect(getDeviceIdFromItem(item)).toBe(456)
-    })
-
-    it('should return null for non-device item', () => {
-      const item = { id: 'account-123' }
-      expect(getDeviceIdFromItem(item)).toBeNull()
-    })
-
-    it('should return null for null item', () => {
-      expect(getDeviceIdFromItem(null)).toBeNull()
-    })
-  })
-
-  describe('getGroupIdFromDeviceItem', () => {
-    it('should extract group ID from device in group section', () => {
-      const item = { id: 'device-123-account-456-group-789' }
-      expect(getGroupIdFromDeviceItem(item)).toBe(789)
-    })
-
-    it('should return null for device in unassigned section', () => {
-      const item = { id: 'device-123-account-456-unassigned' }
-      expect(getGroupIdFromDeviceItem(item)).toBe(null)
-    })
-
-    it('should return null for top-level device', () => {
-      const item = { id: 'device-123' }
-      expect(getGroupIdFromDeviceItem(item)).toBe(null)
-    })
-
-    it('should return null for non-device item', () => {
-      const item = { id: 'group-123' }
-      expect(getGroupIdFromDeviceItem(item)).toBe(null)
-    })
-
-    it('should return null for null item', () => {
-      expect(getGroupIdFromDeviceItem(null)).toBe(null)
     })
   })
 

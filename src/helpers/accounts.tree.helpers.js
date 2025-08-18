@@ -49,12 +49,20 @@ import { createLoadChildrenHandler } from './tree/tree.loader.js'
 import { createStateManager } from './tree/tree.state.js'
 
 // Action creators for different node types
-import { createAccountActions, getAccountIdFromNodeId } from './tree/account.actions.js'
-import { createDeviceGroupActions, getGroupIdFromNodeId } from './tree/devicegroup.actions.js'
-import { createDeviceActions, getDeviceIdFromNodeId, getAccountIdFromDeviceContext } from './tree/device.actions.js'
+import { createAccountActions } from './tree/account.actions.js'
+import { createDeviceGroupActions } from './tree/devicegroup.actions.js'
+import { createDeviceActions } from './tree/device.actions.js'
 
 // Permission and security helpers
 import { createPermissionCheckers } from './tree/tree.permissions.js'
+
+// ID extraction utilities
+import { 
+  getEntityIdFromNodeId,
+  getAccountIdFromNodeId,
+  getDeviceIdFromNodeId,
+  getGroupIdFromNodeId
+} from './tree/id.extraction.helpers.js'
 
 // Device-specific utilities and helpers
 import { 
@@ -63,8 +71,6 @@ import {
   isDeviceInUnassignedSection,
   isDeviceInGroupSection,
   getDeviceFromItem,
-  getDeviceIdFromItem,
-  getAccountIdFromDeviceItem,
   createAvailableAccountsList,
   createAvailableDeviceGroupsList
 } from './tree/device.item.helpers.js'
@@ -84,6 +90,7 @@ export * from './tree/tree.permissions.js'
 export * from './tree/device.item.helpers.js'
 export * from './tree/account.assignment.helpers.js'
 export * from './tree/devicegroup.assignment.helpers.js'
+export * from './tree/id.extraction.helpers.js'
 
 /**
  * Main Accounts Tree Composable
@@ -158,8 +165,6 @@ export function useAccountsTreeHelper() {
     isDeviceInUnassignedSection,   // Check if device is in unassigned section
     isDeviceInGroupSection,        // Check if device is in a group section
     getDeviceFromItem,             // Extract device object from tree item
-    getDeviceIdFromItem,           // Extract device ID from tree item
-    getAccountIdFromDeviceItem,    // Extract account ID from device item
     createAvailableAccountsList,   // Create list of accounts for assignment
     createAvailableDeviceGroupsList, // Create list of device groups for assignment
     
@@ -170,9 +175,9 @@ export function useAccountsTreeHelper() {
     
     // ID Extraction Utilities
     // Helper functions for extracting IDs from various tree contexts
+    getEntityIdFromNodeId,         // Generic entity ID extraction with configurable prefix
     getAccountIdFromNodeId,        // Extract account ID from tree node ID
-    getGroupIdFromNodeId,          // Extract group ID from tree node ID
-    getDeviceIdFromNodeId,         // Extract device ID from tree node ID
-    getAccountIdFromDeviceContext  // Extract account ID from device context
+    getGroupIdFromNodeId,          // Extract group ID from tree node ID (handles device node patterns too)
+    getDeviceIdFromNodeId          // Extract device ID from tree node ID
   }
 }

@@ -33,8 +33,8 @@ import {
   isDeviceInUnassignedSection,
   isDeviceInGroupSection,
   getDeviceFromItem,
-  getDeviceIdFromItem,
-  getAccountIdFromDeviceItem,
+  getDeviceIdFromNodeId,
+  getAccountIdFromNodeId,
   createAvailableAccountsList,
   createAvailableDeviceGroupsList,
   createAccountAssignmentActions,
@@ -76,7 +76,6 @@ const {
   createAccountActions,
   createDeviceGroupActions,
   createDeviceActions,
-  getAccountIdFromNodeId,
   getGroupIdFromNodeId,
   createPermissionCheckers
 } = useAccountsTreeHelper()
@@ -172,7 +171,7 @@ const availableAccounts = computed(() => {
 
 // Function to get available device groups for a specific device item
 const getAvailableDeviceGroups = (item) => {
-  const accountId = getAccountIdFromDeviceItem(item)
+  const accountId = getAccountIdFromNodeId(item.id)
   return createAvailableDeviceGroupsList(deviceGroupsStore, accountId)
 }
 
@@ -280,7 +279,7 @@ const treeItems = computed(() => {
 
           <!-- Action buttons for root-unassigned node (top level unassigned devices) -->
           <div v-else-if="item.id === 'root-unassigned' && canManageDevice(authStore.user, {})" class="tree-actions">
-            <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать устройство" @click="createDevice" />
+            <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Зарегистрировать устройство" @click="createDevice" />
           </div>
 
           <!-- Action buttons for individual device nodes -->
@@ -292,8 +291,8 @@ const treeItems = computed(() => {
                 <!-- Inline account assignment selector -->
                 <InlineAssignment
                   :item="item"
-                  :edit-mode="accountAssignmentState[getDeviceIdFromItem(item)]?.editMode || false"
-                  :selected-value="accountAssignmentState[getDeviceIdFromItem(item)]?.selectedAccountId"
+                  :edit-mode="accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode || false"
+                  :selected-value="accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.selectedAccountId"
                   :available-options="availableAccounts"
                   placeholder="Выберите лицевой счёт"
                   start-icon="fa-solid fa-plug-circle-check"
@@ -304,14 +303,14 @@ const treeItems = computed(() => {
                   @start-assignment="startAccountAssignment"
                   @cancel-assignment="cancelAccountAssignment"
                   @confirm-assignment="confirmAccountAssignment"
-                  @update-selection="(value) => updateSelectedAccount(getDeviceIdFromItem(item), value)"
+                  @update-selection="(value) => updateSelectedAccount(getDeviceIdFromNodeId(item.id), value)"
                 />
                 <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
-                  :disabled="loading || accountAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                   @click="editDevice" 
                 />
                 <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить устройство" 
-                  :disabled="loading || accountAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                   @click="deleteDevice" 
                 />
               </template>
@@ -323,8 +322,8 @@ const treeItems = computed(() => {
                 <InlineAssignment
                   v-if="isDeviceInUnassignedSection(item)"
                   :item="item"
-                  :edit-mode="deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.editMode || false"
-                  :selected-value="deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.selectedGroupId"
+                  :edit-mode="deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode || false"
+                  :selected-value="deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.selectedGroupId"
                   :available-options="getAvailableDeviceGroups(item)"
                   placeholder="Выберите группу"
                   start-icon="fa-solid fa-plug-circle-plus"
@@ -335,18 +334,18 @@ const treeItems = computed(() => {
                   @start-assignment="startDeviceGroupAssignment"
                   @cancel-assignment="cancelDeviceGroupAssignment"
                   @confirm-assignment="confirmDeviceGroupAssignment"
-                  @update-selection="(value) => updateSelectedDeviceGroup(getDeviceIdFromItem(item), value)"
+                  @update-selection="(value) => updateSelectedDeviceGroup(getDeviceIdFromNodeId(item.id), value)"
                 />
                 <ActionButton v-if="isDeviceInGroupSection(item)" :item="item" icon="fa-solid fa-plug-circle-minus" tooltip-text="Исключить из группы" 
-                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                   @click="unassignFromGroup" 
                 />
                 <ActionButton v-if="isDeviceInUnassignedSection(item)" :item="item" icon="fa-solid fa-plug-circle-xmark" tooltip-text="Исключить из лицевого счёта" 
-                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                   @click="unassignFromAccount" 
                 />
                 <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
-                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromItem(item)]?.editMode"
+                  :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                   @click="editDevice" 
                 />
               </template>

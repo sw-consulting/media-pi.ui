@@ -10,7 +10,7 @@
  * - Device group creation with account context extraction
  * - Device group editing navigation
  * - Safe device group deletion with confirmation
- * - Account ID extraction from tree node structures
+ * - Integration with centralized ID extraction utilities
  * - Comprehensive error handling with user feedback
  * 
  * Tree Context:
@@ -177,36 +177,4 @@ export const createDeviceGroupActions = (router, alertStore, deviceGroupsStore, 
   }
 
   return { createDeviceGroup, editDeviceGroup, deleteDeviceGroup }
-}
-
-/**
- * Extracts device group ID from tree node ID
- * 
- * Utility function that parses tree node IDs to extract the underlying
- * device group ID. Tree nodes use prefixed IDs like "group-456" for uniqueness,
- * and this function extracts the numeric ID portion.
- * 
- * @param {string} nodeId - Tree node ID in format "group-{id}"
- * @returns {number|null} Device group ID as number, or null if parsing fails
- * 
- * @example
- * // Extract group ID from tree node
- * const groupId = getGroupIdFromNodeId('group-456')     // Returns: 456
- * const invalid = getGroupIdFromNodeId('account-123')   // Returns: null
- * const missing = getGroupIdFromNodeId(null)            // Returns: null
- * 
- * // Use in tree action handlers
- * const handleGroupAction = (treeNode) => {
- *   const groupId = getGroupIdFromNodeId(treeNode.id)
- *   if (groupId) {
- *     performGroupAction(groupId)
- *   }
- * }
- */
-export const getGroupIdFromNodeId = (nodeId) => {
-  if (!nodeId || typeof nodeId !== 'string') return null
-  
-  // Match pattern "group-{digits}"
-  const match = nodeId.match(/^group-(\d+)$/)
-  return match ? parseInt(match[1], 10) : null
 }

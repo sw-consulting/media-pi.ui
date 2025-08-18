@@ -30,7 +30,7 @@
  * @since 2025
  */
 
-import { getDeviceIdFromItem } from './device.item.helpers.js'
+import { getDeviceIdFromNodeId } from './id.extraction.helpers.js'
 
 /**
  * Creates device group assignment action handlers for inline device assignment
@@ -100,7 +100,7 @@ export function createDeviceGroupAssignmentActions(
    * </v-btn>
    */
   const startDeviceGroupAssignment = (item) => {
-    const deviceId = getDeviceIdFromItem(item)
+    const deviceId = getDeviceIdFromNodeId(item.id)
     if (!deviceId) {
       alertStore.error('Не удалось определить ID устройства для назначения группы')
       return
@@ -137,7 +137,7 @@ export function createDeviceGroupAssignmentActions(
    * </v-btn>
    */
   const cancelDeviceGroupAssignment = (item) => {
-    const deviceId = getDeviceIdFromItem(item)
+    const deviceId = getDeviceIdFromNodeId(item.id)
     if (deviceId && deviceGroupAssignmentState.value[deviceId]) {
       // Ensure proper reactivity by creating a new object
       deviceGroupAssignmentState.value = {
@@ -180,7 +180,7 @@ export function createDeviceGroupAssignmentActions(
    * </v-btn>
    */
   const confirmDeviceGroupAssignment = async (item) => {
-    const deviceId = getDeviceIdFromItem(item)
+    const deviceId = getDeviceIdFromNodeId(item.id)
     if (!deviceId || !deviceGroupAssignmentState.value[deviceId]?.selectedGroupId) {
       alertStore.error('Не выбрана группа для назначения')
       return

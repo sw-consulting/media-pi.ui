@@ -20,11 +20,8 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { 
-  createDeviceActions, 
-  getDeviceIdFromNodeId, 
-  getAccountIdFromDeviceContext 
-} from '@/helpers/tree/device.actions.js'
+import { createDeviceActions } from '@/helpers/tree/device.actions.js'
+import { getDeviceIdFromNodeId } from '@/helpers/tree/id.extraction.helpers.js'
 
 describe('Device Actions Functions', () => {
   describe('getDeviceIdFromNodeId', () => {
@@ -43,25 +40,6 @@ describe('Device Actions Functions', () => {
       expect(getDeviceIdFromNodeId('')).toBe(null)
       expect(getDeviceIdFromNodeId(null)).toBe(null)
       expect(getDeviceIdFromNodeId(undefined)).toBe(null)
-    })
-  })
-
-  describe('getAccountIdFromDeviceContext', () => {
-    it('should extract account ID from account context node IDs', () => {
-      expect(getAccountIdFromDeviceContext('account-123-unassigned')).toBe(123)
-      expect(getAccountIdFromDeviceContext('account-1-groups')).toBe(1)
-    })
-
-    it('should return null for non-account context node IDs', () => {
-      expect(getAccountIdFromDeviceContext('device-123')).toBe(null)
-      expect(getAccountIdFromDeviceContext('root-accounts')).toBe(null)
-      expect(getAccountIdFromDeviceContext('group-456')).toBe(null)
-    })
-
-    it('should handle invalid input', () => {
-      expect(getAccountIdFromDeviceContext('')).toBe(null)
-      expect(getAccountIdFromDeviceContext(null)).toBe(null)
-      expect(getAccountIdFromDeviceContext(undefined)).toBe(null)
     })
   })
 
@@ -432,28 +410,6 @@ describe('Device Actions Functions', () => {
 
       it('should handle device prefix with float ID', () => {
         expect(getDeviceIdFromNodeId('device-1.5')).toBe(null)
-      })
-    })
-
-    describe('getAccountIdFromDeviceContext edge cases', () => {
-      it('should handle account prefix with no ID', () => {
-        expect(getAccountIdFromDeviceContext('account--unassigned')).toBe(null)
-      })
-
-      it('should handle account prefix with non-numeric ID', () => {
-        expect(getAccountIdFromDeviceContext('account-abc-groups')).toBe(null)
-      })
-
-      it('should handle account prefix with zero ID', () => {
-        expect(getAccountIdFromDeviceContext('account-0-unassigned')).toBe(0)
-      })
-
-      it('should handle malformed account context', () => {
-        expect(getAccountIdFromDeviceContext('account-123')).toBe(null)
-      })
-
-      it('should handle account prefix with float ID', () => {
-        expect(getAccountIdFromDeviceContext('account-1.5-groups')).toBe(null)
       })
     })
   })

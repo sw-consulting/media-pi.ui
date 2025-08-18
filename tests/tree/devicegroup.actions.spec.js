@@ -20,7 +20,8 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createDeviceGroupActions, getGroupIdFromNodeId } from '@/helpers/tree/devicegroup.actions.js'
+import { createDeviceGroupActions } from '@/helpers/tree/devicegroup.actions.js'
+import { getGroupIdFromNodeId } from '@/helpers/tree/id.extraction.helpers.js'
 
 describe('Device Group Actions Functions', () => {
   describe('createDeviceGroupActions', () => {

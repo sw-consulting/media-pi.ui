@@ -10,7 +10,7 @@
  * - Device creation, editing, and deletion with confirmation
  * - Device assignment and unassignment operations
  * - Transition state management to prevent UI inconsistencies
- * - Complex ID extraction from various tree node formats
+ * - Integration with centralized ID extraction utilities
  * - Robust error handling with user-friendly messages
  * 
  * Tree Node ID Formats:
@@ -24,64 +24,7 @@
  * @since 2025
  */
 
-/**
- * Extracts device ID from tree node ID
- * 
- * Utility function that parses various tree node ID formats to extract
- * the underlying device ID. Device nodes can have complex IDs that encode
- * their context within the tree structure.
- * 
- * @param {string} nodeId - Tree node ID in various device formats
- * @returns {number|null} Device ID as number, or null if parsing fails
- * 
- * @example
- * // Simple device node
- * getDeviceIdFromNodeId('device-123') // Returns: 123
- * 
- * // Account-scoped device node
- * getDeviceIdFromNodeId('device-123-account-456-unassigned') // Returns: 123
- * 
- * // Group-scoped device node  
- * getDeviceIdFromNodeId('device-123-account-456-group-789') // Returns: 123
- * 
- * // Invalid formats
- * getDeviceIdFromNodeId('account-123') // Returns: null
- * getDeviceIdFromNodeId(null) // Returns: null
- */
-export const getDeviceIdFromNodeId = (nodeId) => {
-  if (!nodeId || typeof nodeId !== 'string') return null
-  
-  // Match device-ID or device-ID-anything pattern to handle all device node formats
-  const match = nodeId.match(/^device-(\d+)(?:-.*)?$/)
-  return match ? parseInt(match[1], 10) : null
-}
-
-/**
- * Extracts account ID from device context node ID
- * 
- * Utility function that extracts account ID from device node IDs that
- * include account context. This is used for operations that need to
- * understand which account a device operation is taking place within.
- * 
- * @param {string} nodeId - Tree node ID with account context
- * @returns {number|null} Account ID as number, or null if parsing fails
- * 
- * @example
- * // Account-scoped device operations
- * getAccountIdFromDeviceContext('account-456-unassigned') // Returns: 456
- * getAccountIdFromDeviceContext('device-123-account-456-group-789') // Returns: 456
- * 
- * // Non-account contexts
- * getAccountIdFromDeviceContext('device-123') // Returns: null
- * getAccountIdFromDeviceContext('group-789') // Returns: null
- */
-export const getAccountIdFromDeviceContext = (nodeId) => {
-  if (!nodeId || typeof nodeId !== 'string') return null
-  
-  // Match account-ID- pattern to extract account context
-  const match = nodeId.match(/^account-(\d+)-/)
-  return match ? parseInt(match[1], 10) : null
-}
+import { getDeviceIdFromNodeId } from './id.extraction.helpers.js'
 
 /**
  * Creates device action handlers for tree operations
@@ -125,12 +68,12 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
    * @example
    * // In a toolbar button
    * <v-btn @click="createDevice">
-   *   Создать устройство
+   *   Зарегистрировать устройство
    * </v-btn>
    * 
    * // In a context menu
    * const menuItems = [
-   *   { title: 'Создать новое устройство', action: createDevice }
+   *   { title: 'Зарегистрировать новое устройство', action: createDevice }
    * ]
    */
   const createDevice = () => {

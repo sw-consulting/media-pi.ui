@@ -445,9 +445,9 @@ describe('Accounts_Tree.vue', () => {
       // Verify that the assignment state is correctly set
       expect(wrapper.vm.deviceGroupAssignmentState[1].editMode).toBe(true)
       
-      // Verify that getDeviceIdFromItem function would work with our test data
+      // Verify that getDeviceIdFromNodeId function would work with our test data
       const testItem = { id: 'device-1-account-1-unassigned' }
-      const deviceId = wrapper.vm.getDeviceIdFromItem(testItem)
+      const deviceId = wrapper.vm.getDeviceIdFromNodeId(testItem.id)
       expect(deviceId).toBe(1)
       
       // Verify that when editMode is true, buttons would be disabled

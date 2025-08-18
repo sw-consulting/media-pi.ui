@@ -4,20 +4,21 @@
  * 
  * Provides action handlers for account-related operations within the tree interface.
  * This module handles CRUD operations for accounts including navigation to forms,
- * deletion with confirmation, and ID extraction utilities.
+ * deletion with confirmation, and integration with ID extraction utilities.
  * 
  * Key Features:
  * - Account creation navigation
  * - Account editing navigation with ID extraction
  * - Safe account deletion with user confirmation
  * - Robust error handling with user-friendly messages
- * - ID parsing utilities for tree node identification
+ * - Integration with centralized ID extraction utilities
  * 
  * Integration:
  * - Works with Vue Router for navigation
  * - Uses Pinia stores for data management
  * - Integrates with confirmation dialogs for safety
  * - Provides consistent error messaging through alert store
+ * - Uses centralized ID extraction from id.extraction.helpers
  * 
  * @module AccountActions
  * @author Maxim Samsonov
@@ -161,36 +162,4 @@ export const createAccountActions = (router, alertStore, accountsStore, confirmD
   }
 
   return { createAccount, editAccount, deleteAccount }
-}
-
-/**
- * Extracts account ID from tree node ID
- * 
- * Utility function that parses tree node IDs to extract the underlying
- * account ID. Tree nodes use prefixed IDs like "account-123" for uniqueness,
- * and this function extracts the numeric ID portion.
- * 
- * @param {string} nodeId - Tree node ID in format "account-{id}"
- * @returns {number|null} Account ID as number, or null if parsing fails
- * 
- * @example
- * // Extract account ID from tree node
- * const accountId = getAccountIdFromNodeId('account-123') // Returns: 123
- * const invalid = getAccountIdFromNodeId('device-456')    // Returns: null
- * const missing = getAccountIdFromNodeId(null)           // Returns: null
- * 
- * // Use in tree action handlers
- * const handleAccountAction = (treeNode) => {
- *   const accountId = getAccountIdFromNodeId(treeNode.id)
- *   if (accountId) {
- *     performAccountAction(accountId)
- *   }
- * }
- */
-export const getAccountIdFromNodeId = (nodeId) => {
-  if (!nodeId || typeof nodeId !== 'string') return null
-  
-  // Match pattern "account-{digits}"
-  const match = nodeId.match(/^account-(\d+)$/)
-  return match ? parseInt(match[1], 10) : null
 }
