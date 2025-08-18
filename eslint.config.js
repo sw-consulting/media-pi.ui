@@ -106,6 +106,7 @@ export default [
         module: 'readonly',
         require: 'readonly',
         global: 'readonly',
+        setTimeout: 'readonly',
       }
     },
   },
