@@ -23,24 +23,16 @@
 <script setup>
 import DeviceSettings from '@/components/Device_Settings.vue'
 
-const props = defineProps({
-  accountId: {
-    type: String,
-    required: true
-  }
-})
-const accountId = parseInt(props.accountId, 10)
 </script>
 
 <template>
   <Suspense>
-    <DeviceSettings :register="true" :accountId="accountId" />
+    <DeviceSettings :register="true" />
     <template #fallback>
       <div class="text-center m-5">
         <span class="spinner-border spinner-border-lg align-center"></span>
-        <div class="mt-2">Подготовка формы создания устройства...</div>
+        <div class="mt-2">Подготовка формы регистрации устройства...</div>
       </div>
     </template>
   </Suspense>
 </template>
-
