@@ -44,7 +44,6 @@ import { computed } from 'vue'
  * const {
  *   canViewUnassignedDevices,
  *   canViewAccounts,
- *   canEditAccounts,
  *   canCreateDeleteAccounts
  * } = createPermissionCheckers(authStore)
  * 
@@ -116,31 +115,6 @@ export const createPermissionCheckers = (authStore) => {
   )
 
   /**
-   * Determines if user can edit account information
-   * 
-   * Account editing includes modifying account details, managing account
-   * settings, and performing account-level operations. Both administrators
-   * and managers can edit accounts, with managers limited to their assigned accounts.
-   * 
-   * @type {import('vue').ComputedRef<boolean>}
-   * 
-   * @example
-   * // Show edit button in account context menu
-   * <ContextMenuItem 
-   *   v-if="canEditAccounts" 
-   *   @click="editAccount"
-   * >
-   *   Редактировать
-   * </ContextMenuItem>
-   * 
-   * // Enable account form fields
-   * const isReadOnly = computed(() => !canEditAccounts.value)
-   */
-  const canEditAccounts = computed(() => 
-    authStore.isAdministrator || authStore.isManager
-  )
-
-  /**
    * Determines if user can create or delete accounts
    * 
    * Account creation and deletion are high-privilege operations that
@@ -174,7 +148,6 @@ export const createPermissionCheckers = (authStore) => {
   return {
     canViewUnassignedDevices,
     canViewAccounts,
-    canEditAccounts,
     canCreateDeleteAccounts
   }
 }

@@ -70,10 +70,14 @@ import {
   isAccountAssignedDevice,
   isDeviceInUnassignedSection,
   isDeviceInGroupSection,
-  getDeviceFromItem,
   createAvailableAccountsList,
   createAvailableDeviceGroupsList
 } from './tree/device.item.helpers.js'
+
+// Action-specific utilities
+import { getDeviceFromItem } from './tree/device.actions.js'
+import { getAccountFromItem } from './tree/account.actions.js'
+import { getDeviceGroupFromItem } from './tree/devicegroup.actions.js'
 
 // Assignment and reassignment functionality
 import { createAccountAssignmentActions } from './tree/account.assignment.helpers.js'
@@ -165,6 +169,8 @@ export function useAccountsTreeHelper() {
     isDeviceInUnassignedSection,   // Check if device is in unassigned section
     isDeviceInGroupSection,        // Check if device is in a group section
     getDeviceFromItem,             // Extract device object from tree item
+    getAccountFromItem,            // Extract account object from tree item
+    getDeviceGroupFromItem,        // Extract device group object from tree item
     createAvailableAccountsList,   // Create list of accounts for assignment
     createAvailableDeviceGroupsList, // Create list of device groups for assignment
     

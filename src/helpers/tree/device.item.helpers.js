@@ -146,15 +146,6 @@ export const isDeviceInGroupSection = (item) => {
  *   getDeviceFromItem(selectedTreeItem.value, devicesStore)
  * )
  */
-export const getDeviceFromItem = (item, devicesStore) => {
-  const deviceId = getDeviceIdFromNodeId(item?.id)
-  if (deviceId === null) {
-    return {}
-  }
-  const device = devicesStore.getDeviceById(deviceId)
-  return device || {}
-}
-
 /**
  * Creates available accounts list for device assignment
  * 

@@ -20,7 +20,7 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createDeviceActions } from '@/helpers/tree/device.actions.js'
+import { createDeviceActions, getDeviceFromItem } from '@/helpers/tree/device.actions.js'
 import { getDeviceIdFromNodeId } from '@/helpers/tree/id.extraction.helpers.js'
 
 describe('Device Actions Functions', () => {
@@ -411,6 +411,51 @@ describe('Device Actions Functions', () => {
       it('should handle device prefix with float ID', () => {
         expect(getDeviceIdFromNodeId('device-1.5')).toBe(null)
       })
+    })
+  })
+
+  describe('getDeviceFromItem', () => {
+    let mockDevicesStore
+
+    beforeEach(() => {
+      mockDevicesStore = {
+        devices: [
+          { id: 123, name: 'Device 1', accountId: null },
+          { id: 456, name: 'Device 2', accountId: 123 }
+        ],
+        getDeviceById(id) {
+          return this.devices.find(device => device.id === id)
+        }
+      }
+    })
+
+    it('should return device object for valid device item', () => {
+      const item = { id: 'device-123' }
+      const result = getDeviceFromItem(item, mockDevicesStore)
+      expect(result).toEqual({ id: 123, name: 'Device 1', accountId: null })
+    })
+
+    it('should return device object for device with context', () => {
+      const item = { id: 'device-456-account-789' }
+      const result = getDeviceFromItem(item, mockDevicesStore)
+      expect(result).toEqual({ id: 456, name: 'Device 2', accountId: 123 })
+    })
+
+    it('should return empty object for non-device item', () => {
+      const item = { id: 'account-123' }
+      const result = getDeviceFromItem(item, mockDevicesStore)
+      expect(result).toEqual({})
+    })
+
+    it('should return empty object for device not found in store', () => {
+      const item = { id: 'device-999' }
+      const result = getDeviceFromItem(item, mockDevicesStore)
+      expect(result).toEqual({})
+    })
+
+    it('should return empty object for null item', () => {
+      const result = getDeviceFromItem(null, mockDevicesStore)
+      expect(result).toEqual({})
     })
   })
 })

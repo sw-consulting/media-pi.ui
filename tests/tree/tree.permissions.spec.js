@@ -41,7 +41,6 @@ describe('Tree Permissions Functions', () => {
 
       expect(permissions.canViewUnassignedDevices.value).toBe(true)
       expect(permissions.canViewAccounts.value).toBe(true)
-      expect(permissions.canEditAccounts.value).toBe(true)
       expect(permissions.canCreateDeleteAccounts.value).toBe(true)
     })
 
@@ -50,7 +49,6 @@ describe('Tree Permissions Functions', () => {
 
       expect(permissions.canViewUnassignedDevices.value).toBe(false)
       expect(permissions.canViewAccounts.value).toBe(true)
-      expect(permissions.canEditAccounts.value).toBe(true)
       expect(permissions.canCreateDeleteAccounts.value).toBe(false)
     })
 
@@ -59,14 +57,12 @@ describe('Tree Permissions Functions', () => {
 
       expect(permissions.canViewUnassignedDevices.value).toBe(true)
       expect(permissions.canViewAccounts.value).toBe(false)
-      expect(permissions.canEditAccounts.value).toBe(false)
       expect(permissions.canCreateDeleteAccounts.value).toBe(false)
     })
 
     it('should deny everything for regular users', () => {
       expect(permissions.canViewUnassignedDevices.value).toBe(false)
       expect(permissions.canViewAccounts.value).toBe(false)
-      expect(permissions.canEditAccounts.value).toBe(false)
       expect(permissions.canCreateDeleteAccounts.value).toBe(false)
     })
   })

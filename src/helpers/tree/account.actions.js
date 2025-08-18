@@ -25,6 +25,40 @@
  * @since 2025
  */
 
+import { getAccountIdFromNodeId } from './id.extraction.helpers.js'
+
+/**
+ * Retrieves the account object from the store based on tree item
+ * 
+ * Extracts the account ID from the tree item and looks up the corresponding
+ * account object in the accounts store. Handles various tree node ID formats
+ * and returns an empty object if the account is not found.
+ * 
+ * @param {Object} item - Tree item with id property
+ * @param {Object} accountsStore - Pinia store containing accounts array
+ * @returns {Object} Account object or empty object if not found
+ * 
+ * @example
+ * // Get account object for editing
+ * const account = getAccountFromItem(selectedTreeItem, accountsStore)
+ * if (account.id) {
+ *   openAccountEditForm(account)
+ * }
+ * 
+ * // Use in computed property
+ * const selectedAccount = computed(() => 
+ *   getAccountFromItem(selectedTreeItem.value, accountsStore)
+ * )
+ */
+export const getAccountFromItem = (item, accountsStore) => {
+  const accountId = getAccountIdFromNodeId(item?.id)
+  if (accountId === null) {
+    return {}
+  }
+  const account = accountsStore.getAccountById(accountId)
+  return account || {}
+}
+
 /**
  * Creates account action handlers for tree operations
  * 

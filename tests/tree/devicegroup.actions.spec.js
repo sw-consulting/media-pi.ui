@@ -20,7 +20,7 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createDeviceGroupActions } from '@/helpers/tree/devicegroup.actions.js'
+import { createDeviceGroupActions, getDeviceGroupFromItem } from '@/helpers/tree/devicegroup.actions.js'
 import { getGroupIdFromNodeId } from '@/helpers/tree/id.extraction.helpers.js'
 
 describe('Device Group Actions Functions', () => {
@@ -154,6 +154,51 @@ describe('Device Group Actions Functions', () => {
       expect(getGroupIdFromNodeId('')).toBe(null)
       expect(getGroupIdFromNodeId(null)).toBe(null)
       expect(getGroupIdFromNodeId(undefined)).toBe(null)
+    })
+  })
+
+  describe('getDeviceGroupFromItem', () => {
+    let mockDeviceGroupsStore
+
+    beforeEach(() => {
+      mockDeviceGroupsStore = {
+        groups: [
+          { id: 123, name: 'Group 1', accountId: 1 },
+          { id: 456, name: 'Group 2', accountId: 2 }
+        ],
+        getGroupById(id) {
+          return this.groups.find(group => group.id === id)
+        }
+      }
+    })
+
+    it('should return device group object for valid group item', () => {
+      const item = { id: 'group-123' }
+      const result = getDeviceGroupFromItem(item, mockDeviceGroupsStore)
+      expect(result).toEqual({ id: 123, name: 'Group 1', accountId: 1 })
+    })
+
+    it('should return device group object for group from device context', () => {
+      const item = { id: 'device-789-account-1-group-456' }
+      const result = getDeviceGroupFromItem(item, mockDeviceGroupsStore)
+      expect(result).toEqual({ id: 456, name: 'Group 2', accountId: 2 })
+    })
+
+    it('should return empty object for non-group item', () => {
+      const item = { id: 'account-123' }
+      const result = getDeviceGroupFromItem(item, mockDeviceGroupsStore)
+      expect(result).toEqual({})
+    })
+
+    it('should return empty object for group not found in store', () => {
+      const item = { id: 'group-999' }
+      const result = getDeviceGroupFromItem(item, mockDeviceGroupsStore)
+      expect(result).toEqual({})
+    })
+
+    it('should return empty object for null item', () => {
+      const result = getDeviceGroupFromItem(null, mockDeviceGroupsStore)
+      expect(result).toEqual({})
     })
   })
 })

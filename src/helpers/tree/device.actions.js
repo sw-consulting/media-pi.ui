@@ -27,6 +27,38 @@
 import { getDeviceIdFromNodeId } from './id.extraction.helpers.js'
 
 /**
+ * Retrieves the device object from the store based on tree item
+ * 
+ * Extracts the device ID from the tree item and looks up the corresponding
+ * device object in the devices store. Handles various tree node ID formats
+ * and returns an empty object if the device is not found.
+ * 
+ * @param {Object} item - Tree item with id property
+ * @param {Object} devicesStore - Pinia store containing devices array
+ * @returns {Object} Device object or empty object if not found
+ * 
+ * @example
+ * // Get device object for editing
+ * const device = getDeviceFromItem(selectedTreeItem, devicesStore)
+ * if (device.id) {
+ *   openDeviceEditForm(device)
+ * }
+ * 
+ * // Use in computed property
+ * const selectedDevice = computed(() => 
+ *   getDeviceFromItem(selectedTreeItem.value, devicesStore)
+ * )
+ */
+export const getDeviceFromItem = (item, devicesStore) => {
+  const deviceId = getDeviceIdFromNodeId(item?.id)
+  if (deviceId === null) {
+    return {}
+  }
+  const device = devicesStore.getDeviceById(deviceId)
+  return device || {}
+}
+
+/**
  * Creates device action handlers for tree operations
  * 
  * Factory function that creates a comprehensive set of action handlers for device operations.

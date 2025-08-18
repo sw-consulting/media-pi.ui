@@ -24,6 +24,40 @@
  * @since 2025
  */
 
+import { getGroupIdFromNodeId } from './id.extraction.helpers.js'
+
+/**
+ * Retrieves the device group object from the store based on tree item
+ * 
+ * Extracts the device group ID from the tree item and looks up the corresponding
+ * device group object in the device groups store. Handles various tree node ID formats
+ * and returns an empty object if the device group is not found.
+ * 
+ * @param {Object} item - Tree item with id property
+ * @param {Object} deviceGroupsStore - Pinia store containing device groups array
+ * @returns {Object} Device group object or empty object if not found
+ * 
+ * @example
+ * // Get device group object for editing
+ * const deviceGroup = getDeviceGroupFromItem(selectedTreeItem, deviceGroupsStore)
+ * if (deviceGroup.id) {
+ *   openDeviceGroupEditForm(deviceGroup)
+ * }
+ * 
+ * // Use in computed property
+ * const selectedDeviceGroup = computed(() => 
+ *   getDeviceGroupFromItem(selectedTreeItem.value, deviceGroupsStore)
+ * )
+ */
+export const getDeviceGroupFromItem = (item, deviceGroupsStore) => {
+  const groupId = getGroupIdFromNodeId(item?.id)
+  if (groupId === null) {
+    return {}
+  }
+  const deviceGroup = deviceGroupsStore.getGroupById(groupId)
+  return deviceGroup || {}
+}
+
 /**
  * Creates device group action handlers for tree operations
  * 

@@ -54,21 +54,24 @@ import {
   isAccountAssignedDevice,
   isDeviceInUnassignedSection,
   isDeviceInGroupSection,
-  getDeviceFromItem,
   getDeviceIdFromNodeId,
   getAccountIdFromNodeId,
+  getGroupIdFromNodeId,
   createAvailableAccountsList,
   createAvailableDeviceGroupsList,
   createAccountAssignmentActions,
   createDeviceGroupAssignmentActions
 } from '@/helpers/accounts.tree.helpers.js'
+import { getDeviceFromItem } from '@/helpers/tree/device.actions.js'
+import { getAccountFromItem } from '@/helpers/tree/account.actions.js'
+import { getDeviceGroupFromItem } from '@/helpers/tree/devicegroup.actions.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
-import { canManageDevice } from '@/helpers/user.helpers.js'
+import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpers/user.helpers.js'
 import ActionButton from '@/components/ActionButton.vue'
 import InlineAssignment from '@/components/InlineAssignment.vue'
 
@@ -98,7 +101,6 @@ const {
   createAccountActions,
   createDeviceGroupActions,
   createDeviceActions,
-  getGroupIdFromNodeId,
   createPermissionCheckers
 } = useAccountsTreeHelper()
 
@@ -116,7 +118,6 @@ const expandedNodes = ref([])
 const {
   canViewUnassignedDevices,
   canViewAccounts,
-  canEditAccounts,
   canCreateDeleteAccounts
 } = createPermissionCheckers(authStore)
 
@@ -283,18 +284,18 @@ const treeItems = computed(() => {
           </div>
 
           <!-- Action button for Device Groups node -->
-          <div v-else-if="item.id.includes('-groups') && canEditAccounts" class="tree-actions">
+          <div v-else-if="item.id.includes('-groups') && canManageAccount(authStore.user, getAccountFromItem(item, accountsStore))" class="tree-actions">
             <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Создать группу устройств" @click="() => createDeviceGroup(item)" />
           </div>
 
           <!-- Action buttons for individual device group nodes -->
-          <div v-else-if="item.id.startsWith('group-') && canEditAccounts" class="tree-actions">
+          <div v-else-if="item.id.startsWith('group-') && canManageDeviceGroup(authStore.user, getDeviceGroupFromItem(item, deviceGroupsStore))" class="tree-actions">
             <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-pen" tooltip-text="Редактировать группу устройств" @click="editDeviceGroup" />
             <ActionButton :item="{ id: getGroupIdFromNodeId(item.id) }" icon="fa-solid fa-trash-can" tooltip-text="Удалить группу устройств" @click="deleteDeviceGroup" />
           </div>
 
           <!-- Action buttons for account nodes -->
-          <div v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups') && canEditAccounts" class="tree-actions">
+          <div v-else-if="item.id.startsWith('account-') && !item.id.includes('-unassigned') && !item.id.includes('-groups') && canManageAccount(authStore.user, getAccountFromItem(item, accountsStore))" class="tree-actions">
             <ActionButton :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-pen" tooltip-text="Редактировать лицевой счёт"  @click="editAccount" />
             <ActionButton v-if="canCreateDeleteAccounts" :item="{ id: getAccountIdFromNodeId(item.id) }"  icon="fa-solid fa-trash-can" tooltip-text="Удалить лицевой счёт" @click="deleteAccount" />
           </div>

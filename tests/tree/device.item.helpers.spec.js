@@ -25,7 +25,6 @@ import {
   isAccountAssignedDevice,
   isDeviceInUnassignedSection,
   isDeviceInGroupSection,
-  getDeviceFromItem,
   createAvailableAccountsList
 } from '@/helpers/tree/device.item.helpers.js'
 
@@ -95,51 +94,6 @@ describe('Device Item Helper Functions', () => {
     it('should return false for non-device items', () => {
       const item = { id: 'group-123' }
       expect(isDeviceInGroupSection(item)).toBe(false)
-    })
-  })
-
-  describe('getDeviceFromItem', () => {
-    let mockDevicesStore
-
-    beforeEach(() => {
-      mockDevicesStore = {
-        devices: [
-          { id: 123, name: 'Device 1', accountId: null },
-          { id: 456, name: 'Device 2', accountId: 123 }
-        ],
-        getDeviceById(id) {
-          return this.devices.find(device => device.id === id)
-        }
-      }
-    })
-
-    it('should return device object for valid device item', () => {
-      const item = { id: 'device-123' }
-      const result = getDeviceFromItem(item, mockDevicesStore)
-      expect(result).toEqual({ id: 123, name: 'Device 1', accountId: null })
-    })
-
-    it('should return device object for device with context', () => {
-      const item = { id: 'device-456-account-789' }
-      const result = getDeviceFromItem(item, mockDevicesStore)
-      expect(result).toEqual({ id: 456, name: 'Device 2', accountId: 123 })
-    })
-
-    it('should return empty object for non-device item', () => {
-      const item = { id: 'account-123' }
-      const result = getDeviceFromItem(item, mockDevicesStore)
-      expect(result).toEqual({})
-    })
-
-    it('should return empty object for device not found in store', () => {
-      const item = { id: 'device-999' }
-      const result = getDeviceFromItem(item, mockDevicesStore)
-      expect(result).toEqual({})
-    })
-
-    it('should return empty object for null item', () => {
-      const result = getDeviceFromItem(null, mockDevicesStore)
-      expect(result).toEqual({})
     })
   })
 

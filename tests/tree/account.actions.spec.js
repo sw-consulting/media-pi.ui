@@ -20,7 +20,7 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createAccountActions } from '@/helpers/tree/account.actions.js'
+import { createAccountActions, getAccountFromItem } from '@/helpers/tree/account.actions.js'
 import { getAccountIdFromNodeId } from '@/helpers/tree/id.extraction.helpers.js'
 
 describe('Account Actions Functions', () => {
@@ -146,6 +146,51 @@ describe('Account Actions Functions', () => {
       expect(getAccountIdFromNodeId('')).toBe(null)
       expect(getAccountIdFromNodeId(null)).toBe(null)
       expect(getAccountIdFromNodeId(undefined)).toBe(null)
+    })
+  })
+
+  describe('getAccountFromItem', () => {
+    let mockAccountsStore
+
+    beforeEach(() => {
+      mockAccountsStore = {
+        accounts: [
+          { id: 123, name: 'Account 1' },
+          { id: 456, name: 'Account 2' }
+        ],
+        getAccountById(id) {
+          return this.accounts.find(account => account.id === id)
+        }
+      }
+    })
+
+    it('should return account object for valid account item', () => {
+      const item = { id: 'account-123' }
+      const result = getAccountFromItem(item, mockAccountsStore)
+      expect(result).toEqual({ id: 123, name: 'Account 1' })
+    })
+
+    it('should return account object for account with context', () => {
+      const item = { id: 'account-456-groups' }
+      const result = getAccountFromItem(item, mockAccountsStore)
+      expect(result).toEqual({ id: 456, name: 'Account 2' })
+    })
+
+    it('should return empty object for non-account item', () => {
+      const item = { id: 'device-123' }
+      const result = getAccountFromItem(item, mockAccountsStore)
+      expect(result).toEqual({})
+    })
+
+    it('should return empty object for account not found in store', () => {
+      const item = { id: 'account-999' }
+      const result = getAccountFromItem(item, mockAccountsStore)
+      expect(result).toEqual({})
+    })
+
+    it('should return empty object for null item', () => {
+      const result = getAccountFromItem(null, mockAccountsStore)
+      expect(result).toEqual({})
     })
   })
 })
