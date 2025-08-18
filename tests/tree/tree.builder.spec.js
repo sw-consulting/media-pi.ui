@@ -82,18 +82,9 @@ describe('Tree Builder Functions', () => {
 
       expect(result).toHaveLength(2)
       
-      // Check unassigned devices node
-      const unassignedNode = result.find(node => node.id === 'account-1-unassigned')
-      expect(unassignedNode).toBeDefined()
-      expect(unassignedNode.name).toBe('Нераспределённые устройства')
-      expect(unassignedNode.children).toEqual([
-        { id: 'device-1-account-1-unassigned', name: 'Device 1' },
-        { id: 'device-2-account-1-unassigned', name: 'Device 2' }
-      ])
-
-      // Check groups container node
-      const groupsNode = result.find(node => node.id === 'account-1-groups')
-      expect(groupsNode).toBeDefined()
+      // Check that groups container comes first (index 0)
+      const groupsNode = result[0]
+      expect(groupsNode.id).toBe('account-1-groups')
       expect(groupsNode.name).toBe('Группы устройств')
       expect(groupsNode.children).toHaveLength(1)
       expect(groupsNode.children[0]).toEqual({
@@ -101,6 +92,15 @@ describe('Tree Builder Functions', () => {
         name: 'Group 1',
         children: [{ id: 'device-3-account-1-group-1', name: 'Device 3' }]
       })
+
+      // Check that unassigned devices come last (index 1)
+      const unassignedNode = result[1]
+      expect(unassignedNode.id).toBe('account-1-unassigned')
+      expect(unassignedNode.name).toBe('Нераспределённые устройства')
+      expect(unassignedNode.children).toEqual([
+        { id: 'device-1-account-1-unassigned', name: 'Device 1' },
+        { id: 'device-2-account-1-unassigned', name: 'Device 2' }
+      ])
     })
 
     it('should return empty children when no devices or groups exist for account', () => {
@@ -153,21 +153,21 @@ describe('Tree Builder Functions', () => {
 
       expect(result).toHaveLength(2)
       
-      // Check unassigned devices root
-      expect(result[0]).toEqual({
-        id: 'root-unassigned',
-        name: 'Нераспределённые устройства',
-        children: []
-      })
-
-      // Check accounts root
-      const accountsRoot = result[1]
+      // Check accounts root (now comes first)
+      const accountsRoot = result[0]
       expect(accountsRoot.id).toBe('root-accounts')
       expect(accountsRoot.name).toBe('Лицевые счета')
       expect(accountsRoot.children).toHaveLength(2)
       expect(accountsRoot.children[0]).toEqual({
         id: 'account-1',
         name: 'Account 1',
+        children: []
+      })
+
+      // Check unassigned devices root (now comes last)
+      expect(result[1]).toEqual({
+        id: 'root-unassigned',
+        name: 'Нераспределённые устройства',
         children: []
       })
     })

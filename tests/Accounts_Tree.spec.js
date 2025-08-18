@@ -127,11 +127,13 @@ describe('Accounts_Tree.vue', () => {
     const wrapper = mountTree()
     await resolveAll()
     expect(wrapper.vm.treeItems.length).toBe(2)
-    expect(wrapper.vm.treeItems[0].name).toBe('Нераспределённые устройства')
-    expect(wrapper.vm.treeItems[1].name).toBe('Лицевые счета')
-    expect(wrapper.vm.treeItems[1].children[0].name).toBe('Account 1')
+    // Accounts now come first
+    expect(wrapper.vm.treeItems[0].name).toBe('Лицевые счета')
+    expect(wrapper.vm.treeItems[0].children[0].name).toBe('Account 1')
+    // Unassigned devices now come last
+    expect(wrapper.vm.treeItems[1].name).toBe('Нераспределённые устройства')
     // With lazy loading, unassigned devices children are empty initially
-    expect(wrapper.vm.treeItems[0].children).toEqual([])
+    expect(wrapper.vm.treeItems[1].children).toEqual([])
   })
 
   it('shows only accounts for manager', async () => {

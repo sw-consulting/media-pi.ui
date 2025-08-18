@@ -1,37 +1,62 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software")
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// This file is a part of Media Pi frontend application
+/**
+ * Accounts Tree Helper Module
+ * This file is a part of Media Pi frontend application
+ * 
+ * Central aggregator and facade for all tree-related functionality in the Media Pi
+ * application. This module combines tree building, state management, actions, and
+ * utilities into a cohesive API for working with the hierarchical account/device tree.
+ * 
+ * Architecture:
+ * - Modular design with separate files for each concern
+ * - Facade pattern providing unified access to all tree functionality
+ * - Composable pattern for easy integration with Vue components
+ * - Re-exports all individual modules for direct access when needed
+ * 
+ * Tree Structure:
+ * ```
+ * Root
+ * ├── Accounts
+ * │   ├── Account A
+ * │   │   ├── Device Groups
+ * │   │   └── Devices
+ * │   └── Account B
+ * └── Unassigned Devices
+ *     ├── Device 1
+ *     └── Device 2
+ * ```
+ * 
+ * Key Features:
+ * - Hierarchical account/device organization
+ * - Lazy loading of tree nodes
+ * - Context-sensitive actions and permissions
+ * - Device assignment and reassignment
+ * - Account and device group management
+ * 
+ * @module AccountsTreeHelpers
+ * @author Maxim Samsonov
+ * @since 2025
+ */
 
-// Import all tree functionality from modular files
+// Core tree building functionality
 import {
   getUnassignedDevices,
   getAccountChildren,
   buildTreeItems
 } from './tree/tree.builder.js'
 
+// Tree loading and state management
 import { createLoadChildrenHandler } from './tree/tree.loader.js'
 import { createStateManager } from './tree/tree.state.js'
+
+// Action creators for different node types
 import { createAccountActions, getAccountIdFromNodeId } from './tree/account.actions.js'
 import { createDeviceGroupActions, getGroupIdFromNodeId } from './tree/devicegroup.actions.js'
 import { createDeviceActions, getDeviceIdFromNodeId, getAccountIdFromDeviceContext } from './tree/device.actions.js'
+
+// Permission and security helpers
 import { createPermissionCheckers } from './tree/tree.permissions.js'
+
+// Device-specific utilities and helpers
 import { 
   isTopLevelUnassignedDevice,
   isAccountAssignedDevice,
@@ -43,10 +68,12 @@ import {
   createAvailableAccountsList,
   createAvailableDeviceGroupsList
 } from './tree/device.item.helpers.js'
+
+// Assignment and reassignment functionality
 import { createAccountAssignmentActions } from './tree/account.assignment.helpers.js'
 import { createDeviceGroupAssignmentActions } from './tree/devicegroup.assignment.helpers.js'
 
-// Re-export all functions for direct import access
+// Re-export all functions for direct import access when specific modules are needed
 export * from './tree/tree.builder.js'
 export * from './tree/tree.loader.js'
 export * from './tree/tree.state.js'
@@ -59,49 +86,93 @@ export * from './tree/account.assignment.helpers.js'
 export * from './tree/devicegroup.assignment.helpers.js'
 
 /**
- * Main Accounts Tree Helper
- * Combines all tree functionality into a single composable
+ * Main Accounts Tree Composable
+ * 
+ * Provides a unified interface to all tree functionality, making it easy to use
+ * in Vue components. This composable combines all the tree modules and returns
+ * a comprehensive API for tree operations.
+ * 
+ * Usage Pattern:
+ * ```javascript
+ * // In a Vue component
+ * import { useAccountsTreeHelper } from '@/helpers/accounts.tree.helpers'
+ * 
+ * export default {
+ *   setup() {
+ *     const treeHelper = useAccountsTreeHelper()
+ *     
+ *     // Use any tree functionality
+ *     const treeItems = await treeHelper.buildTreeItems()
+ *     const loadChildren = treeHelper.createLoadChildrenHandler()
+ *     const accountActions = treeHelper.createAccountActions()
+ *     
+ *     return { treeItems, loadChildren, accountActions }
+ *   }
+ * }
+ * ```
+ * 
+ * @returns {Object} Complete tree helper API with all functionality
+ * 
+ * @example
+ * // Basic tree setup
+ * const { buildTreeItems, createStateManager } = useAccountsTreeHelper()
+ * const treeItems = ref(await buildTreeItems())
+ * const { expandedItems, selectedItems } = createStateManager()
+ * 
+ * // Action handling
+ * const { createAccountActions, createDeviceActions } = useAccountsTreeHelper()
+ * const accountActions = createAccountActions(refreshTree)
+ * const deviceActions = createDeviceActions(refreshTree)
+ * 
+ * // Permission checking
+ * const { createPermissionCheckers } = useAccountsTreeHelper()
+ * const { canManageAccount, canManageDevice } = createPermissionCheckers()
  */
 export function useAccountsTreeHelper() {
   return {
-    // Tree building
-    getUnassignedDevices,
-    getAccountChildren,
-    buildTreeItems,
+    // Tree Building Functions
+    // Core functions for constructing the hierarchical tree structure
+    getUnassignedDevices,      // Get all devices not assigned to accounts
+    getAccountChildren,        // Get children (devices/groups) for an account
+    buildTreeItems,           // Build the complete tree structure
     
-    // Loading
-    createLoadChildrenHandler,
+    // Tree Loading and State Management
+    // Functions for managing tree state and lazy loading
+    createLoadChildrenHandler, // Create handler for lazy loading tree nodes
+    createStateManager,       // Create reactive state for tree expansion/selection
     
-    // State management
-    createStateManager,
+    // Action Creators
+    // Factory functions that create context-sensitive action handlers
+    createAccountActions,     // Create actions for account nodes (edit, delete, etc.)
+    createDeviceGroupActions, // Create actions for device group nodes
+    createDeviceActions,      // Create actions for device nodes
     
-    // Actions
-    createAccountActions,
-    createDeviceGroupActions,
-    createDeviceActions,
+    // Permission and Security
+    // Functions for checking user permissions on tree operations
+    createPermissionCheckers, // Create permission checking functions
     
-    // Device item helpers
-    isTopLevelUnassignedDevice,
-    isAccountAssignedDevice,
-    isDeviceInUnassignedSection,
-    isDeviceInGroupSection,
-    getDeviceFromItem,
-    getDeviceIdFromItem,
-    getAccountIdFromDeviceItem,
-    createAvailableAccountsList,
-    createAvailableDeviceGroupsList,
+    // Device Item Utilities
+    // Helper functions for working with device items in different contexts
+    isTopLevelUnassignedDevice,    // Check if device is in top-level unassigned section
+    isAccountAssignedDevice,       // Check if device is assigned to an account
+    isDeviceInUnassignedSection,   // Check if device is in unassigned section
+    isDeviceInGroupSection,        // Check if device is in a group section
+    getDeviceFromItem,             // Extract device object from tree item
+    getDeviceIdFromItem,           // Extract device ID from tree item
+    getAccountIdFromDeviceItem,    // Extract account ID from device item
+    createAvailableAccountsList,   // Create list of accounts for assignment
+    createAvailableDeviceGroupsList, // Create list of device groups for assignment
     
-    // Account assignment
-    createAccountAssignmentActions,
+    // Assignment and Reassignment Actions
+    // Functions for moving devices between accounts and groups
+    createAccountAssignmentActions,     // Create actions for assigning devices to accounts
+    createDeviceGroupAssignmentActions, // Create actions for assigning devices to groups
     
-    // Device group assignment
-    createDeviceGroupAssignmentActions,
-    
-    // Utilities
-    getAccountIdFromNodeId,
-    getGroupIdFromNodeId,
-    getDeviceIdFromNodeId,
-    getAccountIdFromDeviceContext,
-    createPermissionCheckers
+    // ID Extraction Utilities
+    // Helper functions for extracting IDs from various tree contexts
+    getAccountIdFromNodeId,        // Extract account ID from tree node ID
+    getGroupIdFromNodeId,          // Extract group ID from tree node ID
+    getDeviceIdFromNodeId,         // Extract device ID from tree node ID
+    getAccountIdFromDeviceContext  // Extract account ID from device context
   }
 }

@@ -1,37 +1,56 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// This file is a part of Media Pi frontend application
+/**
+ * Accounts Caption Helper
+ * This file is a part of Media Pi frontend application
+ * 
+ * Provides role-based captions for the accounts section header.
+ * Different user roles see different interpretations of the same data,
+ * so the caption reflects what they're actually viewing.
+ * 
+ * Role-based captions:
+ * - Engineers: Only see unassigned devices they can manage
+ * - Managers: See devices across accounts they manage
+ * - Administrators: See the full accounts and devices hierarchy
+ * 
+ * @module AccountsCaption
+ * @author Maxim Samsonov
+ * @since 2025
+ */
 
 import { computed } from 'vue'
 
 /**
  * Get the appropriate accounts caption based on user role
- * @param {Object} authStore - The auth store instance
- * @returns {ComputedRef<string|null>} The caption for accounts section or null if no role
+ * 
+ * Returns a reactive computed value that automatically updates when the user's
+ * role changes. The caption helps users understand what they're viewing based
+ * on their permissions and role within the system.
+ * 
+ * @param {Object} authStore - The authentication store instance containing user role information
+ * @param {boolean} authStore.isEngineer - Whether the user has engineer role
+ * @param {boolean} authStore.isManager - Whether the user has manager role  
+ * @param {boolean} authStore.isAdministrator - Whether the user has administrator role
+ * @returns {ComputedRef<string|null>} The localized caption for the accounts section or null if no valid role
+ * 
+ * @example
+ * // In a Vue component
+ * const authStore = useAuthStore()
+ * const accountsCaption = useAccountsCaption(authStore)
+ * 
+ * // In template
+ * <h1>{{ accountsCaption || 'Информация не доступна' }}</h1>
  */
 export function useAccountsCaption(authStore) {
   return computed(() => {
+    // Engineers only see unassigned devices they can manage
     if (authStore.isEngineer) return 'Нераспределённые устройства'
+    
+    // Managers see devices across their assigned accounts
     if (authStore.isManager) return 'Устройства'
+    
+    // Administrators see the full hierarchy of accounts and devices
     if (authStore.isAdministrator) return 'Лицевые счета и устройства'
+    
+    // No valid role found - should not happen in normal operation
     return null
   })
 }

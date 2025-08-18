@@ -1,31 +1,76 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software")
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// This file is a part of Media Pi frontend application
-
 /**
- * Tree Loading Functions
- * Handles lazy loading of tree nodes and data fetching
+ * Tree Loader Module
+ * This file is a part of Media Pi frontend application
+ * 
+ * Handles lazy loading functionality for the accounts tree. This module provides
+ * efficient data loading strategies to avoid loading all tree data at once,
+ * improving performance and user experience for large trees.
+ * 
+ * Loading Strategy:
+ * - Root level loads only basic structure initially
+ * - Child nodes are loaded on-demand when expanded
+ * - Duplicate loading prevention with loading state tracking
+ * - Error handling with user-friendly messages
+ * 
+ * Performance Benefits:
+ * - Reduces initial page load time
+ * - Minimizes memory usage for large trees
+ * - Improves perceived performance through progressive loading
+ * - Allows users to see and interact with tree structure immediately
+ * 
+ * @module TreeLoader
+ * @author Maxim Samsonov
+ * @since 2025
  */
 
 /**
- * Handle lazy loading of tree nodes
+ * Creates a lazy loading handler for tree nodes
+ * 
+ * This factory function creates a specialized loading handler that manages
+ * the loading of child data for different types of tree nodes. It prevents
+ * duplicate requests, tracks loading state, and handles errors gracefully.
+ * 
+ * Node Types Handled:
+ * - 'root-unassigned': Loads all unassigned devices
+ * - '*-groups': Loads device groups for an account
+ * - 'account-*': Loads both devices and groups for a specific account
+ * 
+ * Loading State Management:
+ * - `loadedNodes`: Set of node IDs that have been successfully loaded
+ * - `loadingNodes`: Set of node IDs currently being loaded
+ * - Prevents duplicate loading attempts and provides loading feedback
+ * 
+ * @param {import('vue').Ref<Set>} loadedNodes - Reactive set of loaded node IDs
+ * @param {import('vue').Ref<Set>} loadingNodes - Reactive set of loading node IDs
+ * @param {Object} devicesStore - Pinia store for device data management
+ * @param {Object} deviceGroupsStore - Pinia store for device group data management
+ * @param {Object} alertStore - Pinia store for displaying user notifications
+ * @returns {Function} Async function that handles node loading
+ * 
+ * @example
+ * // Setup in a Vue component
+ * import { createLoadChildrenHandler } from '@/helpers/tree/tree.loader'
+ * import { useDevicesStore, useDeviceGroupsStore, useAlertStore } from '@/stores'
+ * 
+ * const loadedNodes = ref(new Set())
+ * const loadingNodes = ref(new Set())
+ * const devicesStore = useDevicesStore()
+ * const deviceGroupsStore = useDeviceGroupsStore()
+ * const alertStore = useAlertStore()
+ * 
+ * const loadChildren = createLoadChildrenHandler(
+ *   loadedNodes, 
+ *   loadingNodes, 
+ *   devicesStore, 
+ *   deviceGroupsStore, 
+ *   alertStore
+ * )
+ * 
+ * // Use with tree component
+ * <v-treeview
+ *   :load-children="loadChildren"
+ *   :items="treeItems"
+ * />
  */
 export const createLoadChildrenHandler = (
   loadedNodes, 
@@ -37,36 +82,47 @@ export const createLoadChildrenHandler = (
   return async (item) => {
     const nodeId = item.id
     
-    // Prevent duplicate loading
+    // Prevent duplicate loading - check if already loaded or currently loading
     if (loadedNodes.value.has(nodeId) || loadingNodes.value.has(nodeId)) {
       return
     }
     
+    // Mark node as currently loading
     loadingNodes.value.add(nodeId)
     
     try {
+      // Load data based on node type
       if (nodeId === 'root-unassigned') {
-        // Load devices for unassigned root
+        // Load all devices to populate unassigned devices section
+        // This ensures we have the latest device data and can filter unassigned ones
         await devicesStore.getAll()
         loadedNodes.value.add(nodeId)
         
       } else if (nodeId.includes('-groups')) {
-        // Load device groups for device group container
+        // Load device groups for the groups container node
+        // This populates the "Device Groups" section under an account
         await deviceGroupsStore.getAll()
         loadedNodes.value.add(nodeId)
         
       } else if (nodeId.startsWith('account-')) {
-        // Load devices and groups for specific account
+        // Load both devices and groups for a specific account
+        // This ensures the account node has all its child data available
         await Promise.all([
-          devicesStore.getAll(),
-          deviceGroupsStore.getAll()
+          devicesStore.getAll(),      // Load devices to show account devices
+          deviceGroupsStore.getAll()  // Load groups to show account groups
         ])
         loadedNodes.value.add(nodeId)
       }
       
     } catch (error) {
-      alertStore.error(`Не удалось загрузить данные для "${item.name}": ` + (error.message || error))
+      // Handle loading errors with user-friendly messages
+      const errorMessage = `Не удалось загрузить данные для "${item.name}": ` + (error.message || error)
+      alertStore.error(errorMessage)
+      
+      // Note: We don't add to loadedNodes on error, allowing retry attempts
+      
     } finally {
+      // Always remove from loading state, regardless of success/failure
       loadingNodes.value.delete(nodeId)
     }
   }
