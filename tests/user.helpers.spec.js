@@ -21,7 +21,17 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi } from 'vitest'
-import { UserRoleConstants, isAdministrator, isManager, isEngineer, getRoleName, canManageAccountById, canManageAccount, canManageDeviceGroup, canManageDevice } from '@/helpers/user.helpers.js'
+import {
+  UserRoleConstants,
+  isAdministrator,
+  isManager,
+  isEngineer,
+  getRoleName,
+  canManageAccountById,
+  canManageAccount,
+  canManageDeviceGroup,
+  canManageDevice
+} from '@/helpers/user.helpers.js'
 
 // Mock the roles store - only mocking what getRoleName actually uses
 vi.mock('@/stores/roles.store.js', () => ({
