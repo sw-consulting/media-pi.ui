@@ -22,7 +22,7 @@
 
 <script setup>
 
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 import router from '@/router'
 import { storeToRefs } from 'pinia'
@@ -85,17 +85,19 @@ const schema = Yup.object().shape({
     .oneOf([Yup.ref('password')], 'Пароли должны совпадать')
 })
 
-try {
-  await rolesStore.ensureLoaded() 
-  if (authStore.isAdministrator) {
-    await accountsStore.getAll()
+onMounted(async () => {
+  try {
+    await rolesStore.ensureLoaded() 
+    if (authStore.isAdministrator) {
+      await accountsStore.getAll()
+    }
+    else if (authStore.isAccountManager) {
+      await accountsStore.getByManager(props.id)
+    }
+  } catch {
+    alertStore.error('Не удалось загрузить списки ролей и лицевых счетов');
   }
-  else if (authStore.isAccountManager) {
-    await accountsStore.getByManager(props.id)
-  }
-} catch {
-  alertStore.error('Не удалось загрузить список лицевых счетов.');
-}
+})
 
 const showPassword = ref(false)
 const showPassword2 = ref(false)

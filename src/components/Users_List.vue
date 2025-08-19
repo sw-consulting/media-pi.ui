@@ -55,9 +55,15 @@ const enhancedUsers = computed(() => {
 })
 
 onMounted(async () => {
-  await rolesStore.ensureLoaded()
-  await accountsStore.getAll()
-  await usersStore.getAll()
+  try
+  {
+    await rolesStore.ensureLoaded()
+    await accountsStore.getAll()
+    await usersStore.getAll()
+  } catch {
+    alertStore.error('Не удалось загрузить списки ролей, пользователей и лицевых счетов');
+  }
+
 })
 
 import { useAlertStore } from '@/stores/alert.store.js'
