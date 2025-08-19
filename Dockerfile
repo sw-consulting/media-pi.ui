@@ -25,7 +25,7 @@ FROM node:20.19.4 AS build
 WORKDIR /app
 
 # Add build arguments with default values
-ARG API_URL=https://mediapi.sw.consulting:8085/api
+ARG API_URL=https://media-pi.sw.consulting:8084/api
 ARG ENABLE_LOG=true
 ENV VITE_API_URL=$API_URL
 ENV VITE_ENABLE_LOG=$ENABLE_LOG
@@ -37,7 +37,7 @@ RUN npm run build
 
 # Stage for running nginx with static files
 FROM nginx:1.27-alpine AS final
-COPY --from=build /app/dist /var/www/mediapi
+COPY --from=build /app/dist /var/www/media-pi
 COPY config/public /var/www
 COPY config/nginx.conf /etc/nginx/conf.d/default.conf
 COPY config/update-config.sh /docker-entrypoint.d/40-update-config.sh
