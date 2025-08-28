@@ -472,12 +472,10 @@ describe('Accounts_Tree.vue', () => {
   describe('Device status integration', () => {
     it('starts device status stream on mount', async () => {
       authStore = { isAdministrator: true, isManager: false, isEngineer: false }
-      const wrapper = mountTree()
+      mountTree()
       await resolveAll()
       expect(deviceStatusesStore.getAll).toHaveBeenCalled()
       expect(deviceStatusesStore.startStream).toHaveBeenCalled()
-      // avoid unused variable
-      expect(wrapper.exists()).toBe(true)
     })
 
     it('returns correct status icons for devices', async () => {
