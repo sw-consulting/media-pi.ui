@@ -24,12 +24,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
+import { useAuthStore } from '@/stores/auth.store.js'
 
 vi.mock('@/helpers/fetch.wrapper.js', () => ({
   fetchWrapper: {
     get: vi.fn(),
     post: vi.fn()
   }
+}))
+
+vi.mock('@/stores/auth.store.js', () => ({
+  useAuthStore: vi.fn(() => ({
+    user: { token: 'mock-token' }
+  }))
 }))
 
 const mockStatuses = [
@@ -67,52 +74,113 @@ describe('device.statuses.store', () => {
     expect(store.statuses).toEqual([mockStatuses[0]])
   })
 
-  it('startStream updates statuses on message and stopStream closes connection', () => {
-    const close = vi.fn()
-    class MockES {
-      constructor(url) {
-        this.url = url
-        this.onmessage = null
-        this.onerror = null
-        this.close = close
-        MockES.instance = this
+  it('startStream uses fetch with proper authentication and stopStream cancels stream', async () => {
+    let readCallCount = 0
+    const mockReader = {
+      read: vi.fn().mockImplementation(() => {
+        readCallCount++
+        if (readCallCount === 1) {
+          return Promise.resolve({ 
+            done: false, 
+            value: new TextEncoder().encode('data: ' + JSON.stringify(mockStatuses[0]) + '\n') 
+          })
+        } else {
+          // Simulate a hanging read that will be cancelled
+          return new Promise(() => {}) // Never resolves
+        }
+      }),
+      cancel: vi.fn().mockResolvedValue(undefined)
+    }
+
+    const mockResponse = {
+      ok: true,
+      body: {
+        getReader: () => mockReader
       }
     }
-    const original = global.EventSource
-    global.EventSource = vi.fn((url) => new MockES(url))
+
+    global.fetch = vi.fn().mockResolvedValueOnce(mockResponse)
+    
+    const mockAbort = vi.fn()
+    global.AbortController = vi.fn(() => ({
+      signal: { aborted: false },
+      abort: mockAbort
+    }))
 
     const store = useDeviceStatusesStore()
-    store.startStream()
-    expect(global.EventSource).toHaveBeenCalledWith(expect.stringContaining('/stream'))
-    const item = mockStatuses[0]
-    MockES.instance.onmessage({ data: JSON.stringify(item) })
-    expect(store.statuses).toEqual([item])
+    
+    // Start the stream
+    const streamPromise = store.startStream()
+    
+    // Wait for the first message to be processed
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stream'),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Authorization': 'Bearer mock-token',
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache'
+        })
+      })
+    )
+    expect(store.statuses).toEqual([mockStatuses[0]])
+    
+    // Stop the stream
     store.stopStream()
-    expect(close).toHaveBeenCalled()
-
-    global.EventSource = original
+    expect(mockAbort).toHaveBeenCalled()
+    expect(mockReader.cancel).toHaveBeenCalled()
   })
 
-  it('startStream assigns JSON errors to error', () => {
-    class MockES {
-      constructor(url) {
-        this.url = url
-        this.onmessage = null
-        this.onerror = null
-        this.close = vi.fn()
-        MockES.instance = this
-      }
-    }
-    const original = global.EventSource
-    global.EventSource = vi.fn((url) => new MockES(url))
+  it('startStream handles fetch errors', async () => {
+    const fetchError = new Error('Network error')
+    global.fetch = vi.fn().mockRejectedValueOnce(fetchError)
 
     const store = useDeviceStatusesStore()
-    store.startStream()
-    MockES.instance.onmessage({ data: 'invalid-json' })
-    expect(store.error).toBeInstanceOf(Error)
-    store.stopStream()
+    await store.startStream()
+    
+    expect(store.error).toBe(fetchError)
+  })
 
-    global.EventSource = original
+  it('startStream handles authentication errors', async () => {
+    vi.mocked(useAuthStore).mockReturnValueOnce({ user: null })
+
+    const store = useDeviceStatusesStore()
+    await store.startStream()
+    
+    expect(store.error).toBeInstanceOf(Error)
+    expect(store.error.message).toContain('No authentication token available')
+  })
+
+  it('startStream handles JSON parsing errors in SSE data', async () => {
+    const mockReader = {
+      read: vi.fn()
+        .mockResolvedValueOnce({ 
+          done: false, 
+          value: new TextEncoder().encode('data: invalid-json\n') 
+        })
+        .mockResolvedValueOnce({ done: true }),
+      cancel: vi.fn()
+    }
+
+    const mockResponse = {
+      ok: true,
+      body: {
+        getReader: () => mockReader
+      }
+    }
+
+    global.fetch = vi.fn().mockResolvedValueOnce(mockResponse)
+    global.AbortController = vi.fn(() => ({
+      signal: { aborted: false },
+      abort: vi.fn()
+    }))
+
+    const store = useDeviceStatusesStore()
+    await store.startStream()
+    
+    expect(store.error).toBeInstanceOf(Error)
   })
 
   it('getAll handles errors', async () => {
