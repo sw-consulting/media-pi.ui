@@ -42,7 +42,7 @@
  * - Can assign devices to accounts
  * - Cannot access account-specific operations
  */
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
@@ -70,6 +70,7 @@ import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpers/user.helpers.js'
 import ActionButton from '@/components/ActionButton.vue'
@@ -83,6 +84,7 @@ const deviceGroupsStore = useDeviceGroupsStore()
 const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 const { alert } = storeToRefs(alertStore)
+const deviceStatusesStore = useDeviceStatusesStore()
 
 // State for account assignment
 const accountAssignmentState = ref({})
@@ -198,15 +200,59 @@ const getAvailableDeviceGroups = (item) => {
   return createAvailableDeviceGroupsList(deviceGroupsStore, accountId)
 }
 
+// Device status helpers - optimized with computed cache that reacts to store changes
+const deviceStatusCache = computed(() => {
+  const cache = new Map()
+  
+  // Force reactivity by accessing store properties - handle both real store (.statuses ref) and mock (.statuses array)
+  const statusesFromStore = deviceStatusesStore.statuses?.value || deviceStatusesStore.statuses || []
+  const devicesFromStore = devicesStore.devices
+  
+  const processItems = (items) => {
+    items.forEach(item => {
+      if (item.id.startsWith('device-')) {
+        const deviceId = getDeviceIdFromNodeId(item.id)
+        const status = statusesFromStore.find(s => s.deviceId === deviceId) ||
+          devicesFromStore.find(d => d.id === deviceId)?.deviceStatus ||
+          null
+        
+        cache.set(item.id, {
+          isOnline: status?.isOnline || false,
+          icon: status?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation',
+          class: status?.isOnline ? 'text-success' : 'text-danger'
+        })
+      }
+      
+      if (item.children) {
+        processItems(item.children)
+      }
+    })
+  }
+  
+  processItems(treeItems.value)
+  return cache
+})
+
+// Optimized status functions
+const getDeviceStatusIcon = (item) => {
+  return deviceStatusCache.value.get(item.id)?.icon || 'fa-solid fa-triangle-exclamation'
+}
+
+const getDeviceStatusClass = (item) => {
+  return deviceStatusCache.value.get(item.id)?.class || 'text-danger'
+}
+
 onMounted(async () => {
   loading.value = true
   try {
-    // Для getAll backend сам интеллектуально фильтрует и отдаёт каждому своё 
+    // Для getAll backend сам интеллектуально фильтрует и отдаёт каждому своё
     await accountsStore.getAll()
     // Load device groups for group assignment functionality
     if (authStore.isAdministrator || authStore.isManager) {
       await deviceGroupsStore.getAll()
     }
+    await deviceStatusesStore.getAll()
+    deviceStatusesStore.startStream()
     // Restore tree state after data is loaded, with loadChildren support
     await restoreTreeState(selectedNode, expandedNodes, loadChildren)
   } catch (error) {
@@ -214,6 +260,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onBeforeUnmount(() => {
+  deviceStatusesStore.stopStream()
 })
 
 // Tree structure using helper
@@ -261,8 +311,11 @@ const treeItems = computed(() => {
             width="2"
             color="primary"
           />
-          <!-- Device icons -->
-          <font-awesome-icon v-else-if="item.id.startsWith('device-')" icon="fa-solid fa-tv" size="1x" class="node-icon" />
+          <!-- Device icons with status -->
+          <template v-else-if="item.id.startsWith('device-')">
+            <font-awesome-icon icon="fa-solid fa-tv" size="1x" class="node-icon" />
+            <font-awesome-icon :icon="getDeviceStatusIcon(item)" size="1x" :class="['node-icon', getDeviceStatusClass(item)]" />
+          </template>
           <!-- Device Group icons -->
           <font-awesome-icon v-else-if="item.id.startsWith('group-')" icon="fa-solid fa-object-group" size="1x" class="node-icon" />
           <!-- Device Groups container icons -->

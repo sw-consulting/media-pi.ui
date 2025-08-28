@@ -23,6 +23,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import AccountsTree from '@/components/Accounts_Tree.vue'
 import { resolveAll } from './helpers/test-utils'
 
@@ -33,7 +34,8 @@ const accountsStore = {
 }
 const devicesStore = {
   devices: [],
-  getAll: vi.fn().mockResolvedValue()
+  getAll: vi.fn().mockResolvedValue(),
+  getDeviceById: vi.fn((id) => devicesStore.devices.find(d => d.id === id))
 }
 const deviceGroupsStore = {
   groups: [],
@@ -41,6 +43,13 @@ const deviceGroupsStore = {
 }
 const alertStore = {
   error: vi.fn()
+}
+
+const deviceStatusesStore = {
+  statuses: ref([]),
+  getAll: vi.fn().mockResolvedValue(),
+  startStream: vi.fn(),
+  stopStream: vi.fn()
 }
 
 const mockPush = vi.fn()
@@ -87,6 +96,10 @@ vi.mock('@/stores/alert.store.js', () => ({
   useAlertStore: () => alertStore
 }))
 
+vi.mock('@/stores/device.statuses.store.js', () => ({
+  useDeviceStatusesStore: () => deviceStatusesStore
+}))
+
 const mountTree = () => mount(AccountsTree, {
   global: {
     stubs: {
@@ -113,6 +126,7 @@ describe('Accounts_Tree.vue', () => {
     accountsStore.accounts = []
     devicesStore.devices = []
     deviceGroupsStore.groups = []
+    deviceStatusesStore.statuses.value = []
   })
 
   it('renders both roots for administrator', async () => {
@@ -417,10 +431,10 @@ describe('Accounts_Tree.vue', () => {
 
   describe('Device group assignment UI state', () => {
     it('disables action buttons when device group assignment is in progress', async () => {
-      authStore = { 
-        isAdministrator: true, 
-        isManager: false, 
-        isEngineer: false, 
+      authStore = {
+        isAdministrator: true,
+        isManager: false,
+        isEngineer: false,
         user: { role: 'SystemAdministrator' }
       }
       accountsStore.accounts = [
@@ -453,6 +467,50 @@ describe('Accounts_Tree.vue', () => {
       // Verify that when editMode is true, buttons would be disabled
       const isInEditMode = wrapper.vm.deviceGroupAssignmentState[deviceId]?.editMode
       expect(isInEditMode).toBe(true)
+    })
+  })
+
+  describe('Device status integration', () => {
+    it('starts device status stream on mount', async () => {
+      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      mountTree()
+      await resolveAll()
+      expect(deviceStatusesStore.getAll).toHaveBeenCalled()
+      expect(deviceStatusesStore.startStream).toHaveBeenCalled()
+    })
+
+    it('returns correct status icons for devices', async () => {
+      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      devicesStore.devices = [
+        { id: 1, name: 'Device A', accountId: 0, deviceStatus: { isOnline: true } },
+        { id: 2, name: 'Device B', accountId: 0, deviceStatus: { isOnline: false } }
+      ]
+      const wrapper = mountTree()
+      await resolveAll()
+      // load unassigned root
+      wrapper.vm.loadedNodes.add('root-unassigned')
+      await wrapper.vm.$nextTick()
+      const root = wrapper.vm.treeItems.find(i => i.id === 'root-unassigned')
+      const items = root.children
+      expect(wrapper.vm.getDeviceStatusIcon(items[0])).toBe('fa-solid fa-circle-check')
+      expect(wrapper.vm.getDeviceStatusIcon(items[1])).toBe('fa-solid fa-triangle-exclamation')
+    })
+
+    it('updates status icon when store changes', async () => {
+      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      devicesStore.devices = [
+        { id: 1, name: 'Device A', accountId: 0, deviceStatus: { isOnline: false } }
+      ]
+      const wrapper = mountTree()
+      await resolveAll()
+      wrapper.vm.loadedNodes.add('root-unassigned')
+      await wrapper.vm.$nextTick()
+      const root = wrapper.vm.treeItems.find(i => i.id === 'root-unassigned')
+      const item = root.children[0]
+      expect(wrapper.vm.getDeviceStatusIcon(item)).toBe('fa-solid fa-triangle-exclamation')
+      deviceStatusesStore.statuses.value = [{ deviceId: 1, isOnline: true }]
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.getDeviceStatusIcon(item)).toBe('fa-solid fa-circle-check')
     })
   })
 })
