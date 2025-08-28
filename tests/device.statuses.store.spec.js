@@ -110,7 +110,7 @@ describe('device.statuses.store', () => {
     const store = useDeviceStatusesStore()
     
     // Start the stream
-    const streamPromise = store.startStream()
+    store.startStream()
     
     // Wait for the first message to be processed
     await new Promise(resolve => setTimeout(resolve, 50))
