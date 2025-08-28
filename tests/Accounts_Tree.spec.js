@@ -23,6 +23,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import AccountsTree from '@/components/Accounts_Tree.vue'
 import { resolveAll } from './helpers/test-utils'
 
@@ -45,7 +46,7 @@ const alertStore = {
 }
 
 const deviceStatusesStore = {
-  statuses: [],
+  statuses: ref([]),
   getAll: vi.fn().mockResolvedValue(),
   startStream: vi.fn(),
   stopStream: vi.fn()
@@ -125,7 +126,7 @@ describe('Accounts_Tree.vue', () => {
     accountsStore.accounts = []
     devicesStore.devices = []
     deviceGroupsStore.groups = []
-    deviceStatusesStore.statuses = []
+    deviceStatusesStore.statuses.value = []
   })
 
   it('renders both roots for administrator', async () => {
@@ -509,7 +510,7 @@ describe('Accounts_Tree.vue', () => {
       const root = wrapper.vm.treeItems.find(i => i.id === 'root-unassigned')
       const item = root.children[0]
       expect(wrapper.vm.getDeviceStatusIcon(item)).toBe('fa-solid fa-triangle-exclamation')
-      deviceStatusesStore.statuses = [{ deviceId: 1, isOnline: true }]
+      deviceStatusesStore.statuses.value = [{ deviceId: 1, isOnline: true }]
       await wrapper.vm.$nextTick()
       expect(wrapper.vm.getDeviceStatusIcon(item)).toBe('fa-solid fa-circle-check')
     })

@@ -200,23 +200,46 @@ const getAvailableDeviceGroups = (item) => {
   return createAvailableDeviceGroupsList(deviceGroupsStore, accountId)
 }
 
-// Device status helpers
-const getDeviceStatusById = (id) => {
-  return deviceStatusesStore.statuses.find(s => s.deviceId === id) ||
-    devicesStore.getDeviceById(id)?.deviceStatus ||
-    null
-}
+// Device status helpers - optimized with computed cache that reacts to store changes
+const deviceStatusCache = computed(() => {
+  const cache = new Map()
+  
+  // Force reactivity by accessing store properties - handle both real store (.statuses ref) and mock (.statuses array)
+  const statusesFromStore = deviceStatusesStore.statuses?.value || deviceStatusesStore.statuses || []
+  const devicesFromStore = devicesStore.devices
+  
+  const processItems = (items) => {
+    items.forEach(item => {
+      if (item.id.startsWith('device-')) {
+        const deviceId = getDeviceIdFromNodeId(item.id)
+        const status = statusesFromStore.find(s => s.deviceId === deviceId) ||
+          devicesFromStore.find(d => d.id === deviceId)?.deviceStatus ||
+          null
+        
+        cache.set(item.id, {
+          isOnline: status?.isOnline || false,
+          icon: status?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation',
+          class: status?.isOnline ? 'text-success' : 'text-danger'
+        })
+      }
+      
+      if (item.children) {
+        processItems(item.children)
+      }
+    })
+  }
+  
+  processItems(treeItems.value)
+  return cache
+})
 
+// Optimized status functions
 const getDeviceStatusIcon = (item) => {
-  const id = getDeviceIdFromNodeId(item.id)
-  const status = getDeviceStatusById(id)
-  return status?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'
+  return deviceStatusCache.value.get(item.id)?.icon || 'fa-solid fa-triangle-exclamation'
 }
 
 const getDeviceStatusClass = (item) => {
-  const id = getDeviceIdFromNodeId(item.id)
-  const status = getDeviceStatusById(id)
-  return status?.isOnline ? 'text-success' : 'text-danger'
+  return deviceStatusCache.value.get(item.id)?.class || 'text-danger'
 }
 
 onMounted(async () => {
