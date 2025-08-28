@@ -99,38 +99,46 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
       return
     }
     
+    // Create an AbortController before the initial fetch so we can
+    // cancel both the fetch request and the subsequent stream
+    const controller = new AbortController()
+    streamController = controller
+
     try {
       const response = await fetch(`${baseUrl}/stream`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'text/event-stream',
           'Cache-Control': 'no-cache'
-        }
+        },
+        signal: controller.signal
       })
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-      
+
+      // If stopStream() was called while the fetch was in-flight, abort
+      if (controller.signal.aborted) {
+        return
+      }
+
       streamReader = response.body?.getReader()
       if (!streamReader) {
         throw new Error('Response body is not readable')
       }
-      
+
       const decoder = new TextDecoder()
       let buffer = ''
-      
-      // Create an AbortController to handle cancellation
-      streamController = new AbortController()
-      
-      while (!streamController.signal.aborted) {
+
+      while (!controller.signal.aborted) {
         const { done, value } = await streamReader.read()
         if (done) break
-        
+
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         buffer = lines.pop() || '' // Keep incomplete line in buffer
-        
+
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
@@ -147,14 +155,18 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
         }
       }
     } catch (err) {
-      if (!streamController?.signal.aborted) {
+      // Ignore AbortError triggered by stopStream()
+      if (err?.name !== 'AbortError' && !controller.signal.aborted) {
         error.value = err instanceof Error ? err : new Error(String(err))
         console.error('SSE stream error:', err)
         // Implement retry logic here if needed
       }
     } finally {
-      streamReader = null
-      streamController = null
+      // Only clean up if this startStream call is still the active one
+      if (streamController === controller) {
+        streamReader = null
+        streamController = null
+      }
     }
   }
 

@@ -39,6 +39,8 @@ vi.mock('@/stores/auth.store.js', () => ({
   }))
 }))
 
+const RealAbortController = global.AbortController
+
 const mockStatuses = [
   { deviceId: 1, ipAddress: '192.168.1.10', isOnline: true, lastChecked: '2025-01-01T00:00:00Z', connectLatencyMs: 10, totalLatencyMs: 20 },
   { deviceId: 2, ipAddress: '192.168.1.11', isOnline: false, lastChecked: '2025-01-01T00:00:00Z', connectLatencyMs: 30, totalLatencyMs: 40 }
@@ -76,17 +78,19 @@ describe('device.statuses.store', () => {
 
   it('startStream uses fetch with proper authentication and stopStream cancels stream', async () => {
     let readCallCount = 0
+    let resolveSecondRead
+    const secondRead = new Promise(resolve => { resolveSecondRead = resolve })
     const mockReader = {
       read: vi.fn().mockImplementation(() => {
         readCallCount++
         if (readCallCount === 1) {
-          return Promise.resolve({ 
-            done: false, 
-            value: new TextEncoder().encode('data: ' + JSON.stringify(mockStatuses[0]) + '\n') 
+          return Promise.resolve({
+            done: false,
+            value: new TextEncoder().encode('data: ' + JSON.stringify(mockStatuses[0]) + '\n')
           })
         } else {
-          // Simulate a hanging read that will be cancelled
-          return new Promise(() => {}) // Never resolves
+          // Promise that we control to end the loop after stopStream
+          return secondRead
         }
       }),
       cancel: vi.fn().mockResolvedValue(undefined)
@@ -100,7 +104,7 @@ describe('device.statuses.store', () => {
     }
 
     global.fetch = vi.fn().mockResolvedValueOnce(mockResponse)
-    
+
     const mockAbort = vi.fn()
     global.AbortController = vi.fn(() => ({
       signal: { aborted: false },
@@ -122,15 +126,44 @@ describe('device.statuses.store', () => {
           'Authorization': 'Bearer mock-token',
           'Accept': 'text/event-stream',
           'Cache-Control': 'no-cache'
-        })
+        }),
+        signal: expect.any(Object)
       })
     )
     expect(store.statuses).toEqual([mockStatuses[0]])
     
     // Stop the stream
     store.stopStream()
+    // resolve the pending read so startStream can exit cleanly
+    resolveSecondRead({ done: true })
+
     expect(mockAbort).toHaveBeenCalled()
     expect(mockReader.cancel).toHaveBeenCalled()
+  })
+
+  it('stopStream aborts pending fetch before stream starts', async () => {
+    let capturedSignal
+    let rejectFetch
+    global.fetch = vi.fn((_url, opts) => new Promise((resolve, reject) => {
+      capturedSignal = opts.signal
+      rejectFetch = reject
+    }))
+
+    global.AbortController = RealAbortController
+
+    const store = useDeviceStatusesStore()
+    const startPromise = store.startStream()
+
+    await Promise.resolve()
+
+    store.stopStream()
+    expect(capturedSignal.aborted).toBe(true)
+
+    rejectFetch(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+
+    await startPromise
+
+    expect(store.statuses).toEqual([])
   })
 
   it('startStream handles fetch errors', async () => {
