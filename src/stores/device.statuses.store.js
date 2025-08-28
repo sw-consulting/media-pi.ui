@@ -99,8 +99,7 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
         error.value = err instanceof Error ? err : new Error(String(err))
       }
     }
-    eventSource.onerror = (e) => {
-      error.value = e
+      error.value = new Error('EventSource connection error' + (e && e.type ? `: ${e.type}` : ''))
     }
   }
 
