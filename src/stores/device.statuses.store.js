@@ -26,7 +26,7 @@ import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
 import { apiUrl } from '@/helpers/config.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 
-const baseUrl = `${apiUrl}/deviceStatus`
+const baseUrl = `${apiUrl}/devicestatuses`
 
 export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
   const statuses = ref([])

@@ -290,8 +290,8 @@ const treeItems = computed(() => {
           />
           <!-- Device icons with status -->
           <template v-else-if="item.id.startsWith('device-')">
-            <font-awesome-icon :icon="getDeviceStatusIcon(item)" size="1x" :class="['node-icon', getDeviceStatusClass(item)]" />
             <font-awesome-icon icon="fa-solid fa-tv" size="1x" class="node-icon" />
+            <font-awesome-icon :icon="getDeviceStatusIcon(item)" size="1x" :class="['node-icon', getDeviceStatusClass(item)]" />
           </template>
           <!-- Device Group icons -->
           <font-awesome-icon v-else-if="item.id.startsWith('group-')" icon="fa-solid fa-object-group" size="1x" class="node-icon" />
