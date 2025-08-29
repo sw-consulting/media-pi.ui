@@ -50,7 +50,9 @@ import {
   faPlugCircleCheck,
   faPlugCircleXmark,
   faPlugCirclePlus,
-  faPlugCircleMinus
+  faPlugCircleMinus,
+  faCircleCheck,
+  faTriangleExclamation
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -83,7 +85,9 @@ library.add(
   faPlugCircleCheck,
   faPlugCircleXmark,
   faPlugCirclePlus,
-  faPlugCircleMinus
+  faPlugCircleMinus,
+  faCircleCheck,
+  faTriangleExclamation
 )
 
 import 'vuetify/styles'
