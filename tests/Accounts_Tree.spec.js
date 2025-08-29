@@ -568,6 +568,29 @@ describe('Accounts_Tree.vue', () => {
       const groupItem = getFirstGroupItem(wrapper)
       expect(wrapper.vm.getGroupStatusIcon(groupItem)).toBe('fa-solid fa-triangle-exclamation')
     })
+
+    it('updates group icon reactively when statuses change', async () => {
+      devicesStore.devices = [
+        { id: 1, name: 'Device A', accountId: 1, deviceGroupId: 10 },
+        { id: 2, name: 'Device B', accountId: 1, deviceGroupId: 10 }
+      ]
+      deviceStatusesStore.statuses.value = [
+        { deviceId: 1, isOnline: true },
+        { deviceId: 2, isOnline: false }
+      ]
+      const wrapper = mountTree()
+      await resolveAll()
+      await loadAccountGroups(wrapper)
+      const groupItem = getFirstGroupItem(wrapper)
+      expect(wrapper.vm.getGroupStatusIcon(groupItem)).toBe('fa-solid fa-triangle-exclamation')
+      // Flip status to all online
+      deviceStatusesStore.statuses.value = [
+        { deviceId: 1, isOnline: true },
+        { deviceId: 2, isOnline: true }
+      ]
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.getGroupStatusIcon(groupItem)).toBe('fa-solid fa-circle-check')
+    })
   })
 })
 
