@@ -9,7 +9,7 @@
   --input-readonly-text: #666;
   --input-invalid-border: #dc3545;
   --form-actions-border: #eee;
-  --button-secondary-bg: #6c757d;
+  --button-secondary-bg: #6b757d;
   --button-secondary-hover-bg: #5a6268;
   --text-color: var(--color-text);
   --primary-color: #1976d2;
@@ -192,7 +192,7 @@
 
 .button-o:focus {
   outline: none;
-  box-shadow: 0px 2px 10px #1976d2;
+  box-shadow: 0px 2px 10px var(--primary-color);
 }
 
 .button-o-c {
@@ -204,7 +204,7 @@
 
 .button-o-c:focus {
   outline: none;
-  box-shadow: 0px 2px 10px #1976d2;
+  box-shadow: 0px 2px 10px var(--primary-color);
 }
 
 .button {
