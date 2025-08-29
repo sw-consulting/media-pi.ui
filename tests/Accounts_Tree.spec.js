@@ -513,5 +513,61 @@ describe('Accounts_Tree.vue', () => {
       expect(wrapper.vm.getDeviceStatusIcon(item)).toBe('fa-solid fa-circle-check')
     })
   })
+
+  describe('Device group status aggregation', () => {
+    beforeEach(() => {
+      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      accountsStore.accounts = [ { id: 1, name: 'Account 1' } ]
+      deviceGroupsStore.groups = [ { id: 10, name: 'Group 10', accountId: 1 } ]
+    })
+
+    const loadAccountGroups = async (wrapper) => {
+      // Expand account and its groups container to build group nodes
+      wrapper.vm.loadedNodes.add('account-1')
+      await wrapper.vm.$nextTick()
+      wrapper.vm.loadedNodes.add('account-1-groups')
+      await wrapper.vm.$nextTick()
+    }
+
+    const getFirstGroupItem = (wrapper) => {
+      const root = wrapper.vm.treeItems.find(i => i.id === 'root-accounts')
+      const account = root.children.find(i => i.id === 'account-1')
+      const groupsContainer = account.children.find(i => i.id === 'account-1-groups')
+      const groupItem = groupsContainer.children.find(i => i.id === 'group-10')
+      return groupItem
+    }
+
+    it('returns green icon when all devices in group are online', async () => {
+      devicesStore.devices = [
+        { id: 1, name: 'Device A', accountId: 1, deviceGroupId: 10 },
+        { id: 2, name: 'Device B', accountId: 1, deviceGroupId: 10 }
+      ]
+      deviceStatusesStore.statuses.value = [
+        { deviceId: 1, isOnline: true },
+        { deviceId: 2, isOnline: true }
+      ]
+      const wrapper = mountTree()
+      await resolveAll()
+      await loadAccountGroups(wrapper)
+      const groupItem = getFirstGroupItem(wrapper)
+      expect(wrapper.vm.getGroupStatusIcon(groupItem)).toBe('fa-solid fa-circle-check')
+    })
+
+    it('returns red icon when any device in group is offline', async () => {
+      devicesStore.devices = [
+        { id: 1, name: 'Device A', accountId: 1, deviceGroupId: 10 },
+        { id: 2, name: 'Device B', accountId: 1, deviceGroupId: 10 }
+      ]
+      deviceStatusesStore.statuses.value = [
+        { deviceId: 1, isOnline: true },
+        { deviceId: 2, isOnline: false }
+      ]
+      const wrapper = mountTree()
+      await resolveAll()
+      await loadAccountGroups(wrapper)
+      const groupItem = getFirstGroupItem(wrapper)
+      expect(wrapper.vm.getGroupStatusIcon(groupItem)).toBe('fa-solid fa-triangle-exclamation')
+    })
+  })
 })
 

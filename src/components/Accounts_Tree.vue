@@ -200,35 +200,54 @@ const getAvailableDeviceGroups = (item) => {
   return createAvailableDeviceGroupsList(deviceGroupsStore, accountId)
 }
 
-// Device status helpers - optimized with computed cache that reacts to store changes
+// Tree structure using helper
+const treeItems = computed(() => {
+  return buildTreeItems(
+    canViewUnassignedDevices.value,
+    canViewAccounts.value,
+    loadedNodes.value,
+    accountsStore,
+    devicesStore,
+    deviceGroupsStore,
+    // Pass custom functions that exclude transitioning devices
+    (devicesStore) => getUnassignedDevices(devicesStore, transitioningDevices.value),
+    (accountId, devicesStore, deviceGroupsStore) => getAccountChildren(accountId, devicesStore, deviceGroupsStore, transitioningDevices.value)
+  )
+})
+
+// Device status helpers - keep a fast lookup map and a cache per tree node
+const { statuses } = storeToRefs(deviceStatusesStore)
+const statusesById = computed(() => {
+  const map = new Map()
+  ;(statuses.value || []).forEach(s => map.set(s.deviceId, s))
+  return map
+})
+
 const deviceStatusCache = computed(() => {
   const cache = new Map()
-  
-  // Force reactivity by accessing store properties - handle both real store (.statuses ref) and mock (.statuses array)
-  const statusesFromStore = deviceStatusesStore.statuses?.value || deviceStatusesStore.statuses || []
   const devicesFromStore = devicesStore.devices
-  
+
   const processItems = (items) => {
     items.forEach(item => {
       if (item.id.startsWith('device-')) {
         const deviceId = getDeviceIdFromNodeId(item.id)
-        const status = statusesFromStore.find(s => s.deviceId === deviceId) ||
+        const status = statusesById.value.get(deviceId) ||
           devicesFromStore.find(d => d.id === deviceId)?.deviceStatus ||
           null
-        
+
         cache.set(item.id, {
           isOnline: status?.isOnline || false,
           icon: status?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation',
           class: status?.isOnline ? 'text-success' : 'text-danger'
         })
       }
-      
+
       if (item.children) {
         processItems(item.children)
       }
     })
   }
-  
+
   processItems(treeItems.value)
   return cache
 })
@@ -240,6 +259,37 @@ const getDeviceStatusIcon = (item) => {
 
 const getDeviceStatusClass = (item) => {
   return deviceStatusCache.value.get(item.id)?.class || 'text-danger'
+}
+
+// Group status aggregation
+const groupStatusById = computed(() => {
+  const result = new Map()
+  const devices = devicesStore.devices || []
+  const groups = deviceGroupsStore.groups || []
+  groups.forEach(g => {
+    const groupDevices = devices.filter(d => d.deviceGroupId === g.id)
+    if (groupDevices.length === 0) {
+      result.set(g.id, { allOnline: false, icon: 'fa-solid fa-triangle-exclamation', class: 'text-danger' })
+      return
+    }
+    const allOnline = groupDevices.every(d => (statusesById.value.get(d.id)?.isOnline) || d.deviceStatus?.isOnline === true)
+    result.set(g.id, {
+      allOnline,
+      icon: allOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation',
+      class: allOnline ? 'text-success' : 'text-danger'
+    })
+  })
+  return result
+})
+
+const getGroupStatusIcon = (item) => {
+  const groupId = getGroupIdFromNodeId(item.id)
+  return groupStatusById.value.get(groupId)?.icon || 'fa-solid fa-triangle-exclamation'
+}
+
+const getGroupStatusClass = (item) => {
+  const groupId = getGroupIdFromNodeId(item.id)
+  return groupStatusById.value.get(groupId)?.class || 'text-danger'
 }
 
 onMounted(async () => {
@@ -266,20 +316,6 @@ onBeforeUnmount(() => {
   deviceStatusesStore.stopStream()
 })
 
-// Tree structure using helper
-const treeItems = computed(() => {
-  return buildTreeItems(
-    canViewUnassignedDevices.value,
-    canViewAccounts.value,
-    loadedNodes.value,
-    accountsStore,
-    devicesStore,
-    deviceGroupsStore,
-    // Pass custom functions that exclude transitioning devices
-    (devicesStore) => getUnassignedDevices(devicesStore, transitioningDevices.value),
-    (accountId, devicesStore, deviceGroupsStore) => getAccountChildren(accountId, devicesStore, deviceGroupsStore, transitioningDevices.value)
-  )
-})
 </script>
 
 <template>
@@ -316,8 +352,11 @@ const treeItems = computed(() => {
             <font-awesome-icon icon="fa-solid fa-tv" size="1x" class="node-icon" />
             <font-awesome-icon :icon="getDeviceStatusIcon(item)" size="1x" :class="['node-icon', getDeviceStatusClass(item)]" />
           </template>
-          <!-- Device Group icons -->
-          <font-awesome-icon v-else-if="item.id.startsWith('group-')" icon="fa-solid fa-object-group" size="1x" class="node-icon" />
+          <!-- Device Group icons with aggregated status -->
+          <template v-else-if="item.id.startsWith('group-')">
+            <font-awesome-icon icon="fa-solid fa-object-group" size="1x" class="node-icon" />
+            <font-awesome-icon :icon="getGroupStatusIcon(item)" size="1x" :class="['node-icon', getGroupStatusClass(item)]" />
+          </template>
           <!-- Device Groups container icons -->
           <font-awesome-icon v-else-if="item.id.includes('-groups')" icon="fa-solid fa-layer-group" size="1x" class="node-icon" />
           <!-- Account icons -->

@@ -23,7 +23,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
-import { apiUrl } from '@/helpers/config.js'
+import { apiUrl, enableLog } from '@/helpers/config.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 
 const baseUrl = `${apiUrl}/devicestatuses`
@@ -37,10 +37,13 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
 
   const updateLocal = (item) => {
     const idx = statuses.value.findIndex(s => s.deviceId === item.deviceId)
+    const next = { ...item }
     if (idx >= 0) {
-      statuses.value[idx] = item
+      // ensure reactivity on replace
+      statuses.value.splice(idx, 1, next)
     } else {
-      statuses.value.push(item)
+      // ensure reactivity on add by creating new array reference
+      statuses.value = [...statuses.value, next]
     }
   }
 
@@ -113,7 +116,6 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
         },
         signal: controller.signal
       })
-
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -148,8 +150,8 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
                 updateLocal(item)
               }
             } catch (err) {
-              console.error('Failed to parse SSE data:', err)
               error.value = err instanceof Error ? err : new Error(String(err))
+              if (enableLog) console.log('[device.statuses.store] SSE error:', { line: line, error: error.value })
             }
           }
         }
