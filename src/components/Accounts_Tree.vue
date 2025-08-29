@@ -74,6 +74,7 @@ import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpers/user.helpers.js'
 import ActionButton from '@/components/ActionButton.vue'
+import DeviceStatusDialog from '@/components/Device_Status_Dialog.vue'
 import InlineAssignment from '@/components/InlineAssignment.vue'
 
 const router = useRouter()
@@ -94,6 +95,17 @@ const deviceGroupAssignmentState = ref({})
 
 // State for tracking devices being moved (to prevent duplication during transitions)
 const transitioningDevices = ref(new Set())
+
+// Device status dialog state
+const statusDialogOpen = ref(false)
+const statusDialogDeviceId = ref(null)
+
+const openDeviceStatus = (item) => {
+  const id = getDeviceIdFromNodeId(item.id)
+  if (!id) return
+  statusDialogDeviceId.value = id
+  statusDialogOpen.value = true
+}
 
 // Initialize tree helper
 const {
@@ -467,6 +479,11 @@ onBeforeUnmount(() => {
                   />
                 </template>
               </template>
+              <!-- Always allow viewing device status -->
+              <ActionButton :item="item" icon="fa-solid fa-list" tooltip-text="Статус устройства" 
+                :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                @click="openDeviceStatus" 
+              />
             </div>
           </div>
         </template>
@@ -481,6 +498,13 @@ onBeforeUnmount(() => {
         Нет данных для отображения
       </v-alert>
     </v-card>
+
+    <!-- Device Status Dialog -->
+    <DeviceStatusDialog 
+      v-if="statusDialogDeviceId"
+      v-model="statusDialogOpen"
+      :device-id="statusDialogDeviceId"
+    />
     
     <!-- Global alert messages -->
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
