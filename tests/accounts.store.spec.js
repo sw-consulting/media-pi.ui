@@ -149,7 +149,7 @@ describe('accounts.store', () => {
 
     await store.getByManager(5)
 
-    expect(fetchWrapper.get).toHaveBeenCalledWith('http://localhost:8080/api/accounts/by-manager/5')
+    expect(fetchWrapper.get).toHaveBeenCalledWith('http://localhost:8087/api/accounts/by-manager/5')
     expect(store.accounts).toEqual(managerAccounts)
     expect(store.error).toBe(null)
     expect(store.loading).toBe(false)
@@ -196,7 +196,7 @@ describe('accounts.store', () => {
 
     await store.getByManager(10)
 
-    expect(fetchWrapper.get).toHaveBeenCalledWith('http://localhost:8080/api/accounts/by-manager/10')
+    expect(fetchWrapper.get).toHaveBeenCalledWith('http://localhost:8087/api/accounts/by-manager/10')
     expect(store.accounts).toEqual([])
     expect(store.error).toBe(null)
     expect(store.loading).toBe(false)

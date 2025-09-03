@@ -33,7 +33,7 @@ vi.mock('@/helpers/fetch.wrapper.js', () => ({
 }))
 
 vi.mock('@/helpers/config.js', () => ({
-  apiUrl: 'http://localhost:8080/api'
+  apiUrl: 'http://localhost:8087/api'
 }))
 
 describe('status store', () => {
