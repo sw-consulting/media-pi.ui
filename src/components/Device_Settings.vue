@@ -26,6 +26,7 @@ import router from '@/router'
 import { storeToRefs } from 'pinia'
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
+import { isValidOpenSshPublicKey } from '@/helpers/ssh.key.validation.js'
 
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
@@ -56,10 +57,15 @@ const { loading } = storeToRefs(devicesStore)
 
 const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя'),
-  ipAddress: Yup.string().required('Необходимо указать IP адрес')
+  ipAddress: Yup.string().required('Необходимо указать IP адрес'),
+  publicKeyOpenSsh: Yup.string()
+    .test('openssh-or-empty', 'Некорректный публичный ключ OpenSSH', (value) => {
+      if (!value || !String(value).trim()) return true
+      return isValidOpenSshPublicKey(value)
+    })
 })
 
-let device = ref({ name: '', ipAddress: '' })
+let device = ref({ name: '', ipAddress: '', sshUser: '', publicKeyOpenSsh: '' })
 const initialLoading = ref(false)
 
 function canCreate () {
@@ -91,7 +97,9 @@ if (props.register) {
     }
     device.value = {
       name: loadedDevice.name || '',
-      ipAddress: loadedDevice.ipAddress || ''
+      ipAddress: loadedDevice.ipAddress || '',
+      sshUser: loadedDevice.sshUser || '',
+      publicKeyOpenSsh: loadedDevice.publicKeyOpenSsh || ''
     }
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
@@ -119,7 +127,9 @@ async function onSubmit (values) {
   try {
     const payload = {
       name: values.name.trim(),
-      ipAddress: values.ipAddress.trim()
+      ipAddress: values.ipAddress.trim(),
+      sshUser: (values.sshUser ?? '').trim(),
+      publicKeyOpenSsh: (values.publicKeyOpenSsh ?? '').trim()
     }
     if (props.accountId !== undefined) {
       payload.accountId = props.accountId
@@ -172,6 +182,22 @@ async function onSubmit (values) {
         <Field name="ipAddress" type="text" id="ipAddress" :disabled="isSubmitting"
           class="form-control input" :class="{ 'is-invalid': errors.ipAddress }"
           placeholder="Введите IP адрес устройства"
+        />
+      </div>
+
+      <div class="form-group mt-4">
+        <label for="sshUser" class="label">Имя пользователя для устройства:</label>
+        <Field name="sshUser" type="text" id="sshUser" :disabled="isSubmitting"
+          class="form-control input"
+          placeholder="Введите имя пользователя для устройства"
+        />
+      </div>
+
+      <div class="form-group mt-4 align-top">
+        <label for="publicKeyOpenSsh" class="label">Публичный ключ ssh:</label>
+        <Field name="publicKeyOpenSsh" as="textarea" id="publicKeyOpenSsh" :disabled="isSubmitting" rows="6"
+          class="form-control input"
+          placeholder="Вставьте публичный ключ ssh"
         />
       </div>
 

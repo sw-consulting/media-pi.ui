@@ -98,13 +98,18 @@ const mountSettings = (props = {}) => mount({
         },
         methods: {
           onSubmit() {
-            this.$emit('submit', { name: props.submitName || 'Test Device', ipAddress: props.submitIp || '1.2.3.4' })
+            this.$emit('submit', {
+              name: props.submitName || 'Test Device',
+              ipAddress: props.submitIp || '1.2.3.4',
+              sshUser: props.submitSshUser || 'sshuser',
+              publicKeyOpenSsh: props.submitPublicKey || 'ssh-ed25519 AAAAC3Nza... user@host'
+            })
           }
         }
       },
       Field: {
-        template: '<input />',
-        props: ['name', 'type', 'disabled', 'class', 'placeholder']
+        template: '<component :is="as ? as : \'input\'" />',
+        props: ['name', 'type', 'disabled', 'class', 'placeholder', 'as']
       }
     },
     components: {
@@ -466,7 +471,9 @@ describe('Device_Settings.vue', () => {
       const wrapper = mountSettings({ 
         register: true, 
         submitName: '  Test Device  ', 
-        submitIp: '  1.2.3.4  ' 
+        submitIp: '  1.2.3.4  ',
+        submitSshUser: '  user  ',
+        submitPublicKey: '  ssh-ed25519 AAAAC3Nza... user@host  '
       })
       await flushPromises()
 
@@ -476,7 +483,9 @@ describe('Device_Settings.vue', () => {
 
       expect(devicesStore.update).toHaveBeenCalledWith(5, expect.objectContaining({ 
         name: 'Test Device', 
-        ipAddress: '1.2.3.4' 
+        ipAddress: '1.2.3.4',
+        sshUser: 'user',
+        publicKeyOpenSsh: 'ssh-ed25519 AAAAC3Nza... user@host'
       }))
     })
 
@@ -497,6 +506,31 @@ describe('Device_Settings.vue', () => {
       }))
       expect(devicesStore.update).toHaveBeenCalledWith(5, expect.not.objectContaining({ 
         accountId: expect.anything()
+      }))
+    })
+
+    it('renders textarea for publicKeyOpenSsh', async () => {
+      const wrapper = mountSettings({ register: true })
+      await flushPromises()
+      expect(wrapper.find('textarea').exists()).toBe(true)
+    })
+
+    it('allows empty OpenSSH public key (trimmed to empty string)', async () => {
+      devicesStore.register.mockResolvedValue({ id: 5 })
+      devicesStore.update.mockResolvedValue()
+
+      const wrapper = mountSettings({ 
+        register: true,
+        submitPublicKey: '   ' // whitespace only
+      })
+      await flushPromises()
+
+      const form = wrapper.find('[data-testid="form"]')
+      await form.trigger('submit')
+      await flushPromises()
+
+      expect(devicesStore.update).toHaveBeenCalledWith(5, expect.objectContaining({
+        publicKeyOpenSsh: ''
       }))
     })
   })

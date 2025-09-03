@@ -126,6 +126,12 @@
   padding-right: 10px;
 }
 
+/* Ensure top alignment for tall inputs (e.g., textarea) when needed */
+.form-group.align-top .label,
+.form-group.align-top .input {
+  vertical-align: top;
+}
+
 
 .hr {
   position: relative;
@@ -920,6 +926,11 @@ a,
   min-width: 0;
   overflow: hidden;
   gap: 0.5rem;
+}
+
+/* For groups with tall inputs (e.g., textarea), align items to the top */
+.form-group.align-top {
+  align-items: flex-start;
 }
 
 .form-group-0 {
