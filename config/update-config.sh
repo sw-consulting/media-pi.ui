@@ -1,7 +1,6 @@
-#!/bin/sh
+# !/bin/sh
 
 # Copyright (c) 2025 sw.consulting
-# Licensed under the MIT License.
 # This file is a part of Media Pi frontend application
 
 # This script updates the runtime configuration with environment variables
