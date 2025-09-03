@@ -46,7 +46,7 @@ echo "PORTS_LAYOUT: ${PORTS_LAYOUT}"
 
 # Generate nginx include for port 8082
 NGINX_PORT_CONF=/etc/nginx/conf.d/port-8082.conf
-mkdir -p $(dirname "$NGINX_PORT_CONF")
+mkdir -p "$(dirname $NGINX_PORT_CONF)"
 if [ "$PORTS_LAYOUT" = "debug" ]; then
   cat > "$NGINX_PORT_CONF" <<-'NGINX'
 server {
