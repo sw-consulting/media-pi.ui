@@ -39,6 +39,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      PORTS_LAYOUT: release
 
     steps:
       - name: Checkout

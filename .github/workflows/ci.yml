@@ -36,6 +36,8 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      PORTS_LAYOUT: release
 
     steps:
     - name: Checkout code
