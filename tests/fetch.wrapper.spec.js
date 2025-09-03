@@ -39,13 +39,13 @@ vi.mock('@/stores/auth.store.js', () => {
 })
 
 vi.mock('@/helpers/config.js', () => ({
-  get apiUrl() { return 'http://localhost:8080/api' },
+  get apiUrl() { return 'http://localhost:8087/api' },
   get enableLog() { return false }
 }))
 
 import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
 
-const baseUrl = 'http://localhost:8080/api'
+const baseUrl = 'http://localhost:8087/api'
 
 describe('fetchWrapper', () => {
   beforeEach(() => {

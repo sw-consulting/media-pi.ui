@@ -10,7 +10,7 @@
 set -e
 
 # Default API URL if not provided
-API_URL=${API_URL:-https://media-pi.sw.consulting:8084/api}
+API_URL=${API_URL:-https://media-pi.sw.consulting:8086/api}
 ENABLE_LOG=${ENABLE_LOG:-false}
 
 # PORTS_LAYOUT: "debug" => serve UI on 8082; "release" => redirect to 8083.
@@ -45,14 +45,14 @@ echo "Enable Log: ${ENABLE_LOG}"
 echo "PORTS_LAYOUT: ${PORTS_LAYOUT}"
 
 # Generate nginx include for port 8082
-NGINX_PORT_CONF=/etc/nginx/conf.d/port-8082.conf
+NGINX_PORT_8082_CONF=/etc/nginx/conf.d/port-8082.conf
 mkdir -p "$(dirname $NGINX_PORT_CONF)"
 if [ "$PORTS_LAYOUT" = "debug" ]; then
-  cat > "$NGINX_PORT_CONF" <<-'NGINX'
+  cat > "$NGINX_PORT_8082_CONF" <<-'NGINX'
 server {
   listen 8082;
   listen [::]:8082;
-  http2;
+  http2 on; 
   server_name _;
   root /var/www/media-pi;
   index index.html;
@@ -63,18 +63,18 @@ server {
 }
 NGINX
 else
-  cat > "$NGINX_PORT_CONF" <<-'NGINX'
+  cat > "$NGINX_PORT_8082_CONF" <<-'NGINX'
 server {
   listen 8082;
   listen [::]:8082;
-  http2;
+  http2 on;
   server_name _;
   return 301 https://$host:8083$request_uri;
 }
 NGINX
 fi
 
-echo "Wrote $NGINX_PORT_CONF"
+echo "Wrote $NGINX_PORT_8082_CONF"
 
 # Finally exec the container CMD
 exec "$@"

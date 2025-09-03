@@ -30,7 +30,7 @@ export const config = {
   // API endpoint configuration with fallback chain
   apiUrl: window.RUNTIME_CONFIG?.apiUrl ||          // Runtime config (highest priority)
           import.meta.env.VITE_API_URL ||           // Build-time env variable
-          'http://localhost:8080/api',              // Default fallback
+          'http://localhost:8085/api',              // Default fallback
 
   // Logging configuration with fallback chain
   enableLog: window.RUNTIME_CONFIG?.enableLog ||   // Runtime config (highest priority)
