@@ -9,6 +9,8 @@ import * as Yup from 'yup'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import { useRolesStore } from '@/stores/roles.store.js'
+
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 
 
@@ -35,7 +37,11 @@ function onSubmit(values) {
 
   return authStore
     .login(login_email, login_password)
-    .then(() => redirectToDefaultRoute())
+    .then(() => {
+      const rolesStore = useRolesStore()
+      rolesStore.ensureLoaded().catch(() => {})
+      redirectToDefaultRoute()
+    })
     .catch((error) => alertStore.error(error.message || String(error)))
 }
 </script>

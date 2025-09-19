@@ -24,8 +24,9 @@ const accountsCaption = useAccountsCaption(authStore)
 const statusStore = useStatusStore()
 statusStore.fetchStatus().catch(() => {})
  onMounted(() => {
-  statusStore.fetchStatus().catch(() => {})
-  rolesStore.ensureLoaded().catch(() => {})
+  statusStore.fetchStatus()
+    .then(() => {rolesStore.ensureLoaded().catch(() => {})})
+    .catch(() => {})
  })
 
 import { drawer, toggleDrawer } from '@/helpers/drawer.js'
