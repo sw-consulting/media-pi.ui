@@ -6,6 +6,7 @@ import { computed, watch, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
+import ServicesList from '@/components/Services_List.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -42,6 +43,7 @@ const status = computed(() => {
 const device = computed(() => devicesStore.getDeviceById(props.deviceId))
 
 const onlineClass = computed(() => status.value?.isOnline ? 'text-success' : 'text-danger')
+const isAccessible = computed(() => Boolean(status.value?.isOnline))
 
 function fmtDate(value) {
   if (!value) return '—'
@@ -109,6 +111,11 @@ watch(() => props.deviceId, () => {
           <div class="label">Задержка SSH</div>
           <div class="value">{{ status?.totalLatencyMs ?? '—' }} мс</div>
         </div>
+        <ServicesList
+          :device-id="props.deviceId"
+          :accessible="isAccessible"
+          :open="internalOpen"
+        />
       </v-card-text>
       <v-card-actions>
         <v-spacer />
@@ -135,7 +142,7 @@ watch(() => props.deviceId, () => {
 
 <style scoped>
 .status-dialog {
-  max-width: 560px;
+  max-width: 900px;
 }
 .status-card {
   border: 2px solid var(--primary-color-dark);
@@ -145,6 +152,7 @@ watch(() => props.deviceId, () => {
   display: grid;
   grid-template-columns: 180px 1fr;
   gap: 8px 16px;
+  margin-bottom: 1.5rem;
 }
 .label {
   color: var(--button-secondary-bg);
