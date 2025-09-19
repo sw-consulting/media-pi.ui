@@ -263,7 +263,7 @@ const disableService = (item) => handleAction(devicesStore.disableService, item)
           hide-default-footer
           v-model:sort-by="sortBy"
         >
-          <template #item.actions="{ item }">
+          <template #[`item.actions`]="{ item }">
             <div class="actions-container services-actions">
               <ActionButton
                 class="start-service"
@@ -308,15 +308,15 @@ const disableService = (item) => handleAction(devicesStore.disableService, item)
             </div>
           </template>
 
-          <template #item.active="{ item }">
+          <template #[`item.active`]="{ item }">
             <span class="services-state">{{ item.active }}</span>
           </template>
 
-          <template #item.sub="{ item }">
+          <template #[`item.sub`]="{ item }">
             <span class="services-state">{{ item.sub }}</span>
           </template>
 
-          <template #item.error="{ item }">
+          <template #[`item.error`]="{ item }">
             <span :class="['services-state', item.error !== '—' ? 'text-danger' : '']">{{ item.error }}</span>
           </template>
         </v-data-table>
