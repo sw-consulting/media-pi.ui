@@ -1,14 +1,5 @@
-/**
- * Unit Tests for ID Extraction Utilities
- * This file is a part of Media Pi frontend application
- * 
- * Comprehensive test suite for ID extraction helper functions.
- * Tests cover all utility functions, edge cases, error conditions,
- * and real-world usage scenarios.
- * 
- * @author Maxim Samsonov
- * @since 2025
- */
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi backend
 
 import { describe, it, expect } from 'vitest'
 import {
@@ -211,3 +202,4 @@ describe('ID Extraction Utilities', () => {
     })
   })
 })
+

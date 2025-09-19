@@ -1,3 +1,6 @@
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi backend
+
 import { flushPromises } from '@vue/test-utils'
 
 /**
@@ -25,3 +28,4 @@ export async function waitForNextTick() {
   const { nextTick } = await import('vue')
   await nextTick()
 }
+

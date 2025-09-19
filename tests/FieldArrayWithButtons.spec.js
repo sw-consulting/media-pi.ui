@@ -1,4 +1,6 @@
 /* @vitest-environment jsdom */
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi backend
 
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
@@ -301,3 +303,4 @@ describe('FieldArrayWithButtons', () => {
     expect(wrapper.find('#managers_1').exists()).toBe(true)
   })
 })
+

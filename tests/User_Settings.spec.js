@@ -1,4 +1,6 @@
 /* @vitest-environment jsdom */
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi backend
 
 // Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
 //
@@ -344,3 +346,4 @@ describe('User_Settings.vue real component', () => {
     expect(ensureLoaded).toHaveBeenCalled()
   })
 })
+
