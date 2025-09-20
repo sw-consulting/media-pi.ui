@@ -37,10 +37,17 @@ const { loading } = storeToRefs(devicesStore)
 
 const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя'),
-  ipAddress: Yup.string().required('Необходимо указать IP адрес')
+  ipAddress: Yup.string().required('Необходимо указать IP адрес'),
+  port: Yup.number()
+    .typeError('Порт должен быть числом')
+    .integer('Порт должен быть целым числом')
+    .min(1, 'Порт должен быть больше 0')
+    .max(65535, 'Порт должен быть меньше либо равен 65535')
+    .required('Необходимо указать TCP порт')
 })
 
-let device = ref({ name: '', ipAddress: '' })
+// Default port for devices is 8081
+let device = ref({ name: '', ipAddress: '', port: 8081 })
 const initialLoading = ref(false)
 
 function canCreate () {
@@ -72,7 +79,8 @@ if (props.register) {
     }
     device.value = {
       name: loadedDevice.name || '',
-      ipAddress: loadedDevice.ipAddress || ''
+      ipAddress: loadedDevice.ipAddress || '',
+      port: typeof loadedDevice.port === 'number' ? loadedDevice.port : (loadedDevice.port ? Number(loadedDevice.port) : 8081)
     }
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
@@ -100,7 +108,8 @@ async function onSubmit (values) {
   try {
     const payload = {
       name: values.name.trim(),
-      ipAddress: values.ipAddress.trim()
+      ipAddress: values.ipAddress.trim(),
+      port: Number(values.port) || 8081
     }
     if (props.accountId !== undefined) {
       payload.accountId = props.accountId
@@ -153,6 +162,14 @@ async function onSubmit (values) {
         <Field name="ipAddress" type="text" id="ipAddress" :disabled="isSubmitting"
           class="form-control input" :class="{ 'is-invalid': errors.ipAddress }"
           placeholder="Введите IP адрес устройства"
+        />
+      </div>
+
+      <div class="form-group mt-4">
+        <label for="port" class="label">TCP порт:</label>
+        <Field name="port" type="number" id="port" :disabled="isSubmitting"
+          class="form-control input" :class="{ 'is-invalid': errors.port }"
+          placeholder="Введите TCP порт (1-65535)"
         />
       </div>
 

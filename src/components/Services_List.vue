@@ -15,7 +15,7 @@ const props = defineProps({
 })
 
 const devicesStore = useDevicesStore()
-const { services, loading, error } = storeToRefs(devicesStore)
+const { services, loading } = storeToRefs(devicesStore)
 
 const sortBy = ref([{ key: 'unit', order: 'asc' }])
 const lastActionMessage = ref('')
@@ -27,7 +27,7 @@ const headers = [
   { title: 'Служба', align: 'start', key: 'unit' },
   { title: 'Активность', align: 'start', key: 'active' },
   { title: 'Состояние', align: 'start', key: 'sub' },
-  { title: 'Ошибка', align: 'start', key: 'error' }
+//  { title: 'Ошибка', align: 'start', key: 'error' }
 ]
 
 const isAccessible = computed(() => Boolean(props.accessible))
@@ -52,11 +52,6 @@ const displayServices = computed(() => {
       error: formatServiceError(service?.error)
     }
   })
-})
-
-const requestError = computed(() => {
-  const message = lastError.value || extractMessage(error.value)
-  return message && message.trim() ? message : ''
 })
 
 watch(shouldLoad, (value) => {
@@ -200,7 +195,8 @@ async function handleAction(actionFn, item) {
       await fetchServices()
     }
   } catch (err) {
-    lastActionMessage.value = extractMessage(err) || 'Не удалось выполнить действие'
+    // console.error('Ошибка выполнения действия над службой:', err)
+    lastActionMessage.value = extractMessage(err) || 'Ошибка выполнения операции'
     lastActionState.value = 'error'
   }
 }
@@ -219,16 +215,22 @@ function normalizeActionResponse(response) {
       return { message: extractMessage(response.error), state: 'error' }
     }
 
-    if (Object.prototype.hasOwnProperty.call(response, 'result') && response.result) {
-      return { message: response.result, state: 'success' }
-    }
-
     if (Object.prototype.hasOwnProperty.call(response, 'enabled') && typeof response.enabled === 'boolean') {
       return {
         message: response.enabled ? 'Служба включена' : 'Служба отключена',
         state: 'success'
       }
     }
+
+    if (Object.prototype.hasOwnProperty.call(response, 'result') && response.result) {
+      if (response.result.toLowerCase().includes('done')) {
+        return { message: "Операция выполнена успешно", state: 'success' }
+      }
+      if (response.result.toLowerCase().includes('fail')) {
+        return { message: "Ошибка выполнения операции", state: 'error' }
+      }
+        return { message: response.result, state: 'success' }
+      }
 
     if (Object.prototype.hasOwnProperty.call(response, 'ok') && response.ok === false) {
       return { message: 'Операция не выполнена', state: 'error' }
@@ -243,6 +245,11 @@ const stopService = (item) => handleAction(devicesStore.stopService, item)
 const restartService = (item) => handleAction(devicesStore.restartService, item)
 const enableService = (item) => handleAction(devicesStore.enableService, item)
 const disableService = (item) => handleAction(devicesStore.disableService, item)
+
+// Expose the fetchServices method so parent components can call it
+defineExpose({
+  fetchServices
+})
 </script>
 
 <template>
@@ -326,10 +333,12 @@ const disableService = (item) => handleAction(devicesStore.disableService, item)
       <div v-if="isBusy" class="services-loading">
         <span class="spinner-border spinner-border-lg align-center"></span>
       </div>
-
+      
+      <!--  the same message will be shown by lastActionMessage
       <div v-if="requestError" class="services-message text-danger">
         {{ requestError }}
       </div>
+      -->
 
       <div
         v-if="lastActionMessage"

@@ -21,6 +21,7 @@ const { statuses, loading } = storeToRefs(deviceStatusesStore)
 
 // Manual refresh override: prioritizes explicit refresh over SSE
 const manualStatus = ref(null)
+const servicesListRef = ref(null)
 
 const internalOpen = ref(props.modelValue)
 watch(() => props.modelValue, (v) => { internalOpen.value = v })
@@ -61,6 +62,11 @@ async function refreshNow () {
     const result = await deviceStatusesStore.getById(props.deviceId)
     // Ensure the dialog shows the freshly fetched value even if SSE also updates
     manualStatus.value = result || null
+    
+    // Also refresh the services list
+    if (servicesListRef.value && servicesListRef.value.fetchServices) {
+      await servicesListRef.value.fetchServices()
+    }
   } catch (err) {
     console.error('Ошибка обновления статуса устройства:', err)
   }
@@ -83,7 +89,7 @@ watch(() => props.deviceId, () => {
         <div class="d-flex align-center justify-space-between w-100">
           <div>
             <font-awesome-icon :icon="status?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'" :class="onlineClass" class="mr-2"/>
-            <span>Статус устройства</span>
+            <span>Состояние устройства</span>
           </div>
         </div>
       </v-card-title>
@@ -107,11 +113,15 @@ watch(() => props.deviceId, () => {
 
           <div class="label">Задержка подключения</div>
           <div class="value">{{ status?.connectLatencyMs ?? '—' }} мс</div>
-
-          <div class="label">Задержка SSH</div>
+          
+          <!-- Теперь не понятно, что это ...
+          <div class="label">Общая задержка</div>
           <div class="value">{{ status?.totalLatencyMs ?? '—' }} мс</div>
+          -->
+        
         </div>
         <ServicesList
+          ref="servicesListRef"
           :device-id="props.deviceId"
           :accessible="isAccessible"
           :open="internalOpen"
@@ -150,7 +160,7 @@ watch(() => props.deviceId, () => {
 }
 .status-grid {
   display: grid;
-  grid-template-columns: 180px 1fr;
+  grid-template-columns: 360px 1fr;
   gap: 8px 16px;
   margin-bottom: 1.5rem;
 }

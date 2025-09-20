@@ -134,8 +134,8 @@ const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGr
   deviceGroupsStore,
   confirmDelete
 )
-
-const { createDevice, editDevice, deleteDevice, unassignFromGroup, unassignFromAccount } = createDeviceActions(
+// ... createDevice ...  -- commented out as devices self-register
+const { editDevice, deleteDevice, unassignFromGroup, unassignFromAccount } = createDeviceActions(
   router,
   alertStore,
   devicesStore,
@@ -389,12 +389,20 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- Action buttons for root-unassigned node (top level unassigned devices) -->
+            
+            <!--  Device shall register itself and provied access key, so manual creation is not possible 
             <div v-else-if="item.id === 'root-unassigned' && canManageDevice(authStore.user, {})" class="tree-actions">
               <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Зарегистрировать устройство" @click="createDevice" />
             </div>
+            -->
 
             <!-- Action buttons for individual device nodes -->
             <div v-else-if="item.id.startsWith('device-')" class="tree-actions">
+              <!-- Always allow viewing device status -->
+              <ActionButton :item="item" icon="fa-solid fa-list" tooltip-text="Состояние устройства" 
+                :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                @click="openDeviceStatus" 
+              />
               <!-- Determine context: top-level unassigned vs account-assigned -->
               <template v-if="isTopLevelUnassignedDevice(item)">
                 <!-- Top level unassigned devices: SystemAdministrator, InstallationEngineer -->
@@ -461,11 +469,6 @@ onBeforeUnmount(() => {
                   />
                 </template>
               </template>
-              <!-- Always allow viewing device status -->
-              <ActionButton :item="item" icon="fa-solid fa-list" tooltip-text="Статус устройства" 
-                :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                @click="openDeviceStatus" 
-              />
             </div>
           </div>
         </template>
