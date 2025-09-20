@@ -1,5 +1,5 @@
 // Copyright (c) 2025 sw.consulting
-// This file is a part of Media Pi backend
+// This file is a part of Media Pi  frontend application
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'

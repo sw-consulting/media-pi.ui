@@ -1,5 +1,5 @@
 // Copyright (c) 2025 sw.consulting
-// This file is a part of Media Pi backend
+// This file is a part of Media Pi  frontend application
 
 import { describe, it, expect } from 'vitest'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'

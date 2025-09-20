@@ -1,5 +1,5 @@
 // Copyright (c) 2025 sw.consulting
-// This file is a part of Media Pi backend
+// This file is a part of Media Pi  frontend application
 
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store.js'

@@ -1,5 +1,5 @@
 // Copyright (c) 2025 sw.consulting
-// This file is a part of Media Pi backend
+// This file is a part of Media Pi  frontend application
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { faCheckDouble, faXmark } from '@fortawesome/free-solid-svg-icons'
