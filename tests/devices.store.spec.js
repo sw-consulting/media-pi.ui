@@ -1,24 +1,5 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// This file is a part of Media Pi frontend application
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi  frontend application
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
@@ -227,5 +208,89 @@ describe('devices.store', () => {
       { Id: 3 }
     )
   })
+
+  it('listServices updates services and serviceResponse', async () => {
+    const store = useDevicesStore()
+    const mockResponse = {
+      ok: true,
+      units: [
+        { unit: 'one', active: 'active', sub: 'running' },
+        { unit: 'two', active: 'inactive', sub: 'dead' }
+      ]
+    }
+    fetchWrapper.get.mockResolvedValueOnce(mockResponse)
+
+    const result = await store.listServices(5)
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/devices/5/services'))
+    expect(store.services).toEqual(mockResponse.units)
+    expect(store.serviceResponse).toEqual(mockResponse)
+    expect(result).toEqual(mockResponse)
+  })
+
+  it('listServices resets state on error', async () => {
+    const store = useDevicesStore()
+    const mockError = new Error('List failed')
+    fetchWrapper.get.mockRejectedValueOnce(mockError)
+
+    await expect(store.listServices(6)).rejects.toThrow('List failed')
+    expect(store.error).toBe(mockError)
+    expect(store.services).toEqual([])
+    expect(store.serviceResponse).toBe(null)
+  })
+
+  it.each([
+    ['startService', 'start'],
+    ['stopService', 'stop'],
+    ['restartService', 'restart'],
+    ['enableService', 'enable'],
+    ['disableService', 'disable']
+  ])('%s posts to the correct endpoint and updates response', async (method, action) => {
+    const store = useDevicesStore()
+    const mockResult = { ok: true, unit: 'media-pi.service', result: 'done' }
+    fetchWrapper.post.mockResolvedValueOnce(mockResult)
+
+    const returned = await store[method](10, ' media-pi.service ')
+
+    expect(fetchWrapper.post).toHaveBeenCalledWith(
+      expect.stringContaining(`/devices/10/services/media-pi.service/${action}`),
+      {}
+    )
+    expect(store.serviceResponse).toEqual(mockResult)
+    expect(returned).toEqual(mockResult)
+  })
+
+  it('service commands URL-encode unit names', async () => {
+    const store = useDevicesStore()
+    fetchWrapper.post.mockResolvedValueOnce({ ok: true })
+
+    await store.startService(3, 'my service@1.service')
+
+    expect(fetchWrapper.post).toHaveBeenCalledWith(
+      expect.stringContaining('/devices/3/services/my%20service%401.service/start'),
+      {}
+    )
+  })
+
+  it('service commands validate unit name before sending request', async () => {
+    const store = useDevicesStore()
+
+    await expect(store.startService(4, '   ')).rejects.toThrow('Не указано имя службы')
+    expect(fetchWrapper.post).not.toHaveBeenCalled()
+    expect(store.error).toBeInstanceOf(Error)
+    expect(store.serviceResponse).toBe(null)
+  })
+
+  it('service commands reset state when fetch fails', async () => {
+    const store = useDevicesStore()
+    const mockError = new Error('Command failed')
+    fetchWrapper.post.mockRejectedValueOnce(mockError)
+
+    await expect(store.stopService(7, 'media-pi.service')).rejects.toThrow('Command failed')
+    expect(fetchWrapper.post).toHaveBeenCalled()
+    expect(store.error).toBe(mockError)
+    expect(store.serviceResponse).toBe(null)
+  })
 })
+
 

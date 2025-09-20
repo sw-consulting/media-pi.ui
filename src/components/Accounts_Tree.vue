@@ -1,23 +1,5 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software")
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// This file is a part of Media Pi frontend application
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi  frontend application
 
 <script setup>
 /**
@@ -152,8 +134,8 @@ const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGr
   deviceGroupsStore,
   confirmDelete
 )
-
-const { createDevice, editDevice, deleteDevice, unassignFromGroup, unassignFromAccount } = createDeviceActions(
+// ... createDevice ...  -- commented out as devices self-register
+const { editDevice, deleteDevice, unassignFromGroup, unassignFromAccount } = createDeviceActions(
   router,
   alertStore,
   devicesStore,
@@ -407,12 +389,20 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- Action buttons for root-unassigned node (top level unassigned devices) -->
+            
+            <!--  Device shall register itself and provied access key, so manual creation is not possible 
             <div v-else-if="item.id === 'root-unassigned' && canManageDevice(authStore.user, {})" class="tree-actions">
               <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Зарегистрировать устройство" @click="createDevice" />
             </div>
+            -->
 
             <!-- Action buttons for individual device nodes -->
             <div v-else-if="item.id.startsWith('device-')" class="tree-actions">
+              <!-- Always allow viewing device status -->
+              <ActionButton :item="item" icon="fa-solid fa-list" tooltip-text="Состояние устройства" 
+                :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                @click="openDeviceStatus" 
+              />
               <!-- Determine context: top-level unassigned vs account-assigned -->
               <template v-if="isTopLevelUnassignedDevice(item)">
                 <!-- Top level unassigned devices: SystemAdministrator, InstallationEngineer -->
@@ -479,11 +469,6 @@ onBeforeUnmount(() => {
                   />
                 </template>
               </template>
-              <!-- Always allow viewing device status -->
-              <ActionButton :item="item" icon="fa-solid fa-list" tooltip-text="Статус устройства" 
-                :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                @click="openDeviceStatus" 
-              />
             </div>
           </div>
         </template>
