@@ -60,9 +60,13 @@ watch(shouldLoad, (value) => {
   }
 }, { immediate: true })
 
-watch(() => props.deviceId, () => {
+watch(() => props.deviceId, async () => {
   lastActionMessage.value = ''
   lastError.value = ''
+
+  if (shouldLoad.value) {
+    await fetchServices()
+  }
 })
 
 watch(isOpen, (value) => {
