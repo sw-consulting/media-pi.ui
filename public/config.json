@@ -1,4 +1,4 @@
 {
-  "apiUrl": "https://localhost:8085/api",
-  "enableLog": false
+  "apiUrl": "http://localhost:8084/api",
+  "enableLog": true
 }

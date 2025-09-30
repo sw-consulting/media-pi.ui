@@ -45,7 +45,17 @@ vi.mock('@/stores/auth.store.js', () => ({
 }))
 
 vi.mock('@/stores/alert.store.js', () => ({
-  useAlertStore: () => ({ alert: null, clear: vi.fn() })
+  useAlertStore: () => ({ alert: null, clear: vi.fn(), error: vi.fn() })
+}))
+
+vi.mock('@/helpers/default.route.js', () => ({
+  redirectToDefaultRoute: vi.fn()
+}))
+
+vi.mock('@/stores/roles.store.js', () => ({
+  useRolesStore: () => ({
+    ensureLoaded: vi.fn().mockResolvedValue()
+  })
 }))
 
 const FormStub = {
@@ -59,7 +69,13 @@ const FieldStub = {
 describe('User_LoginView.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    authStore = { login: loginMock, isAdmin: false, user: { id: 1 } }
+    authStore = { 
+      login: loginMock, 
+      isAdministrator: false,
+      isManager: false,
+      isEngineer: false,
+      user: { id: 1 } 
+    }
   })
 
   it('toggles password visibility', async () => {
@@ -81,7 +97,9 @@ describe('User_LoginView.vue', () => {
     await wrapper.vm.onSubmit({ login_email: 'a', login_password: 'b' })
     await resolveAll()
     expect(loginMock).toHaveBeenCalledWith('a', 'b')
-    expect(routerPush).toHaveBeenCalledWith('/accounts')
+    
+    const { redirectToDefaultRoute } = await import('@/helpers/default.route.js')
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
   })
 
   it('redirects non-admin to edit page', async () => {
@@ -91,6 +109,8 @@ describe('User_LoginView.vue', () => {
     })
     await wrapper.vm.onSubmit({ login_email: 'a', login_password: 'b' })
     await resolveAll()
-    expect(routerPush).toHaveBeenCalledWith('/user/edit/1')
+    
+    const { redirectToDefaultRoute } = await import('@/helpers/default.route.js')
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
   })
 })
