@@ -51,8 +51,8 @@ describe('User_LoginView.vue', () => {
     vi.clearAllMocks()
     authStore = { 
       login: loginMock, 
-      isAdministrator: false, 
-      isManager: false, 
+      isAdministrator: false,
+      isManager: false,
       isEngineer: false,
       user: { id: 1 } 
     }

@@ -23,6 +23,7 @@ export const useRolesStore = defineStore('roles', () => {
       const res = await fetchWrapper.get(baseUrl)
       roles.value = res || []
       roleMap.value = new Map(roles.value.map(t => [t.roleId, t]))
+      initialized = true
     } catch (err) {
       error.value = err
       throw err
@@ -33,7 +34,6 @@ export const useRolesStore = defineStore('roles', () => {
   
   async function ensureLoaded() {
     if (!initialized  && !loading.value) {
-      initialized = true
       await getAll()
     }
   }
