@@ -1,24 +1,5 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// This file is a part of Media Pi frontend application
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi  frontend application
 
 <script setup>
 import { ref } from 'vue'
@@ -56,10 +37,17 @@ const { loading } = storeToRefs(devicesStore)
 
 const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя'),
-  ipAddress: Yup.string().required('Необходимо указать IP адрес')
+  ipAddress: Yup.string().required('Необходимо указать IP адрес'),
+  port: Yup.number()
+    .typeError('Порт должен быть числом')
+    .integer('Порт должен быть целым числом')
+    .min(1, 'Порт должен быть больше 0')
+    .max(65535, 'Порт должен быть меньше либо равен 65535')
+    .required('Необходимо указать TCP порт')
 })
 
-let device = ref({ name: '', ipAddress: '' })
+// Default port for devices is 8081
+let device = ref({ name: '', ipAddress: '', port: 8081 })
 const initialLoading = ref(false)
 
 function canCreate () {
@@ -91,7 +79,8 @@ if (props.register) {
     }
     device.value = {
       name: loadedDevice.name || '',
-      ipAddress: loadedDevice.ipAddress || ''
+      ipAddress: loadedDevice.ipAddress || '',
+      port: typeof loadedDevice.port === 'number' ? loadedDevice.port : (loadedDevice.port ? Number(loadedDevice.port) : 8081)
     }
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
@@ -119,7 +108,8 @@ async function onSubmit (values) {
   try {
     const payload = {
       name: values.name.trim(),
-      ipAddress: values.ipAddress.trim()
+      ipAddress: values.ipAddress.trim(),
+      port: Number(values.port) || 8081
     }
     if (props.accountId !== undefined) {
       payload.accountId = props.accountId
@@ -172,6 +162,14 @@ async function onSubmit (values) {
         <Field name="ipAddress" type="text" id="ipAddress" :disabled="isSubmitting"
           class="form-control input" :class="{ 'is-invalid': errors.ipAddress }"
           placeholder="Введите IP адрес устройства"
+        />
+      </div>
+
+      <div class="form-group mt-4">
+        <label for="port" class="label">TCP порт:</label>
+        <Field name="port" type="number" id="port" :disabled="isSubmitting"
+          class="form-control input" :class="{ 'is-invalid': errors.port }"
+          placeholder="Введите TCP порт (1-65535)"
         />
       </div>
 

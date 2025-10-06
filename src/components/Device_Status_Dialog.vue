@@ -1,12 +1,12 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// This file is a part of Media Pi frontend application
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi  frontend application
 
 <script setup>
 import { computed, watch, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
+import ServicesList from '@/components/Services_List.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -21,6 +21,7 @@ const { statuses, loading } = storeToRefs(deviceStatusesStore)
 
 // Manual refresh override: prioritizes explicit refresh over SSE
 const manualStatus = ref(null)
+const servicesListRef = ref(null)
 
 const internalOpen = ref(props.modelValue)
 watch(() => props.modelValue, (v) => { internalOpen.value = v })
@@ -43,6 +44,7 @@ const status = computed(() => {
 const device = computed(() => devicesStore.getDeviceById(props.deviceId))
 
 const onlineClass = computed(() => status.value?.isOnline ? 'text-success' : 'text-danger')
+const isAccessible = computed(() => Boolean(status.value?.isOnline))
 
 function fmtDate(value) {
   if (!value) return '—'
@@ -60,6 +62,11 @@ async function refreshNow () {
     const result = await deviceStatusesStore.getById(props.deviceId)
     // Ensure the dialog shows the freshly fetched value even if SSE also updates
     manualStatus.value = result || null
+    
+    // Also refresh the services list
+    if (servicesListRef.value && servicesListRef.value.fetchServices) {
+      await servicesListRef.value.fetchServices()
+    }
   } catch (err) {
     console.error('Ошибка обновления статуса устройства:', err)
   }
@@ -82,7 +89,7 @@ watch(() => props.deviceId, () => {
         <div class="d-flex align-center justify-space-between w-100">
           <div>
             <font-awesome-icon :icon="status?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'" :class="onlineClass" class="mr-2"/>
-            <span>Статус устройства</span>
+            <span>Состояние устройства</span>
           </div>
         </div>
       </v-card-title>
@@ -106,10 +113,19 @@ watch(() => props.deviceId, () => {
 
           <div class="label">Задержка подключения</div>
           <div class="value">{{ status?.connectLatencyMs ?? '—' }} мс</div>
-
-          <div class="label">Задержка SSH</div>
+          
+          <!-- Теперь не понятно, что это ...
+          <div class="label">Общая задержка</div>
           <div class="value">{{ status?.totalLatencyMs ?? '—' }} мс</div>
+          -->
+        
         </div>
+        <ServicesList
+          ref="servicesListRef"
+          :device-id="props.deviceId"
+          :accessible="isAccessible"
+          :open="internalOpen"
+        />
       </v-card-text>
       <v-card-actions>
         <v-spacer />
@@ -136,7 +152,7 @@ watch(() => props.deviceId, () => {
 
 <style scoped>
 .status-dialog {
-  max-width: 560px;
+  max-width: 900px;
 }
 .status-card {
   border: 2px solid var(--primary-color-dark);
@@ -144,8 +160,9 @@ watch(() => props.deviceId, () => {
 }
 .status-grid {
   display: grid;
-  grid-template-columns: 180px 1fr;
+  grid-template-columns: 360px 1fr;
   gap: 8px 16px;
+  margin-bottom: 1.5rem;
 }
 .label {
   color: var(--button-secondary-bg);

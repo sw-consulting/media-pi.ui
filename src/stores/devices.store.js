@@ -1,24 +1,5 @@
-// Copyright (c) 2025 Maxim [maxirmx] Samsonov (www.sw.consulting)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-// This file is a part of Media Pi frontend application
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi  frontend application
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -30,8 +11,17 @@ const baseUrl = `${apiUrl}/devices`
 export const useDevicesStore = defineStore('devices', () => {
   const devices = ref([])
   const device = ref(null)
+  const services = ref([])
+  const serviceResponse = ref(null)
   const loading = ref(false)
   const error = ref(null)
+
+  const sanitizeServiceUnit = (unit) => {
+    if (typeof unit !== 'string') {
+      return ''
+    }
+    return unit.trim()
+  }
 
   const getDeviceById = (id) => {
     if (!devices.value || !Array.isArray(devices.value)) {
@@ -101,6 +91,70 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
+  async function listServices(id) {
+    loading.value = true
+    error.value = null
+    try {
+      const result = await fetchWrapper.get(`${baseUrl}/${id}/services`)
+      const units = Array.isArray(result?.units) ? result.units : []
+      services.value = units
+      serviceResponse.value = result
+      return result
+    } catch (err) {
+      error.value = err
+      services.value = []
+      serviceResponse.value = null
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function executeServiceAction(id, unit, action) {
+    loading.value = true
+    error.value = null
+    try {
+      const sanitizedUnit = sanitizeServiceUnit(unit)
+      if (!sanitizedUnit) {
+        const validationError = new Error('Не указано имя службы')
+        validationError.status = 400
+        throw validationError
+      }
+      const result = await fetchWrapper.post(
+        `${baseUrl}/${id}/services/${encodeURIComponent(sanitizedUnit)}/${action}`,
+        {}
+      )
+      serviceResponse.value = result
+      return result
+    } catch (err) {
+      error.value = err
+      serviceResponse.value = null
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function startService(id, unit) {
+    return executeServiceAction(id, unit, 'start')
+  }
+
+  async function stopService(id, unit) {
+    return executeServiceAction(id, unit, 'stop')
+  }
+
+  async function restartService(id, unit) {
+    return executeServiceAction(id, unit, 'restart')
+  }
+
+  async function enableService(id, unit) {
+    return executeServiceAction(id, unit, 'enable')
+  }
+
+  async function disableService(id, unit) {
+    return executeServiceAction(id, unit, 'disable')
+  }
+
   async function update(id, params) {
     loading.value = true
     error.value = null
@@ -162,6 +216,8 @@ export const useDevicesStore = defineStore('devices', () => {
   return {
     devices,
     device,
+    services,
+    serviceResponse,
     loading,
     error,
     getDeviceById,
@@ -169,10 +225,16 @@ export const useDevicesStore = defineStore('devices', () => {
     getAll,
     getByAccount,
     getById,
+    listServices,
     update,
     delete: deleteDevice,
     assignGroup,
-    assignAccount
+    assignAccount,
+    startService,
+    stopService,
+    restartService,
+    enableService,
+    disableService
   }
 })
 
