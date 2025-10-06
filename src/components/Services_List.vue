@@ -260,7 +260,7 @@ defineExpose({
   <div class="services-list">
     <h2 class="services-heading">Службы устройства</h2>
     <div v-if="!isAccessible" class="services-unavailable">
-      Список служб доступен только когда устройство находится онлайн.
+      Список служб доступен, когда устройство находится онлайн.
     </div>
     <template v-else>
       <v-card class="services-card">

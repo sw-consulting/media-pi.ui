@@ -182,6 +182,6 @@ describe('Services_List.vue', () => {
       global: { stubs: globalStubs }
     })
 
-    expect(wrapper.text()).toContain('Список служб доступен только когда устройство находится онлайн')
+    expect(wrapper.text()).toContain('Список служб доступен, когда устройство находится онлайн')
   })
 })
