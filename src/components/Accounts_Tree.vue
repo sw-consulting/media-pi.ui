@@ -134,7 +134,15 @@ const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGr
   deviceGroupsStore,
   confirmDelete
 )
-// ... createDevice ...  -- commented out as devices self-register
+/**
+ * Device creation is intentionally disabled in this component.
+ * Devices are not created manually by users through the UI; instead, they self-register
+ * via an automated provisioning process when they first connect to the system.
+ * This approach ensures that only authorized, network-visible devices are added,
+ * and prevents accidental or unauthorized manual device creation.
+ * The self-registration logic is handled by the backend/device onboarding workflow.
+ * For more details, see the device provisioning documentation or backend implementation.
+ */
 const { editDevice, deleteDevice, unassignFromGroup, unassignFromAccount } = createDeviceActions(
   router,
   alertStore,
