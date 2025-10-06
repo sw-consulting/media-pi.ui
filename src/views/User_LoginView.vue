@@ -12,7 +12,6 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { useRolesStore } from '@/stores/roles.store.js'
 
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
-import { useRolesStore } from '@/stores/roles.store.js'
 
 
 const schema = Yup.object().shape({
