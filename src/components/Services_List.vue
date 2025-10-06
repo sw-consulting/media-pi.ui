@@ -199,7 +199,7 @@ async function handleAction(actionFn, item) {
       await fetchServices()
     }
   } catch (err) {
-    // console.error('Ошибка выполнения действия над службой:', err)
+    
     lastActionMessage.value = extractMessage(err) || 'Ошибка выполнения операции'
     lastActionState.value = 'error'
   }
