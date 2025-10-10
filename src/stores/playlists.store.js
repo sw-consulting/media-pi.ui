@@ -99,8 +99,6 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     )
   }
 
-
-
   return {
     playlists,
     playlist,
