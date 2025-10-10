@@ -15,6 +15,8 @@ vi.mock('@/helpers/fetch.wrapper.js', () => ({
   }
 }))
 
+/* global Blob */
+
 const mockVideos = [
   { id: 1, name: 'Video A' },
   { id: 2, name: 'Video B' }

@@ -90,7 +90,7 @@ export const useVideosStore = defineStore('videos', () => {
   async function uploadFile(id, file, metadata = {}) {
     return handleRequest(
       async () => {
-        const formData = new FormData()
+        const formData = new globalThis.FormData()
         if (file !== undefined && file !== null) {
           formData.append('file', file)
         }
