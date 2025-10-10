@@ -11,8 +11,6 @@ const baseUrl = `${apiUrl}/playlists`
 export const usePlaylistsStore = defineStore('playlists', () => {
   const playlists = ref([])
   const playlist = ref(null)
-  const playlistDevices = ref([])
-  const playlistMediaFiles = ref([])
   const loading = ref(false)
   const error = ref(null)
 
@@ -104,8 +102,6 @@ export const usePlaylistsStore = defineStore('playlists', () => {
   return {
     playlists,
     playlist,
-    playlistDevices,
-    playlistMediaFiles,
     loading,
     error,
     getAll,
