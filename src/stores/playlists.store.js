@@ -8,14 +8,6 @@ import { apiUrl } from '@/helpers/config.js'
 
 const baseUrl = `${apiUrl}/playlists`
 
-const isFormData = (payload) => {
-  if (typeof FormData === 'undefined' || !payload) {
-    return false
-  }
-
-  return payload instanceof FormData
-}
-
 export const usePlaylistsStore = defineStore('playlists', () => {
   const playlists = ref([])
   const playlist = ref(null)
@@ -107,105 +99,7 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     )
   }
 
-  async function getDevices(id) {
-    return handleRequest(
-      async () => {
-        const result = await fetchWrapper.get(`${baseUrl}/${id}/devices`)
-        playlistDevices.value = result || []
-        return playlistDevices.value
-      },
-      null
-    ).catch(err => {
-      playlistDevices.value = []
-      throw err
-    })
-  }
 
-  async function addDevice(id, device) {
-    const payload = typeof device === 'object' && device !== null ? device : { deviceId: device }
-    return handleRequest(
-      async () => {
-        const result = await fetchWrapper.post(`${baseUrl}/${id}/devices`, payload)
-        await getDevices(id)
-        return result
-      }
-    )
-  }
-
-  async function removeDevice(id, deviceId) {
-    return handleRequest(
-      async () => {
-        const result = await fetchWrapper.delete(`${baseUrl}/${id}/devices/${deviceId}`)
-        await getDevices(id)
-        return result
-      }
-    )
-  }
-
-  async function getMediaFiles(id) {
-    return handleRequest(
-      async () => {
-        const result = await fetchWrapper.get(`${baseUrl}/${id}/files`)
-        playlistMediaFiles.value = result || []
-        return playlistMediaFiles.value
-      },
-      null
-    ).catch(err => {
-      playlistMediaFiles.value = []
-      throw err
-    })
-  }
-
-  async function addMediaFile(id, payload) {
-    const request = isFormData(payload) ? fetchWrapper.postFile : fetchWrapper.post
-    return handleRequest(
-      async () => {
-        const result = await request(`${baseUrl}/${id}/files`, payload)
-        await getMediaFiles(id)
-        return result
-      }
-    )
-  }
-
-  async function updateMediaFile(id, fileId, payload) {
-    const request = isFormData(payload) ? fetchWrapper.postFile : fetchWrapper.put
-    return handleRequest(
-      async () => {
-        const result = await request(`${baseUrl}/${id}/files/${fileId}`, payload)
-        await getMediaFiles(id)
-        return result
-      }
-    )
-  }
-
-  async function removeMediaFile(id, fileId) {
-    return handleRequest(
-      async () => {
-        const result = await fetchWrapper.delete(`${baseUrl}/${id}/files/${fileId}`)
-        await getMediaFiles(id)
-        return result
-      }
-    )
-  }
-
-  async function reorderMediaFiles(id, payload) {
-    return handleRequest(
-      async () => {
-        const result = await fetchWrapper.post(`${baseUrl}/${id}/files/reorder`, payload)
-        await getMediaFiles(id)
-        return result
-      }
-    )
-  }
-
-  function resetState() {
-    playlists.value = []
-    playlist.value = null
-    playlistDevices.value = []
-    playlistMediaFiles.value = []
-    error.value = null
-    loading.value = false
-  }
 
   return {
     playlists,
@@ -219,14 +113,5 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     create,
     update,
     remove,
-    getDevices,
-    addDevice,
-    removeDevice,
-    getMediaFiles,
-    addMediaFile,
-    updateMediaFile,
-    removeMediaFile,
-    reorderMediaFiles,
-    resetState
   }
 })
