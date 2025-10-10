@@ -67,6 +67,20 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     })
   }
 
+  async function getAllByAccount(accountId) {
+    return handleRequest(
+      async () => {
+        const result = await fetchWrapper.get(`${baseUrl}/by-account/${accountId}`)
+        playlists.value = result || []
+        return playlists.value
+      },
+      null
+    ).catch(err => {
+      playlists.value = []
+      throw err
+    })
+  }
+
   async function create(params) {
     return handleRequest(
       async () => {
@@ -104,6 +118,7 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     error,
     getAll,
     getById,
+    getAllByAccount,
     create,
     update,
     remove,
