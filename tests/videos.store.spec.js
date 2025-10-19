@@ -15,7 +15,7 @@ vi.mock('@/helpers/fetch.wrapper.js', () => ({
   }
 }))
 
-/* global Blob */
+/* global Blob, File */
 
 const mockVideos = [
   { id: 1, name: 'Video A' },
@@ -105,7 +105,7 @@ describe('videos.store', () => {
     expect(fetchWrapper.get).toHaveBeenCalled()
   })
 
-  it('uploadFile posts form data to video file endpoint', async () => {
+  it('uploadFile posts to /videos/upload with File, Title and AccountId (new signature)', async () => {
     const appendSpy = vi.fn()
     const mockFormData = vi.fn(() => ({
       append: appendSpy
@@ -113,16 +113,46 @@ describe('videos.store', () => {
     global.FormData = mockFormData
 
     fetchWrapper.postFile.mockResolvedValueOnce({})
-    fetchWrapper.get.mockResolvedValueOnce(videoDetails)
 
     const store = useVideosStore()
-    store.video = videoDetails
 
-    await store.uploadFile(1, new Blob(['test']), { language: 'ru' })
+    await store.uploadFile(new Blob(['test']), 99, 'Created Video')
 
-    expect(fetchWrapper.postFile).toHaveBeenCalledWith(expect.stringContaining('/videos/1/file'), expect.any(Object))
-    expect(appendSpy).toHaveBeenCalledWith('file', expect.any(Blob))
-    expect(appendSpy).toHaveBeenCalledWith('language', 'ru')
+    expect(fetchWrapper.postFile).toHaveBeenCalledWith(expect.stringContaining('/videos/upload'), expect.any(Object))
+    expect(appendSpy).toHaveBeenCalledWith('File', expect.any(Blob))
+    expect(appendSpy).toHaveBeenCalledWith('Title', 'Created Video')
+    expect(appendSpy).toHaveBeenCalledWith('AccountId', 99)
+  })
+
+  it('uploadFile throws when missing File (Russian message)', async () => {
+    const store = useVideosStore()
+    await expect(store.uploadFile(null, 1, 'X')).rejects.toThrow('Не выбран видеофайл')
+  })
+
+  it('uploadFile derives title from file name when title empty', async () => {
+    const appendSpy = vi.fn()
+    const mockFormData = vi.fn(() => ({ append: appendSpy }))
+    global.FormData = mockFormData
+    fetchWrapper.postFile.mockResolvedValueOnce({})
+    const store = useVideosStore()
+    const file = new File(['data'], 'derived-name.mp4', { type: 'video/mp4' })
+    await store.uploadFile(file, 7, '')
+    expect(appendSpy).toHaveBeenCalledWith('Title', 'derived-name')
+  })
+
+  it('uploadFile throws when missing AccountId (Russian message)', async () => {
+    const store = useVideosStore()
+    await expect(store.uploadFile(new Blob(['x']), undefined, 'X')).rejects.toThrow('Не выбран лицевой счёт')
+  })
+
+  it('uploadFile allows empty title when file has no name (stores empty Title)', async () => {
+    const appendSpy = vi.fn()
+    const mockFormData = vi.fn(() => ({ append: appendSpy }))
+    global.FormData = mockFormData
+    const store = useVideosStore()
+    const file = new Blob(['data']) // no name property to derive from
+    await store.uploadFile(file, 5, '')
+    expect(appendSpy).toHaveBeenCalledWith('Title', '')
   })
 
   it('getAllByAccount loads videos scoped to account', async () => {
@@ -131,7 +161,7 @@ describe('videos.store', () => {
     const store = useVideosStore()
     await store.getAllByAccount(42)
 
-    expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/videos/account/42'))
+    expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/videos/by-account/42'))
     expect(store.videos).toEqual(mockVideos)
   })
 

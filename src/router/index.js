@@ -102,7 +102,13 @@ const router = createRouter({
       name: 'Настройки устройства',
       component: () => import('@/views/Device_EditView.vue'),
       props: true
-    }
+    },
+    {
+      path: '/videos',
+      name: 'Видеофайлы',
+      component: () => import('@/views/Videos_View.vue')
+    },
+
   ]
 })
 

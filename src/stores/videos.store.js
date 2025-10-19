@@ -87,31 +87,23 @@ export const useVideosStore = defineStore('videos', () => {
     )
   }
 
-  async function uploadFile(id, file, metadata = {}) {
-    return handleRequest(
-      async () => {
-        const formData = new globalThis.FormData()
-        if (file !== undefined && file !== null) {
-          formData.append('file', file)
-        }
-        Object.entries(metadata || {}).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            formData.append(key, value)
-          }
-        })
-        const result = await fetchWrapper.postFile(`${baseUrl}/${id}/file`, formData)
-        if (video.value?.id === id) {
-          await getById(id)
-        }
-        return result
-      }
-    )
+  async function uploadFile(file, accountId, title = '') {
+    return handleRequest(async () => {
+      if (!file) throw new Error('Не выбран видеофайл')
+      if (accountId === undefined || accountId === null) throw new Error('Не выбран лицевой счёт')
+      const effectiveTitle = (title && title.trim()) ? title.trim() : (file.name ? file.name.replace(/\.[^.]+$/, '') : '')
+      const formData = new globalThis.FormData()
+      formData.append('File', file)
+      formData.append('Title', effectiveTitle)
+      formData.append('AccountId', accountId)
+      return fetchWrapper.postFile(`${baseUrl}/upload`, formData)
+    })
   }
 
   async function getAllByAccount(accountId) {
     return handleRequest(
       async () => {
-        const result = await fetchWrapper.get(`${baseUrl}/account/${accountId}`)
+        const result = await fetchWrapper.get(`${baseUrl}/by-account/${accountId}`)
         videos.value = result || []
         return videos.value
       },

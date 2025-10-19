@@ -64,7 +64,8 @@ export default mergeConfig(
         branches: 60,
         functions: 70,
         lines: 70
-      }    
+      },
+      setupFiles: ['tests/setup/global.test.setup.js']    
     }
   })
 )

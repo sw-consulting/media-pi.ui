@@ -85,6 +85,9 @@ function getUserRole() {
         <v-list-item v-if="accountsCaption">
           <RouterLink to="/accounts" class="link">{{ accountsCaption }}</RouterLink>
         </v-list-item>
+        <v-list-item>
+          <RouterLink to="/videos" class="link">Видеофайлы</RouterLink>
+        </v-list-item>
         <v-list-item v-if="!authStore.isAdministrator">
           <RouterLink :to="'/user/edit/' + authStore.user.id" class="link">Настройки</RouterLink>
         </v-list-item>

@@ -75,7 +75,8 @@ const router = createRouter({
     { path: '/accounts', component: { template: '<div>Accounts</div>' } },
     { path: '/user/edit/:id', component: { template: '<div>Edit User</div>' } },
     { path: '/recover', component: { template: '<div>Recover</div>' } },
-    { path: '/register', component: { template: '<div>Register</div>' } }
+    { path: '/register', component: { template: '<div>Register</div>' } },
+    { path: '/videos', component: { template: '<div>Videos</div>' } }
   ]
 })
 

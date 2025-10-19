@@ -3,13 +3,19 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch, nextTick } from 'vue'
+import ActionButton from '@/components/ActionButton.vue'
 import { storeToRefs } from 'pinia'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useVideosStore } from '@/stores/videos.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
-import { isAdministrator, isManager } from '@/helpers/user.helpers.js'
+import { isAdministrator, isManager, canManageAccountById } from '@/helpers/user.helpers.js'
+import { useAlertStore } from '@/stores/alert.store.js'
+import { useConfirmation } from '@/helpers/confirmation.js'
+import '@/assets/tree.common.css'
 
 const authStore = useAuthStore()
+const alertStore = useAlertStore()
+const { confirmDelete } = useConfirmation()
 const accountsStore = useAccountsStore()
 const videosStore = useVideosStore()
 
@@ -17,8 +23,10 @@ const { accounts } = storeToRefs(accountsStore)
 
 const loadingAccounts = ref(false)
 const accountsError = ref(null)
-const openedNodes = ref([])
-const selectedNode = ref([])
+// Tree state (restore from auth store if available; tolerate older mocks without API)
+const initialVideosTreeState = authStore.getVideosTreeState ? authStore.getVideosTreeState : { openedNodes: [], selectedNode: [] }
+const openedNodes = ref([...(initialVideosTreeState.openedNodes || [])])
+const selectedNode = ref([...(initialVideosTreeState.selectedNode || [])])
 
 const accountVideos = reactive({})
 const accountErrors = reactive({})
@@ -54,10 +62,10 @@ const accessibleAccounts = computed(() => {
 })
 
 const treeItems = computed(() => {
-  return accessibleAccounts.value.map(account => {
+  // Build account child nodes
+  const accountNodes = accessibleAccounts.value.map(account => {
     const nodeId = `account-${account.id}`
     const hasLoadedChildren = loadedNodes.value.has(nodeId)
-
     return {
       id: nodeId,
       name: account.name || `Лицевой счёт №${account.id}`,
@@ -65,6 +73,22 @@ const treeItems = computed(() => {
       children: hasLoadedChildren ? accountVideos[account.id] || [] : []
     }
   })
+
+  // Root nodes structure similar to Accounts_Tree
+  const roots = [
+    {
+      id: 'root-accounts',
+      name: 'Лицевые счета',
+      children: accountNodes
+    },
+    {
+      id: 'root-subscriptions',
+      name: 'Подписные категории',
+      children: [] // Empty for now
+    }
+  ]
+
+  return roots
 })
 
 const accountErrorList = computed(() => {
@@ -91,23 +115,15 @@ const unmarkNodeLoaded = (nodeId) => {
   }
 }
 
-const buildVideoNodes = (videos = [], accountId) => {
+const buildVideoNodes = (videos = []) => {
   if (!Array.isArray(videos) || videos.length === 0) {
-    return [
-      {
-        id: `account-${accountId}-empty`,
-        name: 'Видео отсутствуют',
-        disabled: true,
-        children: []
-      }
-    ]
+    return [] // Don't create artificial placeholder nodes
   }
-
+  // Omit children property so Vuetify treats node as leaf (no toggler arrows)
   return videos.map(video => ({
     id: `video-${video.id}`,
     name: video.name || video.title || `Видео №${video.id}`,
-    video,
-    children: []
+    video
   }))
 }
 
@@ -124,8 +140,8 @@ const fetchVideosForAccount = async (accountId, nodeId) => {
   accountErrors[accountId] = null
 
   try {
-    const result = await videosStore.getAllByAccount(accountId)
-    const nodes = buildVideoNodes(result, accountId)
+  const result = await videosStore.getAllByAccount(accountId)
+  const nodes = buildVideoNodes(result)
     accountVideos[accountId] = nodes
     markNodeLoaded(nodeId)
     return nodes
@@ -136,6 +152,87 @@ const fetchVideosForAccount = async (accountId, nodeId) => {
   } finally {
     loadingNodes[nodeId] = false
   }
+}
+
+// Permission check for video management on account
+const canManageVideosForAccount = (accountId) => {
+  const user = authStore.user
+  return canManageAccountById(user, accountId)
+}
+
+// Action state refs
+const creatingVideoForAccount = ref(null)
+const editingVideoId = ref(null)
+
+// Upload flow using new signature uploadFile(file, accountId, title='')
+const uploadVideoForAccount = async (accountId, file) => {
+  if (!canManageVideosForAccount(accountId) || !file) return
+  try {
+    const baseName = file.name ? file.name.replace(/\.[^.]+$/, '') : ''
+    await videosStore.uploadFile(file, accountId, baseName)
+    // Refresh account videos
+    delete accountVideos[accountId]
+    unmarkNodeLoaded(`account-${accountId}`)
+    await reloadAccountVideos(accountId)
+  } catch (error) {
+    alertStore.error('Не удалось загрузить видео: ' + (error.message || error))
+  } finally {
+    creatingVideoForAccount.value = null
+  }
+}
+
+const editVideo = async (videoNode) => {
+  const video = videoNode?.video
+  if (!video || !canManageVideosForAccount(video.accountId)) return
+  const currentName = video.name || video.title || ''
+  const newName = window.prompt('Введите новое название видео', currentName)
+  if (!newName || newName === currentName) return
+  try {
+    await videosStore.update(video.id, { name: newName })
+    delete accountVideos[video.accountId]
+    unmarkNodeLoaded(`account-${video.accountId}`)
+    await reloadAccountVideos(video.accountId)
+  } catch (error) {
+    alertStore.error('Не удалось обновить видео: ' + (error.message || error))
+  } finally {
+    editingVideoId.value = null
+  }
+}
+
+const deleteVideo = async (videoNode) => {
+  const video = videoNode?.video
+  if (!video || !canManageVideosForAccount(video.accountId)) return
+  try {
+    const confirmed = await confirmDelete((video.name || video.title || `Id ${video.id}`), 'видеофайл')
+    if (!confirmed) return
+    await videosStore.remove(video.id)
+    delete accountVideos[video.accountId]
+    unmarkNodeLoaded(`account-${video.accountId}`)
+    await reloadAccountVideos(video.accountId)
+  } catch (error) {
+    alertStore.error('Не удалось удалить видеофайл: ' + (error.message || error))
+  }
+}
+
+// Hidden file input handling
+const fileInputRef = ref(null)
+const triggerUpload = (accountId) => {
+  if (!canManageVideosForAccount(accountId)) return
+  creatingVideoForAccount.value = accountId
+  if (fileInputRef.value) {
+    fileInputRef.value.dataset.accountId = accountId
+    fileInputRef.value.click()
+  }
+}
+const onFileSelected = (e) => {
+  const files = e.target.files
+  const accountId = parseInt(e.target.dataset.accountId, 10)
+  if (!files || files.length === 0) {
+    creatingVideoForAccount.value = null
+    return
+  }
+  uploadVideoForAccount(accountId, files[0])
+  e.target.value = ''
 }
 
 const loadChildren = async (item) => {
@@ -230,16 +327,25 @@ watch(accessibleAccounts, (newAccounts) => {
 
 onMounted(async () => {
   await loadAccounts()
+  // Persist initial (possibly restored) state if method exists
+  if (authStore.saveVideosTreeState) {
+    authStore.saveVideosTreeState(selectedNode.value, openedNodes.value)
+  }
 })
+
+// Persist changes to selection and opened nodes
+watch([selectedNode, openedNodes], () => {
+  if (authStore.saveVideosTreeState) {
+    authStore.saveVideosTreeState(selectedNode.value, openedNodes.value)
+  }
+}, { deep: true })
 </script>
 
 <template>
-  <div class="videos-tree">
-    <v-card class="videos-tree__card" elevation="2">
-      <v-card-title class="videos-tree__title">
-        Видеоматериалы
-      </v-card-title>
-      <v-divider />
+  <div class="settings table-3 videos-tree tree-container">
+  <h1 class="primary-heading">Видеофайлы</h1>
+    <hr class="hr" />
+    <v-card elevation="2">
       <v-card-text>
         <v-progress-linear
           v-if="loadingAccounts"
@@ -248,16 +354,7 @@ onMounted(async () => {
           class="mb-4"
         />
 
-        <v-alert
-          v-else-if="!treeItems.length"
-          type="info"
-          variant="outlined"
-        >
-          Нет доступных лицевых счетов или данные не найдены.
-        </v-alert>
-
         <v-treeview
-          v-else
           :items="treeItems"
           item-title="name"
           item-value="id"
@@ -277,24 +374,32 @@ onMounted(async () => {
               color="primary"
             />
             <template v-else>
-              <font-awesome-icon
-                v-if="item.id.startsWith('account-')"
-                icon="fa-solid fa-building-user"
-                class="node-icon"
-              />
-              <font-awesome-icon
-                v-else-if="item.id.startsWith('video-')"
-                icon="fa-solid fa-photo-film"
-                class="node-icon"
-              />
-              <font-awesome-icon
-                v-else
-                icon="fa-regular fa-circle"
-                class="node-icon"
-              />
+              <template v-if="item.id.startsWith('video-')">
+                <font-awesome-icon icon="fa-solid fa-film" size="1x" class="node-icon" />
+              </template>
+              <template v-else>
+                <font-awesome-icon v-if="item.id === 'root-accounts'" icon="fa-solid fa-city" size="1x" class="node-icon" />
+                <font-awesome-icon v-else-if="item.id === 'root-subscriptions'" icon="fa-solid fa-tags" size="1x" class="node-icon" />
+                <font-awesome-icon v-else-if="item.id.startsWith('account-')" icon="fa-solid fa-building-user" size="1x" class="node-icon" />
+                <font-awesome-icon v-else icon="fa-regular fa-circle" size="1x" class="node-icon" />
+              </template>
             </template>
           </template>
+          <template #append="{ item }">
+            <div class="control-panel">
+              <!-- Account node actions -->
+              <div v-if="item.id.startsWith('account-') && canManageVideosForAccount(item.accountId)" class="tree-actions">
+                <ActionButton :item="item" icon="fa-solid fa-plus" tooltip-text="Загрузить видео" @click="() => triggerUpload(item.accountId)" />
+              </div>
+              <!-- Video node actions -->
+              <div v-else-if="item.id.startsWith('video-') && canManageVideosForAccount(item.video?.accountId)" class="tree-actions">
+                <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать видео" @click="() => editVideo(item)" />
+                <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить видео" @click="() => deleteVideo(item)" />
+              </div>
+            </div>
+          </template>
         </v-treeview>
+        <input ref="fileInputRef" type="file" style="display:none" @change="onFileSelected" />
       </v-card-text>
     </v-card>
 
@@ -338,19 +443,3 @@ onMounted(async () => {
     </v-alert>
   </div>
 </template>
-
-<style scoped>
-.videos-tree__card {
-  max-width: 720px;
-  margin: 0 auto;
-}
-
-.videos-tree__title {
-  font-weight: 600;
-}
-
-.node-icon {
-  margin-right: 8px;
-  color: var(--v-theme-primary);
-}
-</style>

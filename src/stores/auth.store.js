@@ -36,6 +36,9 @@ export const useAuthStore = defineStore('auth', () => {
   // Accounts tree state management
   const accountsTreeState = ref({})
 
+  // Videos tree state management
+  const videosTreeState = ref({})
+
   // Load tree state from localStorage on store initialization
   function loadAccountsTreeState() {
     try {
@@ -48,10 +51,28 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Load videos tree state
+  function loadVideosTreeState() {
+    try {
+      const saved = localStorage.getItem('videosTreeState')
+      if (saved) {
+        videosTreeState.value = JSON.parse(saved)
+      }
+    } catch {
+      videosTreeState.value = {}
+    }
+  }
+
   // Get tree state for current user
   const getAccountsTreeState = computed(() => {
     if (!user.value?.id) return { selectedNode: null, expandedNodes: [] }
     return accountsTreeState.value[user.value.id] || { selectedNode: null, expandedNodes: [] }
+  })
+
+  // Get videos tree state for current user
+  const getVideosTreeState = computed(() => {
+    if (!user.value?.id) return { selectedNode: [], openedNodes: [] }
+    return videosTreeState.value[user.value.id] || { selectedNode: [], openedNodes: [] }
   })
 
   // Save tree state for current user
@@ -67,6 +88,18 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('accountsTreeState', JSON.stringify(accountsTreeState.value))
   }
 
+  // Save videos tree state for current user
+  function saveVideosTreeState(selectedNode, openedNodes) {
+    if (!user.value?.id) return
+
+    videosTreeState.value[user.value.id] = {
+      selectedNode: Array.isArray(selectedNode) ? [...selectedNode] : (selectedNode ? [selectedNode] : []),
+      openedNodes: Array.isArray(openedNodes) ? [...openedNodes] : []
+    }
+
+    localStorage.setItem('videosTreeState', JSON.stringify(videosTreeState.value))
+  }
+
   // Clear tree state for current user
   function clearAccountsTreeState() {
     if (!user.value?.id) return
@@ -74,6 +107,15 @@ export const useAuthStore = defineStore('auth', () => {
     if (accountsTreeState.value[user.value.id]) {
       delete accountsTreeState.value[user.value.id]
       localStorage.setItem('accountsTreeState', JSON.stringify(accountsTreeState.value))
+    }
+  }
+
+  // Clear videos tree state for current user
+  function clearVideosTreeState() {
+    if (!user.value?.id) return
+    if (videosTreeState.value[user.value.id]) {
+      delete videosTreeState.value[user.value.id]
+      localStorage.setItem('videosTreeState', JSON.stringify(videosTreeState.value))
     }
   }
 
@@ -153,6 +195,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Load tree state when store is initialized
   loadAccountsTreeState()
+  loadVideosTreeState()
 
   return {
     // state
@@ -168,6 +211,7 @@ export const useAuthStore = defineStore('auth', () => {
     isManager,
     isEngineer,
     getAccountsTreeState,
+  getVideosTreeState,
     // actions
     check,
     register,
@@ -177,6 +221,9 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     saveAccountsTreeState,
     clearAccountsTreeState,
-    loadAccountsTreeState
+    loadAccountsTreeState,
+    saveVideosTreeState,
+    clearVideosTreeState,
+    loadVideosTreeState
   }
 })

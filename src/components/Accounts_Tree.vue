@@ -58,6 +58,7 @@ import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpe
 import ActionButton from '@/components/ActionButton.vue'
 import DeviceStatusDialog from '@/components/Device_Status_Dialog.vue'
 import InlineAssignment from '@/components/InlineAssignment.vue'
+import '@/assets/tree.common.css'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -321,7 +322,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="settings table-3">
+  <div class="settings table-3 tree-container">
     <h1 class="primary-heading">{{ accountsCaption || 'Информация не доступна' }}</h1>
     <hr class="hr" />
 
@@ -506,85 +507,3 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.control-panel {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-left: 8px;
-}
-
-.tree-actions {
-  display: flex;
-  gap: 2px;
-  padding: 2px 6px;
-  background: linear-gradient(135deg, #75b2fd 0%, #bdddfd 100%);
-  border: 1px solid #153754;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  min-height: 24px;
-  align-items: center;
-}
-
-.tree-actions:hover {
-  background: linear-gradient(135deg, #75b2fd 0%, #bdddfd 100%);
-  border: 2px solid #1976d2;
-  box-shadow: 0 2px 6px rgba(25, 118, 210, 0.15);
-  transform: translateY(-1px);
-  transition: all 0.2s ease;
-}
-
-.tree-actions .anti-btn {
-  padding: 2px 4px;
-  margin: 0;
-  font-size: 11px;
-  min-width: auto;
-  height: 18px;
-  background: transparent;
-  border-radius: 3px;
-  color: #495057;
-  transition: all 0.15s ease;
-}
-
-.tree-actions .anti-btn:hover {
-  background-color: rgba(25, 118, 210, 0.1);
-  color: #1976d2;
-  transform: scale(1.1);
-}
-
-.tree-actions .anti-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.node-icon {
-  color: #4a647b;
-  transition: color 0.2s ease;
-}
-
-:deep(.v-treeview-item) {
-  padding-right: 8px !important;
-}
-
-:deep(.v-treeview-item:hover) {
-  border: 2px solid #1976d2;
-  color:  #104981;
-  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
-  border-radius: 6px;
-  background: none !important;
-  transition: box-shadow 0.2s, border-color 0.2s;
-}
-
-:deep(.v-treeview-item:hover .node-icon) {
-  color: #1976d2;
-}
-
-:deep(.v-treeview-item:hover .tree-actions) {
-  background: linear-gradient(135deg, #a3caf9 0%, #e9f3fc 100%);
-  border: 2px solid #1976d2;
-  box-shadow: 0 3px 8px rgba(25, 118, 210, 0.2);
-}
-
-</style>
-
