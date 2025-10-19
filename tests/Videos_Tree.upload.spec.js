@@ -37,6 +37,9 @@ vi.mock('@/helpers/user.helpers.js', () => ({
 vi.mock('@/components/ActionButton.vue', () => ({
   default: { name: 'ActionButton', props: ['item','icon','tooltipText'], emits: ['click'], template: '<button class="action-btn" @click="$emit(\'click\')"></button>' }
 }))
+vi.mock('@/components/ActionDialog.vue', () => ({
+  default: { name: 'ActionDialog', props: ['actionDialog'], template: '<div class="action-dialog" v-if="actionDialog?.show">{{ actionDialog.title }}</div>' }
+}))
 
 const mountTree = async () => {
   const wrapper = mount(VideosTree, {
@@ -78,5 +81,38 @@ describe('Videos_Tree.vue upload create API (new signature)', () => {
     const fakeFile = new File(['data'], 'nope.mp4', { type: 'video/mp4' })
     await wrapper.vm.uploadVideoForAccount(5, fakeFile)
     expect(videosStore.uploadFile).not.toHaveBeenCalled()
+  })
+
+  it('shows modal ActionDialog during upload and keeps it visible at least 2s', async () => {
+    vi.useFakeTimers()
+    currentUser = { roles: [1], accountIds: [5] }
+    // Make uploadFile resolve immediately to test min display time
+    videosStore.uploadFile = vi.fn().mockResolvedValue({ id: 888 })
+    const wrapper = await mountTree()
+    const fakeFile = new File(['data'], 'quick.mp4', { type: 'video/mp4' })
+
+    // Start upload (returns a promise but uploadFile resolves immediately)
+    const uploadPromise = wrapper.vm.uploadVideoForAccount(5, fakeFile)
+
+    // After kicking off, the actionDialog should be set to show
+    await wrapper.vm.$nextTick()
+    const dialogEl = wrapper.find('.action-dialog')
+    expect(dialogEl.exists()).toBe(true)
+    expect(dialogEl.text()).toContain('Загрузка видео')
+
+    // Fast-forward less than 2s: dialog should still be visible
+    vi.advanceTimersByTime(1000)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.action-dialog').exists()).toBe(true)
+
+    // Fast-forward to 2s total
+    vi.advanceTimersByTime(1000)
+    await wrapper.vm.$nextTick()
+    // Allow any pending promises to resolve
+    await uploadPromise
+    // Now dialog should be hidden after min time
+    expect(wrapper.find('.action-dialog').exists()).toBe(false)
+
+    vi.useRealTimers()
   })
 })

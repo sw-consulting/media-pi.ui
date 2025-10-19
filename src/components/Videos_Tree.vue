@@ -4,6 +4,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch, nextTick } from 'vue'
 import ActionButton from '@/components/ActionButton.vue'
+import ActionDialog from '@/components/ActionDialog.vue'
 import { storeToRefs } from 'pinia'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useVideosStore } from '@/stores/videos.store.js'
@@ -163,12 +164,16 @@ const canManageVideosForAccount = (accountId) => {
 // Action state refs
 const creatingVideoForAccount = ref(null)
 const editingVideoId = ref(null)
+// Action dialog state for modal blocking operations (e.g., upload)
+const actionDialog = reactive({ show: false, title: '' })
 
 // Upload flow using new signature uploadFile(file, accountId, title='')
 const uploadVideoForAccount = async (accountId, file) => {
   if (!canManageVideosForAccount(accountId) || !file) return
+  const baseName = file.name ? file.name.replace(/\.[^.]+$/, '') : ''
+  actionDialog.title = 'Загрузка видео...'
+  actionDialog.show = true
   try {
-    const baseName = file.name ? file.name.replace(/\.[^.]+$/, '') : ''
     await videosStore.uploadFile(file, accountId, baseName)
     // Refresh account videos
     delete accountVideos[accountId]
@@ -178,6 +183,8 @@ const uploadVideoForAccount = async (accountId, file) => {
     alertStore.error('Не удалось загрузить видео: ' + (error.message || error))
   } finally {
     creatingVideoForAccount.value = null
+    // Let ActionDialog component handle min display and hide; just request hide
+    actionDialog.show = false
   }
 }
 
@@ -403,6 +410,18 @@ watch([selectedNode, openedNodes], () => {
       </v-card-text>
     </v-card>
 
+    <!-- Global modal action dialog for blocking operations like upload -->
+    <ActionDialog :actionDialog="actionDialog" />
+    <!-- Fallback plain overlay in case Vuetify dialog is not visible in some environments -->
+    <div v-if="actionDialog.show" class="mp-action-overlay" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);z-index:2000;">
+      <div style="background:#fff;padding:1rem 1.25rem;border-radius:8px;min-width:260px;max-width:90%;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,0.2);">
+        <div class="primary-heading" style="margin-bottom:0.5rem;">{{ actionDialog.title }}</div>
+        <div style="margin-top:0.5rem;">
+          <div style="display:inline-block;width:48px;height:48px;border-radius:50%;border:6px solid rgba(0,0,0,0.08);border-top-color:var(--v-primary-base, #1976d2);animation:mp-spin 1s linear infinite"></div>
+        </div>
+      </div>
+    </div>
+
     <v-alert
       v-if="accountsError"
       type="error"
@@ -443,3 +462,10 @@ watch([selectedNode, openedNodes], () => {
     </v-alert>
   </div>
 </template>
+
+<style scoped>
+@keyframes mp-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>

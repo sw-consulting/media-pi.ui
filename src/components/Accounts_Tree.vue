@@ -338,7 +338,7 @@ const groupStatusById = computed(() => {
   groups.forEach(g => {
     const groupDevices = devices.filter(d => d.deviceGroupId === g.id)
     if (groupDevices.length === 0) {
-      result.set(g.id, { allOnline: false, icon: 'fa-solid fa-triangle-exclamation', class: 'text-danger' })
+      result.set(g.id, { allOnline: false, icon: 'fa-solid fa-circle-xmark', class: 'text-none' })
       return
     }
     const allOnline = groupDevices.every(d => (statusesById.value.get(d.id)?.isOnline) || d.deviceStatus?.isOnline === true)

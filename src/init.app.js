@@ -37,7 +37,8 @@ import {
   faRotateRight,
   faBan,
   faTags,
-  faFilm
+  faFilm,
+  faCircleXmark
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -76,7 +77,8 @@ library.add(
   faRotateRight,
   faBan,
   faTags,
-  faFilm
+  faFilm,
+  faCircleXmark
 )
 
 import 'vuetify/styles'
