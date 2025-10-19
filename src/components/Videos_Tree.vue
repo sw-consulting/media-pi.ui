@@ -412,15 +412,7 @@ watch([selectedNode, openedNodes], () => {
 
     <!-- Global modal action dialog for blocking operations like upload -->
     <ActionDialog :actionDialog="actionDialog" />
-    <!-- Fallback plain overlay in case Vuetify dialog is not visible in some environments -->
-    <div v-if="actionDialog.show" class="mp-action-overlay" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);z-index:2000;">
-      <div style="background:#fff;padding:1rem 1.25rem;border-radius:8px;min-width:260px;max-width:90%;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,0.2);">
-        <div class="primary-heading" style="margin-bottom:0.5rem;">{{ actionDialog.title }}</div>
-        <div style="margin-top:0.5rem;">
-          <div style="display:inline-block;width:48px;height:48px;border-radius:50%;border:6px solid rgba(0,0,0,0.08);border-top-color:var(--v-primary-base, #1976d2);animation:mp-spin 1s linear infinite"></div>
-        </div>
-      </div>
-    </div>
+    <!-- ActionDialog (renders its own overlay) -->
 
     <v-alert
       v-if="accountsError"
