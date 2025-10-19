@@ -163,12 +163,17 @@ const loadChildren = async (item) => {
     return item?.children || []
   }
 
-  const accountId = Number.parseInt(item.id.replace('account-', ''), 10)
+  const nodeId = item.id
+  const accountId = Number.parseInt(nodeId.replace('account-', ''), 10)
   if (!Number.isFinite(accountId)) {
     return []
   }
 
-  return fetchPlaylistsForAccount(accountId, item.id)
+  if (loadedNodes.value.has(nodeId)) {
+    return accountPlaylists[accountId] || []
+  }
+
+  return fetchPlaylistsForAccount(accountId, nodeId)
 }
 
 const reloadAccountPlaylists = async (accountId) => {
