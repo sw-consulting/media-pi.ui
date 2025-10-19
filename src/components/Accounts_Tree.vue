@@ -24,7 +24,7 @@
  * - Can assign devices to accounts
  * - Cannot access account-specific operations
  */
-import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
@@ -122,19 +122,66 @@ const {
 const { restoreTreeState, saveTreeState } = createStateManager(authStore)
 
 // Action handlers
-const { createAccount, editAccount, deleteAccount } = createAccountActions(
+const { createAccount, editAccount, deleteAccount: _deleteAccount } = createAccountActions(
   router, 
   alertStore, 
   accountsStore, 
   confirmDelete
 )
 
-const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGroupActions(
+const { createDeviceGroup: _createDeviceGroup, editDeviceGroup, deleteDeviceGroup: _deleteDeviceGroup } = createDeviceGroupActions(
   router,
   alertStore,
   deviceGroupsStore,
   confirmDelete
 )
+
+// Wrap deletion functions to preserve parent node expansion
+const deleteAccount = async (item) => {
+  // Store the parent container node that should remain expanded
+  if (expandedNodes.value && !expandedNodes.value.includes('root-accounts')) {
+    expandedNodes.value = [...expandedNodes.value, 'root-accounts']
+  }
+  await _deleteAccount(item)
+}
+
+const deleteDeviceGroup = async (item) => {
+  // Extract account ID to preserve the groups container expansion
+  const accountMatch = item.id?.toString().match(/(\d+)/)
+  if (accountMatch) {
+    const accountId = accountMatch[1]
+    const accountNodeId = `account-${accountId}`
+    const groupsNodeId = `account-${accountId}-groups`
+    
+    const nodesToExpand = [accountNodeId, groupsNodeId]
+    nodesToExpand.forEach(nodeId => {
+      if (expandedNodes.value && !expandedNodes.value.includes(nodeId)) {
+        expandedNodes.value = [...expandedNodes.value, nodeId]
+      }
+    })
+  }
+  await _deleteDeviceGroup(item)
+}
+
+// Wrap creation functions to preserve parent node expansion
+const createDeviceGroup = (item) => {
+  // Extract account ID from groups container node and ensure parent nodes are expanded
+  const match = item.id.match(/account-(\d+)-groups/)
+  if (match) {
+    const accountId = match[1]
+    const accountNodeId = `account-${accountId}`
+    const groupsNodeId = `account-${accountId}-groups`
+    
+    const nodesToExpand = [accountNodeId, groupsNodeId]
+    nodesToExpand.forEach(nodeId => {
+      if (!expandedNodes.value.includes(nodeId)) {
+        expandedNodes.value = [...expandedNodes.value, nodeId]
+      }
+    })
+    // The watch function will automatically save the state when expandedNodes changes
+  }
+  _createDeviceGroup(item)
+}
 /**
  * Device creation is intentionally disabled in this component.
  * Devices are not created manually by users through the UI; instead, they self-register
@@ -144,13 +191,22 @@ const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGr
  * The self-registration logic is handled by the backend/device onboarding workflow.
  * For more details, see the device provisioning documentation or backend implementation.
  */
-const { editDevice, deleteDevice, unassignFromGroup, unassignFromAccount } = createDeviceActions(
+const { editDevice, deleteDevice, unassignFromGroup: _unassignFromGroup, unassignFromAccount: _unassignFromAccount } = createDeviceActions(
   router,
   alertStore,
   devicesStore,
   confirmDelete,
   transitioningDevices 
 )
+
+// Wrap device actions to pass expandedNodes for preserving tree state
+const unassignFromGroup = async (item) => {
+  await _unassignFromGroup(item, expandedNodes)
+}
+
+const unassignFromAccount = async (item) => {
+  await _unassignFromAccount(item, expandedNodes)
+}
 
 // Loading handler
 const loadChildren = createLoadChildrenHandler(
@@ -170,7 +226,7 @@ watch([selectedNode, expandedNodes], () => {
 const {
   startAccountAssignment,
   cancelAccountAssignment,
-  confirmAccountAssignment,
+  confirmAccountAssignment: _confirmAccountAssignment,
   updateSelectedAccount
 } = createAccountAssignmentActions(
   accountAssignmentState,
@@ -179,11 +235,16 @@ const {
   alertStore
 )
 
+// Wrap assignment functions to pass expandedNodes for preserving tree state
+const confirmAccountAssignment = async (item) => {
+  await _confirmAccountAssignment(item, expandedNodes)
+}
+
 // Device group assignment actions
 const {
   startDeviceGroupAssignment,
   cancelDeviceGroupAssignment,
-  confirmDeviceGroupAssignment,
+  confirmDeviceGroupAssignment: _confirmDeviceGroupAssignment,
   updateSelectedDeviceGroup
 } = createDeviceGroupAssignmentActions(
   deviceGroupAssignmentState,
@@ -191,6 +252,11 @@ const {
   devicesStore,
   alertStore
 )
+
+// Wrap assignment functions to pass expandedNodes for preserving tree state
+const confirmDeviceGroupAssignment = async (item) => {
+  await _confirmDeviceGroupAssignment(item, expandedNodes)
+}
 
 // Available accounts for assignment (only accounts user can manage)
 const availableAccounts = computed(() => {
@@ -308,12 +374,57 @@ onMounted(async () => {
     deviceStatusesStore.startStream()
     // Restore tree state after data is loaded, with loadChildren support
     await restoreTreeState(selectedNode, expandedNodes, loadChildren)
+    
+    // Post-restoration logic: ensure logical parent-child expansion consistency
+    await ensureLogicalExpansion()
   } catch (error) {
     alertStore.error('Не удалось загрузить данные: ' + (error.message || error))
   } finally {
     loading.value = false
   }
 })
+
+// Function to ensure logical expansion of parent nodes when they have content
+const ensureLogicalExpansion = async () => {
+  let hasChanges = false
+  
+  // If we have accounts, ensure root-accounts is expanded
+  if (accountsStore.accounts && accountsStore.accounts.length > 0) {
+    if (!expandedNodes.value.includes('root-accounts')) {
+      expandedNodes.value = [...expandedNodes.value, 'root-accounts']
+      hasChanges = true
+    }
+  }
+  
+  // For each account that has device groups, ensure the groups container is expanded
+  if (deviceGroupsStore.groups && deviceGroupsStore.groups.length > 0) {
+    const accountsWithGroups = new Set()
+    deviceGroupsStore.groups.forEach(group => {
+      if (group.accountId) {
+        accountsWithGroups.add(group.accountId)
+      }
+    })
+    
+    accountsWithGroups.forEach(accountId => {
+      const accountNodeId = `account-${accountId}`
+      const groupsNodeId = `account-${accountId}-groups`
+      
+      // If the account node is expanded, also expand its groups container
+      if (expandedNodes.value.includes(accountNodeId)) {
+        if (!expandedNodes.value.includes(groupsNodeId)) {
+          expandedNodes.value = [...expandedNodes.value, groupsNodeId]
+          hasChanges = true
+        }
+      }
+    })
+  }
+  
+  // If we made changes, save the updated state
+  if (hasChanges) {
+    await nextTick() // Ensure DOM updates
+    saveTreeState(selectedNode, expandedNodes)
+  }
+}
 
 onBeforeUnmount(() => {
   deviceStatusesStore.stopStream()

@@ -17,7 +17,7 @@ defineEmits(['click'])
     <template v-slot:activator="{ props }">
       <button 
         type="button" 
-        @click="$emit('click', item)" 
+        @click.stop="$emit('click', item)" 
         :class="['anti-btn', { 'disabled-btn': disabled }, $attrs.class]"
         v-bind="props"
         :disabled="disabled"

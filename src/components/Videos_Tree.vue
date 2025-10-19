@@ -255,12 +255,12 @@ const reloadAccountVideos = async (accountId) => {
   unmarkNodeLoaded(nodeId)
   await nextTick()
 
-  if (!openedNodes.value.includes(nodeId)) {
-    openedNodes.value = [...openedNodes.value, nodeId]
-  } else {
-    openedNodes.value = openedNodes.value.filter(id => id !== nodeId)
-    await nextTick()
-    openedNodes.value = [...openedNodes.value, nodeId]
+  // Force reload the children by calling loadChildren directly
+  // This ensures the tree data is refreshed
+  try {
+    await loadChildren({ id: nodeId, accountId: accountId })
+  } catch (error) {
+    alertStore.error('Не удалось обновить страницу: ' + (error.message || error))
   }
 }
 

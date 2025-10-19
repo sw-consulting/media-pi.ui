@@ -15,6 +15,7 @@ export const useDevicesStore = defineStore('devices', () => {
   const serviceResponse = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const lastLoaded = ref(null) // Track when data was last loaded
 
   const sanitizeServiceUnit = (unit) => {
     if (typeof unit !== 'string') {
@@ -35,7 +36,7 @@ export const useDevicesStore = defineStore('devices', () => {
     error.value = null
     try {
       const result = await fetchWrapper.post(`${baseUrl}/register`, {})
-      getAll()
+      getAll(true) // Force refresh after register
       return result
     } catch (err) {
       error.value = err
@@ -45,12 +46,21 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
-  async function getAll() {
+  async function getAll(forceRefresh = false) {
+    // Skip loading if data is fresh (loaded within last 30 seconds) and not forcing refresh
+    if (!forceRefresh && lastLoaded.value && devices.value.length > 0) {
+      const timeSinceLastLoad = Date.now() - lastLoaded.value
+      if (timeSinceLastLoad < 30000) { // 30 seconds cache
+        return devices.value
+      }
+    }
+
     loading.value = true
     error.value = null
     try {
       const result = await fetchWrapper.get(baseUrl)
       devices.value = result || []
+      lastLoaded.value = Date.now()
     } catch (err) {
       error.value = err
       devices.value = []
@@ -160,7 +170,7 @@ export const useDevicesStore = defineStore('devices', () => {
     error.value = null
     try {
       await fetchWrapper.put(`${baseUrl}/${id}`, params)
-      getAll()
+      getAll(true) // Force refresh after update
     } catch (err) {
       error.value = err
       throw err
@@ -174,7 +184,7 @@ export const useDevicesStore = defineStore('devices', () => {
     error.value = null
     try {
       await fetchWrapper.delete(`${baseUrl}/${id}`, {})
-      getAll()
+      getAll(true) // Force refresh after delete
     } catch (err) {
       error.value = err
       throw err
@@ -189,7 +199,7 @@ export const useDevicesStore = defineStore('devices', () => {
     try {
       const params = { Id: groupId ?? 0 }
       await fetchWrapper.patch(`${baseUrl}/assign-group/${id}`, params)
-      getAll()
+      getAll(true) // Force refresh after assignment
     } catch (err) {
       error.value = err
       throw err
@@ -204,7 +214,7 @@ export const useDevicesStore = defineStore('devices', () => {
     try {
       const params = { Id: accountId ?? 0 }
       await fetchWrapper.patch(`${baseUrl}/assign-account/${id}`, params)
-      getAll()
+      getAll(true) // Force refresh after assignment
     } catch (err) {
       error.value = err
       throw err

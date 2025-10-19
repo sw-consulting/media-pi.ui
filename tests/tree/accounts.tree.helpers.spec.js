@@ -49,7 +49,7 @@ describe('useAccountsTreeHelper Integration', () => {
       )
     })
 
-    it('should load devices for root-unassigned node', async () => {
+    it('should load devices for root-unassigned node only if not cached', async () => {
       const item = { id: 'root-unassigned', name: 'Unassigned Devices' }
 
       await loadChildrenHandler(item)
@@ -59,13 +59,13 @@ describe('useAccountsTreeHelper Integration', () => {
       expect(loadingNodes.value.has('root-unassigned')).toBe(false)
     })
 
-    it('should load devices and groups for account node', async () => {
+    it('should only load devices for account node if not cached', async () => {
       const item = { id: 'account-1', name: 'Account 1' }
 
       await loadChildrenHandler(item)
 
       expect(devicesStore.getAll).toHaveBeenCalled()
-      expect(deviceGroupsStore.getAll).toHaveBeenCalled()
+      expect(deviceGroupsStore.getAll).not.toHaveBeenCalled() // Groups already loaded on mount
       expect(loadedNodes.value.has('account-1')).toBe(true)
       expect(loadingNodes.value.has('account-1')).toBe(false)
     })

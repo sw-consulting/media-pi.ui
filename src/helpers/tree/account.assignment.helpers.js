@@ -153,11 +153,12 @@ export function createAccountAssignmentActions(
    * 5. Handles errors with user feedback
    * 
    * @param {Object} item - Tree item representing the device to assign
+   * @param {import('vue').Ref} [expandedNodes] - Optional reference to expanded nodes for preserving expansion state
    * 
    * @example
    * // Confirm assignment from UI
    * const handleConfirm = async () => {
-   *   await confirmAccountAssignment(selectedTreeItem)
+   *   await confirmAccountAssignment(selectedTreeItem, expandedNodes)
    * }
    * 
    * // Confirm button in inline editor
@@ -169,12 +170,14 @@ export function createAccountAssignmentActions(
    *   Подтвердить
    * </v-btn>
    */
-  const confirmAccountAssignment = async (item) => {
+  const confirmAccountAssignment = async (item, expandedNodes = null) => {
     const deviceId = getDeviceIdFromNodeId(item.id)
     if (!deviceId || !accountAssignmentState.value[deviceId]?.selectedAccountId) {
       alertStore.error('Не выбран лицевой счёт для назначения')
       return
     }
+    
+    const targetAccountId = accountAssignmentState.value[deviceId].selectedAccountId
     
     try {
       // Linear state change approach to prevent race conditions:
@@ -182,9 +185,23 @@ export function createAccountAssignmentActions(
       transitioningDevices.value.add(deviceId)
       
       // 2. Perform the API call to assign the account
-      await devicesStore.assignAccount(deviceId, accountAssignmentState.value[deviceId].selectedAccountId)
+      await devicesStore.assignAccount(deviceId, targetAccountId)
       
-      // 3. Clear assignment state to exit edit mode
+      // 3. Ensure target account node remains expanded after the device is added
+      if (expandedNodes && expandedNodes.value) {
+        const targetAccountNodeId = `account-${targetAccountId}`
+        const targetAccountUnassignedId = `account-${targetAccountId}-unassigned`
+        
+        // Ensure both the account node and its unassigned section remain expanded
+        if (!expandedNodes.value.includes(targetAccountNodeId)) {
+          expandedNodes.value = [...expandedNodes.value, targetAccountNodeId]
+        }
+        if (!expandedNodes.value.includes(targetAccountUnassignedId)) {
+          expandedNodes.value = [...expandedNodes.value, targetAccountUnassignedId]
+        }
+      }
+      
+      // 4. Clear assignment state to exit edit mode
       accountAssignmentState.value = {
         ...accountAssignmentState.value,
         [deviceId]: {
@@ -193,7 +210,7 @@ export function createAccountAssignmentActions(
         }
       }
       
-      // 4. Remove from transitioning state after successful assignment
+      // 5. Remove from transitioning state after successful assignment
       transitioningDevices.value.delete(deviceId)
      
     } catch (error) {
