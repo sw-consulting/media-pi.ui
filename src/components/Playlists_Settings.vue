@@ -140,12 +140,8 @@ const getButtonText = () => (isRegister() ? 'Создать' : 'Сохранит
 
 const filterVideoIds = (videoIds) => {
   return (videoIds || [])
-    .map(value => {
-      if (value === '' || value === null || value === undefined) return null
-      const numeric = Number.parseInt(value, 10)
-      return Number.isNaN(numeric) ? null : numeric
-    })
-    .filter(value => value !== null)
+    .map(value => Number.parseInt(value, 10))
+    .filter(Number.isFinite)
 }
 
 const onSubmit = async (values, submitContext = {}) => {

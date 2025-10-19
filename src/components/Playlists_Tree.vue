@@ -58,11 +58,7 @@ const accessibleAccounts = computed(() => {
     ? currentUser.accountIds
     : []
 
-  if (isManager(currentUser)) {
-    return allAccounts.filter(account => managedAccountIds.includes(account.id))
-  }
-
-  if (managedAccountIds.length > 0) {
+  if (isManager(currentUser) || managedAccountIds.length > 0) {
     return allAccounts.filter(account => managedAccountIds.includes(account.id))
   }
 
@@ -134,6 +130,10 @@ const unmarkNodeLoaded = (nodeId) => {
 const fetchPlaylistsForAccount = async (accountId, nodeId) => {
   if (!accountId) {
     return []
+  }
+
+  if (loadedNodes.value.has(nodeId)) {
+    return accountPlaylists[accountId] || []
   }
 
   if (loadingNodes[nodeId]) {
@@ -350,7 +350,8 @@ onMounted(async () => {
                   :item="item"
                   icon="fa-solid fa-plus"
                   tooltip-text="Создать плейлист"
-                  @click="() => openCreatePlaylist(item.accountId)"
+                  aria-label="Создать плейлист"
+                  @click="openCreatePlaylist(item.accountId)"
                 />
               </div>
               <div v-else-if="item.id.startsWith('playlist-') && canManagePlaylistsForAccount(item.playlist?.accountId)" class="tree-actions">
@@ -358,13 +359,15 @@ onMounted(async () => {
                   :item="item"
                   icon="fa-solid fa-pen"
                   tooltip-text="Редактировать плейлист"
-                  @click="() => openEditPlaylist(item)"
+                  aria-label="Редактировать плейлист"
+                  @click="openEditPlaylist(item)"
                 />
                 <ActionButton
                   :item="item"
                   icon="fa-solid fa-trash-can"
                   tooltip-text="Удалить плейлист"
-                  @click="() => deletePlaylist(item)"
+                  aria-label="Удалить плейлист"
+                  @click="deletePlaylist(item)"
                 />
               </div>
             </div>
