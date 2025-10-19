@@ -44,7 +44,7 @@ const playlistAccountId = ref(props.accountId ?? null)
 const initialLoading = ref(false)
 
 const schema = Yup.object().shape({
-  title: Yup.string().required('Необходимо указать название плейлиста'),
+  title: Yup.string().trim().min(1, 'Необходимо указать название плейлиста'),
   videoIds: Yup.array().of(
     Yup.mixed().test(
       'is-number-or-empty',
