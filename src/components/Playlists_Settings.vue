@@ -176,18 +176,15 @@ const onSubmit = async (values, submitContext = {}) => {
     emit('saved', { accountId })
   } catch (error) {
     const status = error?.status
-    if (status === 401 || status === 403) {
-      alertStore.error('Недостаточно прав для выполнения операции')
-    } else if (status === 404) {
-      alertStore.error('Плейлист или ресурсы не найдены')
-    } else if (status === 409) {
-      alertStore.error('Плейлист с таким названием уже существует')
-    } else if (status === 422) {
-      alertStore.error('Проверьте корректность введённых данных')
-    } else {
-      const message = error?.message || 'Не удалось сохранить плейлист'
-      alertStore.error(message)
+    const statusMessages = {
+      401: 'Недостаточно прав для выполнения операции',
+      403: 'Недостаточно прав для выполнения операции',
+      404: 'Плейлист или ресурсы не найдены',
+      409: 'Плейлист с таким названием уже существует',
+      422: 'Проверьте корректность введённых данных'
     }
+    const message = statusMessages[status] || error?.message || 'Не удалось сохранить плейлист'
+    alertStore.error(message)
   } finally {
     if (typeof setSubmitting === 'function') {
       setSubmitting(false)
