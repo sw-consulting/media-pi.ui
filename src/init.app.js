@@ -35,7 +35,10 @@ import {
   faCircleCheck,
   faTriangleExclamation,
   faRotateRight,
-  faBan
+  faBan,
+  faTags,
+  faFilm,
+  faCircleXmark
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -72,7 +75,10 @@ library.add(
   faCircleCheck,
   faTriangleExclamation,
   faRotateRight,
-  faBan
+  faBan,
+  faTags,
+  faFilm,
+  faCircleXmark
 )
 
 import 'vuetify/styles'

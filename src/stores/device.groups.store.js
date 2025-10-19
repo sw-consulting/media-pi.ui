@@ -13,6 +13,7 @@ export const useDeviceGroupsStore = defineStore('devicegroups', () => {
   const group = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const lastLoaded = ref(null) // Track when data was last loaded
 
   const getGroupById = (id) => {
     if (!groups.value || !Array.isArray(groups.value)) {
@@ -26,7 +27,7 @@ export const useDeviceGroupsStore = defineStore('devicegroups', () => {
     error.value = null
     try {
       await fetchWrapper.post(baseUrl, groupParam)
-      getAll()
+      getAll(true) // Force refresh after add
     } catch (err) {
       error.value = err
       throw err
@@ -35,12 +36,21 @@ export const useDeviceGroupsStore = defineStore('devicegroups', () => {
     }
   }
 
-  async function getAll() {
+  async function getAll(forceRefresh = false) {
+    // Skip loading if data is fresh (loaded within last 30 seconds) and not forcing refresh
+    if (!forceRefresh && lastLoaded.value && groups.value.length > 0) {
+      const timeSinceLastLoad = Date.now() - lastLoaded.value
+      if (timeSinceLastLoad < 30000) { // 30 seconds cache
+        return groups.value
+      }
+    }
+
     loading.value = true
     error.value = null
     try {
       const result = await fetchWrapper.get(baseUrl)
       groups.value = result || []
+      lastLoaded.value = Date.now()
     } catch (err) {
       error.value = err
       groups.value = []
@@ -70,7 +80,7 @@ export const useDeviceGroupsStore = defineStore('devicegroups', () => {
     error.value = null
     try {
       await fetchWrapper.put(`${baseUrl}/${id}`, params)
-      getAll()
+      getAll(true) // Force refresh after update
     } catch (err) {
       error.value = err
       throw err
@@ -84,7 +94,7 @@ export const useDeviceGroupsStore = defineStore('devicegroups', () => {
     error.value = null
     try {
       await fetchWrapper.delete(`${baseUrl}/${id}`, {})
-      getAll()
+      getAll(true) // Force refresh after delete
     } catch (err) {
       error.value = err
       throw err

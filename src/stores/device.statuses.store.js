@@ -1,5 +1,6 @@
 // Copyright (c) 2025 sw.consulting
 // This file is a part of Media Pi  frontend application
+/* global process */
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -132,7 +133,10 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
               }
             } catch (err) {
               error.value = err instanceof Error ? err : new Error(String(err))
-              if (enableLog) console.log('[device.statuses.store] SSE error:', { line: line, error: error.value })
+              const isTest = typeof process !== 'undefined' && process.env && (process.env.VITEST || process.env.VITEST_WORKER_ID)
+              if (enableLog && !isTest) {
+                console.log('[device.statuses.store] SSE error:', { line: line, error: error.value })
+              }
             }
           }
         }
@@ -141,7 +145,10 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
       // Ignore AbortError triggered by stopStream()
       if (err?.name !== 'AbortError' && !controller.signal.aborted) {
         error.value = err instanceof Error ? err : new Error(String(err))
-        console.error('SSE stream error:', err)
+        const isTest = typeof process !== 'undefined' && process.env && (process.env.VITEST || process.env.VITEST_WORKER_ID)
+        if (!isTest) {
+          console.error('SSE stream error:', err)
+        }
         // Implement retry logic here if needed
       }
     } finally {

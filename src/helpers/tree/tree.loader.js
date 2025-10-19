@@ -93,24 +93,27 @@ export const createLoadChildrenHandler = (
     try {
       // Load data based on node type
       if (nodeId === 'root-unassigned') {
-        // Load all devices to populate unassigned devices section
+        // Load devices if not already cached for unassigned devices section
         // This ensures we have the latest device data and can filter unassigned ones
-        await devicesStore.getAll()
+        if (!devicesStore.devices || devicesStore.devices.length === 0) {
+          await devicesStore.getAll()
+        }
         loadedNodes.value.add(nodeId)
         
       } else if (nodeId.includes('-groups')) {
-        // Load device groups for the groups container node
-        // This populates the "Device Groups" section under an account
-        await deviceGroupsStore.getAll()
+        // Device groups container node - only load groups if not already loaded
+        // Since groups are typically loaded once on component mount, avoid redundant calls
+        if (!deviceGroupsStore.groups || deviceGroupsStore.groups.length === 0) {
+          await deviceGroupsStore.getAll()
+        }
         loadedNodes.value.add(nodeId)
         
       } else if (nodeId.startsWith('account-')) {
-        // Load both devices and groups for a specific account
+        // Account node - only load devices if not already cached
         // This ensures the account node has all its child data available
-        await Promise.all([
-          devicesStore.getAll(),      // Load devices to show account devices
-          deviceGroupsStore.getAll()  // Load groups to show account groups
-        ])
+        if (!devicesStore.devices || devicesStore.devices.length === 0) {
+          await devicesStore.getAll()
+        }
         loadedNodes.value.add(nodeId)
       }
       

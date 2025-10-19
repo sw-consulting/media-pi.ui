@@ -29,6 +29,16 @@ import { ref } from 'vue'
 import AccountsTree from '@/components/Accounts_Tree.vue'
 import { resolveAll } from './helpers/test-utils'
 
+// Helper function to create a complete authStore mock
+const createAuthStoreMock = (overrides = {}) => ({
+  isAdministrator: false,
+  isManager: false,
+  isEngineer: false,
+  getAccountsTreeState: { selectedNode: null, expandedNodes: [] },
+  saveAccountsTreeState: vi.fn(),
+  ...overrides
+})
+
 let authStore
 const accountsStore = {
   accounts: [],
@@ -132,7 +142,7 @@ describe('Accounts_Tree.vue', () => {
   })
 
   it('renders both roots for administrator', async () => {
-    authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+    authStore = createAuthStoreMock({ isAdministrator: true })
     accountsStore.accounts = [
       { id: 1, name: 'Account 1' }
     ]
@@ -153,7 +163,7 @@ describe('Accounts_Tree.vue', () => {
   })
 
   it('shows only accounts for manager', async () => {
-    authStore = { isAdministrator: false, isManager: true, isEngineer: false }
+    authStore = createAuthStoreMock({ isManager: true })
     accountsStore.accounts = [
       { id: 1, name: 'Account 1' }
     ]
@@ -170,7 +180,7 @@ describe('Accounts_Tree.vue', () => {
   })
 
   it('shows only unassigned devices for engineer', async () => {
-    authStore = { isAdministrator: false, isManager: false, isEngineer: true }
+    authStore = createAuthStoreMock({ isEngineer: true })
     devicesStore.devices = [
       { id: 1, name: 'Device A', accountId: 0 }
     ]
@@ -184,7 +194,7 @@ describe('Accounts_Tree.vue', () => {
 
   describe('Action Buttons', () => {
     beforeEach(() => {
-      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      authStore = createAuthStoreMock({ isAdministrator: true })
       accountsStore.accounts = [
         { id: 1, name: 'Account 1' },
         { id: 2, name: 'Account 2' }
@@ -295,7 +305,7 @@ describe('Accounts_Tree.vue', () => {
 
     it('only shows create functionality for administrators and managers', async () => {
       // Test for manager role
-      authStore = { isAdministrator: false, isManager: true, isEngineer: false }
+      authStore = createAuthStoreMock({ isManager: true })
       
       const wrapper = mountTree()
       await resolveAll()
@@ -304,7 +314,7 @@ describe('Accounts_Tree.vue', () => {
       expect(typeof wrapper.vm.createAccount).toBe('function')
       
       // Test for engineer role (should not see accounts tree at all)
-      authStore = { isAdministrator: false, isManager: false, isEngineer: true }
+      authStore = createAuthStoreMock({ isEngineer: true })
       
       const wrapper2 = mountTree()
       await resolveAll()
@@ -474,7 +484,7 @@ describe('Accounts_Tree.vue', () => {
 
   describe('Device status integration', () => {
     it('starts device status stream on mount', async () => {
-      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      authStore = createAuthStoreMock({ isAdministrator: true })
       mountTree()
       await resolveAll()
       expect(deviceStatusesStore.getAll).toHaveBeenCalled()
@@ -482,7 +492,7 @@ describe('Accounts_Tree.vue', () => {
     })
 
     it('returns correct status icons for devices', async () => {
-      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      authStore = createAuthStoreMock({ isAdministrator: true })
       devicesStore.devices = [
         { id: 1, name: 'Device A', accountId: 0, deviceStatus: { isOnline: true } },
         { id: 2, name: 'Device B', accountId: 0, deviceStatus: { isOnline: false } }
@@ -499,7 +509,7 @@ describe('Accounts_Tree.vue', () => {
     })
 
     it('updates status icon when store changes', async () => {
-      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      authStore = createAuthStoreMock({ isAdministrator: true })
       devicesStore.devices = [
         { id: 1, name: 'Device A', accountId: 0, deviceStatus: { isOnline: false } }
       ]
@@ -518,7 +528,7 @@ describe('Accounts_Tree.vue', () => {
 
   describe('Device group status aggregation', () => {
     beforeEach(() => {
-      authStore = { isAdministrator: true, isManager: false, isEngineer: false }
+      authStore = createAuthStoreMock({ isAdministrator: true })
       accountsStore.accounts = [ { id: 1, name: 'Account 1' } ]
       deviceGroupsStore.groups = [ { id: 10, name: 'Group 10', accountId: 1 } ]
     })

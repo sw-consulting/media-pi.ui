@@ -24,7 +24,7 @@
  * - Can assign devices to accounts
  * - Cannot access account-specific operations
  */
-import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAccountsCaption } from '@/helpers/accounts.caption.js'
@@ -58,6 +58,7 @@ import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpe
 import ActionButton from '@/components/ActionButton.vue'
 import DeviceStatusDialog from '@/components/Device_Status_Dialog.vue'
 import InlineAssignment from '@/components/InlineAssignment.vue'
+import '@/assets/tree.common.css'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -121,19 +122,66 @@ const {
 const { restoreTreeState, saveTreeState } = createStateManager(authStore)
 
 // Action handlers
-const { createAccount, editAccount, deleteAccount } = createAccountActions(
+const { createAccount, editAccount, deleteAccount: _deleteAccount } = createAccountActions(
   router, 
   alertStore, 
   accountsStore, 
   confirmDelete
 )
 
-const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGroupActions(
+const { createDeviceGroup: _createDeviceGroup, editDeviceGroup, deleteDeviceGroup: _deleteDeviceGroup } = createDeviceGroupActions(
   router,
   alertStore,
   deviceGroupsStore,
   confirmDelete
 )
+
+// Wrap deletion functions to preserve parent node expansion
+const deleteAccount = async (item) => {
+  // Store the parent container node that should remain expanded
+  if (expandedNodes.value && !expandedNodes.value.includes('root-accounts')) {
+    expandedNodes.value = [...expandedNodes.value, 'root-accounts']
+  }
+  await _deleteAccount(item)
+}
+
+const deleteDeviceGroup = async (item) => {
+  // Extract account ID to preserve the groups container expansion
+  const accountMatch = item.id?.toString().match(/(\d+)/)
+  if (accountMatch) {
+    const accountId = accountMatch[1]
+    const accountNodeId = `account-${accountId}`
+    const groupsNodeId = `account-${accountId}-groups`
+    
+    const nodesToExpand = [accountNodeId, groupsNodeId]
+    nodesToExpand.forEach(nodeId => {
+      if (expandedNodes.value && !expandedNodes.value.includes(nodeId)) {
+        expandedNodes.value = [...expandedNodes.value, nodeId]
+      }
+    })
+  }
+  await _deleteDeviceGroup(item)
+}
+
+// Wrap creation functions to preserve parent node expansion
+const createDeviceGroup = (item) => {
+  // Extract account ID from groups container node and ensure parent nodes are expanded
+  const match = item.id.match(/account-(\d+)-groups/)
+  if (match) {
+    const accountId = match[1]
+    const accountNodeId = `account-${accountId}`
+    const groupsNodeId = `account-${accountId}-groups`
+    
+    const nodesToExpand = [accountNodeId, groupsNodeId]
+    nodesToExpand.forEach(nodeId => {
+      if (!expandedNodes.value.includes(nodeId)) {
+        expandedNodes.value = [...expandedNodes.value, nodeId]
+      }
+    })
+    // The watch function will automatically save the state when expandedNodes changes
+  }
+  _createDeviceGroup(item)
+}
 /**
  * Device creation is intentionally disabled in this component.
  * Devices are not created manually by users through the UI; instead, they self-register
@@ -143,13 +191,22 @@ const { createDeviceGroup, editDeviceGroup, deleteDeviceGroup } = createDeviceGr
  * The self-registration logic is handled by the backend/device onboarding workflow.
  * For more details, see the device provisioning documentation or backend implementation.
  */
-const { editDevice, deleteDevice, unassignFromGroup, unassignFromAccount } = createDeviceActions(
+const { editDevice, deleteDevice, unassignFromGroup: _unassignFromGroup, unassignFromAccount: _unassignFromAccount } = createDeviceActions(
   router,
   alertStore,
   devicesStore,
   confirmDelete,
   transitioningDevices 
 )
+
+// Wrap device actions to pass expandedNodes for preserving tree state
+const unassignFromGroup = async (item) => {
+  await _unassignFromGroup(item, expandedNodes)
+}
+
+const unassignFromAccount = async (item) => {
+  await _unassignFromAccount(item, expandedNodes)
+}
 
 // Loading handler
 const loadChildren = createLoadChildrenHandler(
@@ -169,7 +226,7 @@ watch([selectedNode, expandedNodes], () => {
 const {
   startAccountAssignment,
   cancelAccountAssignment,
-  confirmAccountAssignment,
+  confirmAccountAssignment: _confirmAccountAssignment,
   updateSelectedAccount
 } = createAccountAssignmentActions(
   accountAssignmentState,
@@ -178,11 +235,16 @@ const {
   alertStore
 )
 
+// Wrap assignment functions to pass expandedNodes for preserving tree state
+const confirmAccountAssignment = async (item) => {
+  await _confirmAccountAssignment(item, expandedNodes)
+}
+
 // Device group assignment actions
 const {
   startDeviceGroupAssignment,
   cancelDeviceGroupAssignment,
-  confirmDeviceGroupAssignment,
+  confirmDeviceGroupAssignment: _confirmDeviceGroupAssignment,
   updateSelectedDeviceGroup
 } = createDeviceGroupAssignmentActions(
   deviceGroupAssignmentState,
@@ -190,6 +252,11 @@ const {
   devicesStore,
   alertStore
 )
+
+// Wrap assignment functions to pass expandedNodes for preserving tree state
+const confirmDeviceGroupAssignment = async (item) => {
+  await _confirmDeviceGroupAssignment(item, expandedNodes)
+}
 
 // Available accounts for assignment (only accounts user can manage)
 const availableAccounts = computed(() => {
@@ -271,7 +338,7 @@ const groupStatusById = computed(() => {
   groups.forEach(g => {
     const groupDevices = devices.filter(d => d.deviceGroupId === g.id)
     if (groupDevices.length === 0) {
-      result.set(g.id, { allOnline: false, icon: 'fa-solid fa-triangle-exclamation', class: 'text-danger' })
+      result.set(g.id, { allOnline: false, icon: 'fa-solid fa-circle-xmark', class: 'text-none' })
       return
     }
     const allOnline = groupDevices.every(d => (statusesById.value.get(d.id)?.isOnline) || d.deviceStatus?.isOnline === true)
@@ -307,12 +374,57 @@ onMounted(async () => {
     deviceStatusesStore.startStream()
     // Restore tree state after data is loaded, with loadChildren support
     await restoreTreeState(selectedNode, expandedNodes, loadChildren)
+    
+    // Post-restoration logic: ensure logical parent-child expansion consistency
+    await ensureLogicalExpansion()
   } catch (error) {
     alertStore.error('Не удалось загрузить данные: ' + (error.message || error))
   } finally {
     loading.value = false
   }
 })
+
+// Function to ensure logical expansion of parent nodes when they have content
+const ensureLogicalExpansion = async () => {
+  let hasChanges = false
+  
+  // If we have accounts, ensure root-accounts is expanded
+  if (accountsStore.accounts && accountsStore.accounts.length > 0) {
+    if (!expandedNodes.value.includes('root-accounts')) {
+      expandedNodes.value = [...expandedNodes.value, 'root-accounts']
+      hasChanges = true
+    }
+  }
+  
+  // For each account that has device groups, ensure the groups container is expanded
+  if (deviceGroupsStore.groups && deviceGroupsStore.groups.length > 0) {
+    const accountsWithGroups = new Set()
+    deviceGroupsStore.groups.forEach(group => {
+      if (group.accountId) {
+        accountsWithGroups.add(group.accountId)
+      }
+    })
+    
+    accountsWithGroups.forEach(accountId => {
+      const accountNodeId = `account-${accountId}`
+      const groupsNodeId = `account-${accountId}-groups`
+      
+      // If the account node is expanded, also expand its groups container
+      if (expandedNodes.value.includes(accountNodeId)) {
+        if (!expandedNodes.value.includes(groupsNodeId)) {
+          expandedNodes.value = [...expandedNodes.value, groupsNodeId]
+          hasChanges = true
+        }
+      }
+    })
+  }
+  
+  // If we made changes, save the updated state
+  if (hasChanges) {
+    await nextTick() // Ensure DOM updates
+    saveTreeState(selectedNode, expandedNodes)
+  }
+}
 
 onBeforeUnmount(() => {
   deviceStatusesStore.stopStream()
@@ -321,7 +433,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="settings table-3">
+  <div class="settings table-3 tree-container">
     <h1 class="primary-heading">{{ accountsCaption || 'Информация не доступна' }}</h1>
     <hr class="hr" />
 
@@ -506,85 +618,3 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.control-panel {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-left: 8px;
-}
-
-.tree-actions {
-  display: flex;
-  gap: 2px;
-  padding: 2px 6px;
-  background: linear-gradient(135deg, #75b2fd 0%, #bdddfd 100%);
-  border: 1px solid #153754;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  min-height: 24px;
-  align-items: center;
-}
-
-.tree-actions:hover {
-  background: linear-gradient(135deg, #75b2fd 0%, #bdddfd 100%);
-  border: 2px solid #1976d2;
-  box-shadow: 0 2px 6px rgba(25, 118, 210, 0.15);
-  transform: translateY(-1px);
-  transition: all 0.2s ease;
-}
-
-.tree-actions .anti-btn {
-  padding: 2px 4px;
-  margin: 0;
-  font-size: 11px;
-  min-width: auto;
-  height: 18px;
-  background: transparent;
-  border-radius: 3px;
-  color: #495057;
-  transition: all 0.15s ease;
-}
-
-.tree-actions .anti-btn:hover {
-  background-color: rgba(25, 118, 210, 0.1);
-  color: #1976d2;
-  transform: scale(1.1);
-}
-
-.tree-actions .anti-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.node-icon {
-  color: #4a647b;
-  transition: color 0.2s ease;
-}
-
-:deep(.v-treeview-item) {
-  padding-right: 8px !important;
-}
-
-:deep(.v-treeview-item:hover) {
-  border: 2px solid #1976d2;
-  color:  #104981;
-  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
-  border-radius: 6px;
-  background: none !important;
-  transition: box-shadow 0.2s, border-color 0.2s;
-}
-
-:deep(.v-treeview-item:hover .node-icon) {
-  color: #1976d2;
-}
-
-:deep(.v-treeview-item:hover .tree-actions) {
-  background: linear-gradient(135deg, #a3caf9 0%, #e9f3fc 100%);
-  border: 2px solid #1976d2;
-  box-shadow: 0 3px 8px rgba(25, 118, 210, 0.2);
-}
-
-</style>
-

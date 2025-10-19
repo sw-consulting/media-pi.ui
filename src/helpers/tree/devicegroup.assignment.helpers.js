@@ -163,11 +163,12 @@ export function createDeviceGroupAssignmentActions(
    * Note: This operation preserves the device's account assignment while adding group organization.
    * 
    * @param {Object} item - Tree item representing the device to assign to a group
+   * @param {import('vue').Ref} [expandedNodes] - Optional reference to expanded nodes for preserving expansion state
    * 
    * @example
    * // Confirm group assignment from UI
    * const handleConfirm = async () => {
-   *   await confirmDeviceGroupAssignment(selectedTreeItem)
+   *   await confirmDeviceGroupAssignment(selectedTreeItem, expandedNodes)
    * }
    * 
    * // Confirm button in inline editor
@@ -179,12 +180,18 @@ export function createDeviceGroupAssignmentActions(
    *   Подтвердить
    * </v-btn>
    */
-  const confirmDeviceGroupAssignment = async (item) => {
+  const confirmDeviceGroupAssignment = async (item, expandedNodes = null) => {
     const deviceId = getDeviceIdFromNodeId(item.id)
     if (!deviceId || !deviceGroupAssignmentState.value[deviceId]?.selectedGroupId) {
       alertStore.error('Не выбрана группа для назначения')
       return
     }
+    
+    const targetGroupId = deviceGroupAssignmentState.value[deviceId].selectedGroupId
+    
+    // Extract account ID from the device node to identify the account context
+    const accountMatch = item.id.match(/account-(\d+)/)
+    const accountId = accountMatch ? parseInt(accountMatch[1], 10) : null
     
     try {
       // Linear state change approach to prevent race conditions:
@@ -192,9 +199,25 @@ export function createDeviceGroupAssignmentActions(
       transitioningDevices.value.add(deviceId)
       
       // 2. Perform the API call to assign the device group
-      await devicesStore.assignGroup(deviceId, deviceGroupAssignmentState.value[deviceId].selectedGroupId)
+      await devicesStore.assignGroup(deviceId, targetGroupId)
       
-      // 3. Clear assignment state to exit edit mode
+      // 3. Ensure target group node remains expanded after the device is added
+      if (expandedNodes && expandedNodes.value && accountId) {
+        const accountNodeId = `account-${accountId}`
+        const groupsNodeId = `account-${accountId}-groups`
+        const targetGroupNodeId = `group-${targetGroupId}`
+        
+        // Ensure the account, groups container, and target group remain expanded
+        const nodesToExpand = [accountNodeId, groupsNodeId, targetGroupNodeId]
+        
+        nodesToExpand.forEach(nodeId => {
+          if (!expandedNodes.value.includes(nodeId)) {
+            expandedNodes.value = [...expandedNodes.value, nodeId]
+          }
+        })
+      }
+      
+      // 4. Clear assignment state to exit edit mode
       deviceGroupAssignmentState.value = {
         ...deviceGroupAssignmentState.value,
         [deviceId]: {
@@ -203,7 +226,7 @@ export function createDeviceGroupAssignmentActions(
         }
       }
       
-      // 4. Remove from transitioning state after successful assignment
+      // 5. Remove from transitioning state after successful assignment
       transitioningDevices.value.delete(deviceId)
      
     } catch (error) {

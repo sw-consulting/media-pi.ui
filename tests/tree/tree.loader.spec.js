@@ -32,7 +32,7 @@ describe('Tree Loader Functions', () => {
       )
     })
 
-    it('should load devices for root-unassigned node', async () => {
+    it('should load devices for root-unassigned node only if not cached', async () => {
       const item = { id: 'root-unassigned', name: 'Unassigned Devices' }
 
       await loadChildrenHandler(item)
@@ -42,13 +42,38 @@ describe('Tree Loader Functions', () => {
       expect(loadingNodes.value.has('root-unassigned')).toBe(false)
     })
 
-    it('should load devices and groups for account node', async () => {
+    it('should only load devices for account node if not cached', async () => {
       const item = { id: 'account-1', name: 'Account 1' }
 
       await loadChildrenHandler(item)
 
       expect(devicesStore.getAll).toHaveBeenCalled()
-      expect(deviceGroupsStore.getAll).toHaveBeenCalled()
+      expect(deviceGroupsStore.getAll).not.toHaveBeenCalled() // Groups already loaded on mount
+      expect(loadedNodes.value.has('account-1')).toBe(true)
+      expect(loadingNodes.value.has('account-1')).toBe(false)
+    })
+
+    it('should skip loading devices if already cached for root-unassigned', async () => {
+      const item = { id: 'root-unassigned', name: 'Unassigned Devices' }
+      // Mock that devices are already loaded
+      devicesStore.devices = [{ id: 1, name: 'Device 1' }]
+
+      await loadChildrenHandler(item)
+
+      expect(devicesStore.getAll).not.toHaveBeenCalled() // Should skip loading
+      expect(loadedNodes.value.has('root-unassigned')).toBe(true)
+      expect(loadingNodes.value.has('root-unassigned')).toBe(false)
+    })
+
+    it('should skip loading devices if already cached for account node', async () => {
+      const item = { id: 'account-1', name: 'Account 1' }
+      // Mock that devices are already loaded
+      devicesStore.devices = [{ id: 1, name: 'Device 1' }]
+
+      await loadChildrenHandler(item)
+
+      expect(devicesStore.getAll).not.toHaveBeenCalled() // Should skip loading
+      expect(deviceGroupsStore.getAll).not.toHaveBeenCalled()
       expect(loadedNodes.value.has('account-1')).toBe(true)
       expect(loadingNodes.value.has('account-1')).toBe(false)
     })
@@ -71,13 +96,26 @@ describe('Tree Loader Functions', () => {
       expect(devicesStore.getAll).not.toHaveBeenCalled()
     })
 
-    it('should load device groups for device group container node', async () => {
+    it('should load device groups for device group container node only if not cached', async () => {
       const item = { id: 'account-1-groups', name: 'Device Groups' }
 
       await loadChildrenHandler(item)
 
       expect(deviceGroupsStore.getAll).toHaveBeenCalled()
       expect(devicesStore.getAll).not.toHaveBeenCalled() // Only groups needed
+      expect(loadedNodes.value.has('account-1-groups')).toBe(true)
+      expect(loadingNodes.value.has('account-1-groups')).toBe(false)
+    })
+
+    it('should skip loading device groups if already cached', async () => {
+      const item = { id: 'account-1-groups', name: 'Device Groups' }
+      // Mock that groups are already loaded
+      deviceGroupsStore.groups = [{ id: 1, name: 'Group 1' }]
+
+      await loadChildrenHandler(item)
+
+      expect(deviceGroupsStore.getAll).not.toHaveBeenCalled() // Should skip loading
+      expect(devicesStore.getAll).not.toHaveBeenCalled()
       expect(loadedNodes.value.has('account-1-groups')).toBe(true)
       expect(loadingNodes.value.has('account-1-groups')).toBe(false)
     })

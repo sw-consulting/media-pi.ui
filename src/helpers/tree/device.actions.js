@@ -204,25 +204,30 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
    * the async operation.
    * 
    * @param {Object} item - Tree node representing the device in a group context
+   * @param {import('vue').Ref} [expandedNodes] - Optional reference to expanded nodes for preserving expansion state
    * 
    * @example
    * // Unassign from group context menu
    * const groupDeviceMenu = [
-   *   { title: 'Исключить из группы', action: () => unassignFromGroup(selectedNode) }
+   *   { title: 'Исключить из группы', action: () => unassignFromGroup(selectedNode, expandedNodes) }
    * ]
    * 
    * // Programmatic unassignment
    * const moveDeviceToAccountUnassigned = async (deviceNode) => {
-   *   await unassignFromGroup(deviceNode)
+   *   await unassignFromGroup(deviceNode, expandedNodes)
    * }
    */
-  const unassignFromGroup = async (item) => {
+  const unassignFromGroup = async (item, expandedNodes = null) => {
     try {
       const deviceId = getDeviceIdFromNodeId(item?.id)
       if (!deviceId) {
         alertStore.error('Не удалось определить ID устройства для исключения из группы')
         return
       }
+
+      // Extract account ID from the device node to identify the target location
+      const accountMatch = item.id.match(/account-(\d+)/)
+      const accountId = accountMatch ? parseInt(accountMatch[1], 10) : null
 
       // Linear state change: mark device as transitioning to prevent duplication
       if (transitioningDevices) {
@@ -232,6 +237,21 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
       try {
         // Assign to group 0 (unassigned) while keeping account assignment
         await devicesStore.assignGroup(deviceId, 0)
+        
+        // Ensure target unassigned section remains expanded after the device is moved
+        if (expandedNodes && expandedNodes.value && accountId) {
+          const accountNodeId = `account-${accountId}`
+          const unassignedNodeId = `account-${accountId}-unassigned`
+          
+          // Ensure both the account node and its unassigned section remain expanded
+          const nodesToExpand = [accountNodeId, unassignedNodeId]
+          
+          nodesToExpand.forEach(nodeId => {
+            if (!expandedNodes.value.includes(nodeId)) {
+              expandedNodes.value = [...expandedNodes.value, nodeId]
+            }
+          })
+        }
       } finally {
         // Remove from transitioning state after operation (success or failure)
         if (transitioningDevices) {
@@ -254,19 +274,20 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
    * in a group without being in an account.
    * 
    * @param {Object} item - Tree node representing the device in an account context
+   * @param {import('vue').Ref} [expandedNodes] - Optional reference to expanded nodes for preserving expansion state
    * 
    * @example
    * // Unassign from account context menu
    * const accountDeviceMenu = [
-   *   { title: 'Исключить из лицевого счёта', action: () => unassignFromAccount(selectedNode) }
+   *   { title: 'Исключить из лицевого счёта', action: () => unassignFromAccount(selectedNode, expandedNodes) }
    * ]
    * 
    * // Return device to global pool
    * const returnDeviceToGlobalPool = async (deviceNode) => {
-   *   await unassignFromAccount(deviceNode)
+   *   await unassignFromAccount(deviceNode, expandedNodes)
    * }
    */
-  const unassignFromAccount = async (item) => {
+  const unassignFromAccount = async (item, expandedNodes = null) => {
     try {
       const deviceId = getDeviceIdFromNodeId(item?.id)
 
@@ -283,6 +304,15 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
       try {
         // Assign to account 0 (unassigned) which also removes group assignment
         await devicesStore.assignAccount(deviceId, 0)
+        
+        // Ensure root unassigned section remains expanded after the device is moved
+        if (expandedNodes && expandedNodes.value) {
+          const rootUnassignedNodeId = 'root-unassigned'
+          
+          if (!expandedNodes.value.includes(rootUnassignedNodeId)) {
+            expandedNodes.value = [...expandedNodes.value, rootUnassignedNodeId]
+          }
+        }
       } finally {
         // Remove from transitioning state after operation (success or failure)
         if (transitioningDevices) {

@@ -6,6 +6,7 @@ import { computed, watch, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
+import { useAlertStore } from '@/stores/alert.store.js'
 import ServicesList from '@/components/Services_List.vue'
 
 const props = defineProps({
@@ -67,8 +68,9 @@ async function refreshNow () {
     if (servicesListRef.value && servicesListRef.value.fetchServices) {
       await servicesListRef.value.fetchServices()
     }
-  } catch (err) {
-    console.error('Ошибка обновления статуса устройства:', err)
+  } catch {
+    const alert = useAlertStore()
+    alert.error('Не удалось обновить статус устройства')
   }
 }
 
@@ -175,6 +177,7 @@ watch(() => props.deviceId, () => {
 .value { color: #1f2937; }
 .text-success { color: #22c55e; }
 .text-danger { color: #ef4444; }
+.text-none { color: #595959; }
 
 .button-o-c {
   color: var(--button-secondary-bg);

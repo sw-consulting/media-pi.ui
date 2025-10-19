@@ -78,7 +78,7 @@ export const createStateManager = (authStore) => {
    * try {
    *   await restoreTreeState(selectedNode, expandedNodes, loadChildren)
    * } catch (error) {
-   *   console.warn('Failed to restore tree state:', error)
+   *   // Failed to restore tree state: handle or log via alert store if needed
    * }
    */
   const restoreTreeState = async (selectedNode, expandedNodes, loadChildren) => {

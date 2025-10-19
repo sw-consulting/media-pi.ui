@@ -57,7 +57,7 @@
  *   if (entityId !== null) {
  *     performAction(entityId)
  *   } else {
- *     console.warn(`Invalid ${entityType} node ID: ${treeNode.id}`)
+ *     // Invalid node ID found - handle appropriately
  *   }
  * }
  */
