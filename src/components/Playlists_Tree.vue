@@ -6,7 +6,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ActionButton from '@/components/ActionButton.vue'
-import PlaylistsSettings from '@/components/Playlists_Settings.vue'
+import { useRouter } from 'vue-router'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { usePlaylistsStore } from '@/stores/playlists.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
@@ -34,13 +34,7 @@ const loadedNodes = ref(new Set())
 const openedNodes = ref([])
 const selectedNode = ref([])
 
-const dialogState = reactive({
-  open: false,
-  register: true,
-  accountId: null,
-  playlistId: null,
-  key: 0
-})
+const router = useRouter()
 
 const accessibleAccounts = computed(() => {
   const currentUser = authStore.user
@@ -211,37 +205,14 @@ const loadAccounts = async () => {
 }
 
 const openCreatePlaylist = (accountId) => {
-  if (!canManagePlaylistsForAccount(accountId)) {
-    return
-  }
-  dialogState.register = true
-  dialogState.accountId = accountId
-  dialogState.playlistId = null
-  dialogState.key += 1
-  dialogState.open = true
+  if (!canManagePlaylistsForAccount(accountId)) return
+  router.push(`/playlist/create/${accountId}`)
 }
 
 const openEditPlaylist = (playlistNode) => {
   const playlist = playlistNode?.playlist
-  if (!playlist || !canManagePlaylistsForAccount(playlist.accountId)) {
-    return
-  }
-  dialogState.register = false
-  dialogState.accountId = playlist.accountId
-  dialogState.playlistId = playlist.id
-  dialogState.key += 1
-  dialogState.open = true
-}
-
-const closeDialog = () => {
-  dialogState.open = false
-}
-
-const handleSaved = async ({ accountId }) => {
-  dialogState.open = false
-  if (accountId) {
-    await reloadAccountPlaylists(accountId)
-  }
+  if (!playlist || !canManagePlaylistsForAccount(playlist.accountId)) return
+  router.push(`/playlist/edit/${playlist.id}`)
 }
 
 const deletePlaylist = async (playlistNode) => {
@@ -420,27 +391,6 @@ onMounted(async () => {
       </template>
     </v-alert>
 
-    <v-dialog v-model="dialogState.open" max-width="640">
-      <v-card>
-        <v-card-text>
-          <Suspense>
-            <PlaylistsSettings
-              :key="dialogState.key"
-              :register="dialogState.register"
-              :id="dialogState.playlistId ?? undefined"
-              :account-id="dialogState.accountId ?? undefined"
-              @saved="handleSaved"
-              @cancel="closeDialog"
-            />
-            <template #fallback>
-              <div class="text-center m-5">
-                <span class="spinner-border spinner-border-lg align-center"></span>
-                <div class="mt-2">Загрузка формы плейлиста...</div>
-              </div>
-            </template>
-          </Suspense>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+    <!-- Playlist settings are now displayed on a separate page -->
   </div>
 </template>
