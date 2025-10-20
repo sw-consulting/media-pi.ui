@@ -35,6 +35,14 @@ defineProps({
     type: String,
     default: 'Удалить элемент'
   },
+  moveUpTooltip: {
+    type: String,
+    default: 'Переместить вверх'
+  },
+  moveDownTooltip: {
+    type: String,
+    default: 'Переместить вниз'
+  },
   defaultValue: {
     type: [String, Number],
     default: ''
@@ -46,16 +54,20 @@ defineProps({
   hasError: {
     type: Boolean,
     default: false
+  },
+  ordered: {
+    type: Boolean,
+    default: false
   }
 })
 </script>
 
 <template>
-  <FieldArray :name="name" v-slot="{ fields, push, remove }">
+  <FieldArray :name="name" v-slot="{ fields, push, remove, move }">
     <div v-for="(field, idx) in fields" :key="field.key" class="form-group mb-2">
       <label v-if="idx === 0" class="label">{{ label }}:</label>
       <div v-else class="label"></div>
-      
+
       <div class="field-container">
         <!-- Plus button positioned to the left for first option -->
         <ActionButton 
@@ -78,7 +90,27 @@ defineProps({
             </option>
           </template>
         </Field>
-        
+
+        <template v-if="ordered">
+          <ActionButton
+            icon="fa-solid fa-chevron-up"
+            :item="idx"
+            @click="move(idx, idx - 1)"
+            :disabled="idx === 0"
+            class="button-o-c field-container-move field-container-move-up"
+            :tooltip-text="moveUpTooltip"
+          />
+
+          <ActionButton
+            icon="fa-solid fa-chevron-down"
+            :item="idx"
+            @click="move(idx, idx + 1)"
+            :disabled="idx === fields.length - 1"
+            class="button-o-c field-container-move field-container-move-down"
+            :tooltip-text="moveDownTooltip"
+          />
+        </template>
+
         <!-- Minus button always after select -->
         <ActionButton
           icon="fa-solid fa-minus"
@@ -151,6 +183,12 @@ defineProps({
 }
 
 .button-o-c.field-container-plus:focus {
+  outline: none;
+  border: none;
+  box-shadow: none;
+}
+
+.button-o-c.field-container-move:focus {
   outline: none;
   border: none;
   box-shadow: none;
