@@ -5,6 +5,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
+// router mock will be provided to components that call useRouter()
+let routerMock = { push: vi.fn() }
+vi.mock('vue-router', () => ({
+  useRouter: () => routerMock,
+  useRoute: () => ({ params: {} })
+}))
+
 import PlaylistsTree from '@/components/Playlists_Tree.vue'
 
 let currentUser
@@ -121,7 +128,6 @@ describe('Playlists_Tree.vue', () => {
       { id: 1, name: 'Account 1' },
       { id: 2, name: 'Account 2' }
     ]
-
     const wrapper = await mountTree()
     const items = wrapper.vm.treeItems
     expect(items[0].children).toHaveLength(2)
@@ -129,11 +135,13 @@ describe('Playlists_Tree.vue', () => {
 
   it('opens dialog in create mode for managed account', async () => {
     accountsStore.accounts.value = [{ id: 1, name: 'Account 1' }]
-    const wrapper = await mountTree()
+    routerMock.push.mockClear()
+    await mountTree()
 
-    wrapper.vm.openCreatePlaylist(1)
-    expect(wrapper.vm.dialogState.open).toBe(true)
-    expect(wrapper.vm.dialogState.register).toBe(true)
+  // call openCreatePlaylist directly with account id
+  const wrapper = await mountTree()
+  wrapper.vm.openCreatePlaylist(1)
+    expect(routerMock.push).toHaveBeenCalledWith('/playlist/create/1')
   })
 
   it('deletes playlist after confirmation', async () => {
@@ -148,9 +156,10 @@ describe('Playlists_Tree.vue', () => {
   it('reloads account playlists after save', async () => {
     accountsStore.accounts.value = [{ id: 1, name: 'Account 1' }]
     playlistsStore.getAllByAccount.mockResolvedValueOnce([])
-    const wrapper = await mountTree()
-
-    await wrapper.vm.handleSaved({ accountId: 1 })
-    expect(playlistsStore.getAllByAccount).toHaveBeenCalledWith(1)
+    await mountTree()
+    routerMock.push.mockClear()
+  const wrapper = await mountTree()
+  await wrapper.vm.reloadAccountPlaylists(1)
+  expect(playlistsStore.getAllByAccount).toHaveBeenCalledWith(1)
   })
 })

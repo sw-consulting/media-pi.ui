@@ -194,7 +194,7 @@ const cancel = () => {
 </script>
 
 <template>
-  <div class="settings form-2 form-compact">
+  <div class="settings form-3 form-compact">
     <h1 class="primary-heading">{{ getTitle() }}</h1>
     <hr class="hr" />
 
@@ -219,10 +219,10 @@ const cancel = () => {
         <div v-if="errors.title" class="alert alert-danger mt-2 mb-0">{{ errors.title }}</div>
       </div>
 
-      <div class="form-group">
+      <div>
         <FieldArrayWithButtons
           name="videoIds"
-          label="Видео"
+          label="Видеофайлы в плейлисте:"
           :options="videoOptions"
           placeholder="Выберите видеофайл"
           :has-error="!!errors.videoIds"
