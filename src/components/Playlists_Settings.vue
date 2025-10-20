@@ -226,6 +226,7 @@ const cancel = () => {
           :options="videoOptions"
           placeholder="Выберите видеофайл"
           :has-error="!!errors.videoIds"
+          ordered
         />
         <div v-if="errors.videoIds" class="alert alert-danger mt-2 mb-0">{{ errors.videoIds }}</div>
       </div>
