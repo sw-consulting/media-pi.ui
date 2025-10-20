@@ -41,7 +41,9 @@ import {
   faCircleXmark,
   faPowerOff,
   faRetweet,
-  faSpinner
+  faSpinner,
+  faChevronUp,
+  faChevronDown
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -86,7 +88,9 @@ library.add(
   faPowerOff,
   faRetweet,
   faSave,
-  faSpinner
+  faSpinner,
+  faChevronUp,
+  faChevronDown
 )
 
 import 'vuetify/styles'
