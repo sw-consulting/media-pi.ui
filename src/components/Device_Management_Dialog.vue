@@ -58,7 +58,7 @@ async function fetchDeviceStatus() {
     // Ensure the dialog shows the freshly fetched value even if SSE also updates
     manualStatus.value = result || null
   } catch (err) {
-    alertStore.error('Не удалось обновить статус устройства')
+    alertStore.error('Не удалось обновить статус устройства: ' + (err?.message || 'Неизвестная ошибка'))
   }
 }
 
