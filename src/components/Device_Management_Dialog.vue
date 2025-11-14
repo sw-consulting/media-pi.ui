@@ -7,6 +7,7 @@ import { storeToRefs } from 'pinia'
 
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
+import { useAlertStore } from '@/stores/alert.store.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -17,6 +18,7 @@ const emit = defineEmits(['update:modelValue'])
 
 const devicesStore = useDevicesStore()
 const deviceStatusesStore = useDeviceStatusesStore()
+const alertStore = useAlertStore()
 const { statuses } = storeToRefs(deviceStatusesStore)
 
 const internalOpen = ref(props.modelValue)
@@ -45,7 +47,12 @@ const isDisabled = computed(() => !isOnline.value)
 
 const runWithDevice = async (handler) => {
   if (!props.deviceId || typeof handler !== 'function') return
-  await handler(props.deviceId)
+  try {
+    await handler(props.deviceId)
+  } catch (err) {
+    const message = err?.message || 'Ошибка выполнения операции'
+    alertStore.error(message)
+  }
 }
 
 const applyChanges = () => runWithDevice(devicesStore.reloadSystem)

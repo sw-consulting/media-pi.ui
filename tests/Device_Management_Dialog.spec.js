@@ -14,6 +14,7 @@ const getDeviceById = vi.hoisted(() => vi.fn())
 const reloadSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const rebootSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const shutdownSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const alertError = vi.hoisted(() => vi.fn())
 
 vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
@@ -40,6 +41,12 @@ vi.mock('@/stores/device.statuses.store.js', () => ({
   })
 }))
 
+vi.mock('@/stores/alert.store.js', () => ({
+  useAlertStore: () => ({
+    error: alertError
+  })
+}))
+
 const globalStubs = {
   'v-dialog': {
     props: ['modelValue'],
@@ -56,6 +63,7 @@ const globalStubs = {
 describe('Device_Management_Dialog.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    alertError.mockReset()
     statusesRef.value = []
     getDeviceById.mockImplementation((id) => (
       id === 1
@@ -107,6 +115,21 @@ describe('Device_Management_Dialog.vue', () => {
 
     await shutdownBtn.trigger('click')
     expect(shutdownSystem).toHaveBeenCalledWith(1)
+  })
+
+  it('displays error message when system action fails', async () => {
+    statusesRef.value = [
+      { deviceId: 1, isOnline: true }
+    ]
+    reloadSystem.mockRejectedValueOnce(new Error('Network error'))
+
+    const wrapper = mountDialog()
+    const [applyBtn] = wrapper.findAll('.system-actions button')
+
+    await applyBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(alertError).toHaveBeenCalledWith('Network error')
   })
 
   it('emits update when close button clicked', async () => {
