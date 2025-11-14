@@ -291,6 +291,80 @@ describe('devices.store', () => {
     expect(store.error).toBe(mockError)
     expect(store.serviceResponse).toBe(null)
   })
+
+  it('getMenu fetches root menu and stores response', async () => {
+    const store = useDevicesStore()
+    const mockMenu = { sections: [{ title: 'Power' }] }
+    fetchWrapper.get.mockResolvedValueOnce(mockMenu)
+
+    const result = await store.getMenu(5)
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith(
+      expect.stringContaining('/devices/5/menu'),
+      undefined
+    )
+    expect(store.menu).toEqual(mockMenu)
+    expect(result).toEqual(mockMenu)
+  })
+
+  it('getMenu encodes nested segments', async () => {
+    const store = useDevicesStore()
+    fetchWrapper.get.mockResolvedValueOnce({})
+
+    await store.getMenu(8, ['Power Options', 'Screen/Display'])
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith(
+      expect.stringContaining('/devices/8/menu/Power%20Options/Screen%2FDisplay'),
+      undefined
+    )
+  })
+
+  it('getMenu resets menu on error', async () => {
+    const store = useDevicesStore()
+    const mockError = new Error('Menu failed')
+    fetchWrapper.get.mockRejectedValueOnce(mockError)
+
+    await expect(store.getMenu(3)).rejects.toThrow('Menu failed')
+    expect(store.error).toBe(mockError)
+    expect(store.menu).toBeNull()
+  })
+
+  it('executeMenuAction posts to encoded endpoint with payload', async () => {
+    const store = useDevicesStore()
+    const mockResponse = { ok: true }
+    fetchWrapper.post.mockResolvedValueOnce(mockResponse)
+
+    const result = await store.executeMenuAction(4, ['Power Options', 'Restart'], { confirm: true })
+
+    expect(fetchWrapper.post).toHaveBeenCalledWith(
+      expect.stringContaining('/devices/4/menu/Power%20Options/Restart'),
+      { confirm: true }
+    )
+    expect(store.menuActionResponse).toEqual(mockResponse)
+    expect(result).toEqual(mockResponse)
+  })
+
+  it('executeMenuAction defaults payload to empty object', async () => {
+    const store = useDevicesStore()
+    fetchWrapper.post.mockResolvedValueOnce({ ok: true })
+
+    await store.executeMenuAction(9, 'Reboot')
+
+    expect(fetchWrapper.post).toHaveBeenCalledWith(
+      expect.stringContaining('/devices/9/menu/Reboot'),
+      {}
+    )
+  })
+
+  it('executeMenuAction resets state on error', async () => {
+    const store = useDevicesStore()
+    const mockError = new Error('Execute failed')
+    fetchWrapper.post.mockRejectedValueOnce(mockError)
+
+    await expect(store.executeMenuAction(6, 'Shutdown')).rejects.toThrow('Execute failed')
+    expect(store.error).toBe(mockError)
+    expect(store.menuActionResponse).toBeNull()
+  })
 })
 
 

@@ -13,6 +13,8 @@ export const useDevicesStore = defineStore('devices', () => {
   const device = ref(null)
   const services = ref([])
   const serviceResponse = ref(null)
+  const menu = ref(null)
+  const menuActionResponse = ref(null)
   const loading = ref(false)
   const error = ref(null)
   const lastLoaded = ref(null) // Track when data was last loaded
@@ -29,6 +31,59 @@ export const useDevicesStore = defineStore('devices', () => {
       return null
     }
     return devices.value.find(d => d && d.id === id)
+  }
+
+  const normalizeMenuSegments = (segments) => {
+    const normalized = []
+
+    const pushSegment = (segment) => {
+      if (segment === undefined || segment === null) {
+        return
+      }
+
+      if (Array.isArray(segment)) {
+        segment.forEach(pushSegment)
+        return
+      }
+
+      const value = String(segment).trim()
+      if (value) {
+        normalized.push(value)
+      }
+    }
+
+    pushSegment(segments)
+    return normalized
+  }
+
+  const callMenuEndpoint = async (method, deviceId, segments = [], payload, { onSuccess, onError } = {}) => {
+    const normalizedSegments = normalizeMenuSegments(segments)
+    const encodedSegments = normalizedSegments.map(segment => encodeURIComponent(segment))
+    const suffix = encodedSegments.length ? `/${encodedSegments.join('/')}` : ''
+    const url = `${baseUrl}/${deviceId}/menu${suffix}`
+    const httpMethod = method.toLowerCase()
+    const requestPayload = httpMethod === 'get' ? undefined : (payload ?? {})
+    const fetchMethod = fetchWrapper[httpMethod]
+
+    if (typeof fetchMethod !== 'function') {
+      throw new Error(`Unsupported HTTP method for menu endpoint: ${method}`)
+    }
+
+    loading.value = true
+    error.value = null
+
+    try {
+      const data = await fetchMethod(url, requestPayload)
+
+      onSuccess?.(data)
+      return data
+    } catch (err) {
+      error.value = err
+      onError?.(err)
+      throw err
+    } finally {
+      loading.value = false
+    }
   }
 
   async function register() {
@@ -165,6 +220,28 @@ export const useDevicesStore = defineStore('devices', () => {
     return executeServiceAction(id, unit, 'disable')
   }
 
+  async function getMenu(deviceId, segments = []) {
+    return callMenuEndpoint('get', deviceId, segments, undefined, {
+      onSuccess: (result) => {
+        menu.value = result ?? null
+      },
+      onError: () => {
+        menu.value = null
+      }
+    })
+  }
+
+  async function executeMenuAction(deviceId, segments, payload = {}) {
+    return callMenuEndpoint('post', deviceId, segments, payload, {
+      onSuccess: (result) => {
+        menuActionResponse.value = result ?? null
+      },
+      onError: () => {
+        menuActionResponse.value = null
+      }
+    })
+  }
+
   async function update(id, params) {
     loading.value = true
     error.value = null
@@ -228,6 +305,8 @@ export const useDevicesStore = defineStore('devices', () => {
     device,
     services,
     serviceResponse,
+    menu,
+    menuActionResponse,
     loading,
     error,
     getDeviceById,
@@ -244,7 +323,9 @@ export const useDevicesStore = defineStore('devices', () => {
     stopService,
     restartService,
     enableService,
-    disableService
+    disableService,
+    getMenu,
+    executeMenuAction
   }
 })
 
