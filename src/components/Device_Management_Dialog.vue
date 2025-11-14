@@ -58,7 +58,6 @@ async function fetchDeviceStatus() {
     // Ensure the dialog shows the freshly fetched value even if SSE also updates
     manualStatus.value = result || null
   } catch (err) {
-    console.error('Failed to fetch device status', err)
     alertStore.error('Не удалось обновить статус устройства')
   }
 }
@@ -123,8 +122,22 @@ const runWithDevice = async (handler) => {
 }
 
 const applyChanges = () => runWithDevice(devicesStore.reloadSystem)
-const reboot = () => runWithDevice(devicesStore.rebootSystem)
-const shutdown = () => runWithDevice(devicesStore.shutdownSystem)
+
+const reboot = async () => {
+  await runWithDevice(devicesStore.rebootSystem)
+  // Wait 30 seconds and then fetch status to reflect the reboot
+  setTimeout(async () => {
+    await fetchDeviceStatus()
+  }, 30000)
+}
+
+const shutdown = async () => {
+  await runWithDevice(devicesStore.shutdownSystem)
+  // Wait 5 seconds and then fetch status to reflect the shutdown
+  setTimeout(async () => {
+    await fetchDeviceStatus()
+  }, 5000)
+}
 </script>
 
 <template>

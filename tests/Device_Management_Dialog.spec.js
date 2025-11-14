@@ -190,4 +190,45 @@ describe('Device_Management_Dialog.vue', () => {
     expect(buttons).toHaveLength(3)
     buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeDefined())
   })
+
+  it('fetches device status 5 seconds after reboot and shutdown operations', async () => {
+    vi.useFakeTimers()
+    
+    statusesRef.value = [
+      { deviceId: 1, isOnline: true }
+    ]
+    const wrapper = mount(DeviceManagementDialog, {
+      props: { modelValue: true, deviceId: 1 },
+      global: { stubs: globalStubs }
+    })
+
+    // Wait for initial status fetch
+    await vi.runOnlyPendingTimersAsync()
+    getDeviceStatusById.mockClear()
+
+    const [, rebootBtn, shutdownBtn] = wrapper.findAll('.system-actions button')
+
+    // Test reboot button
+    await rebootBtn.trigger('click')
+    expect(rebootSystem).toHaveBeenCalledWith(1)
+    expect(getDeviceStatusById).not.toHaveBeenCalled()
+
+    // Fast-forward 5 seconds
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(getDeviceStatusById).toHaveBeenCalledWith(1)
+    getDeviceStatusById.mockClear()
+
+    // Test shutdown button
+    await shutdownBtn.trigger('click')
+    expect(shutdownSystem).toHaveBeenCalledWith(1)
+    expect(getDeviceStatusById).not.toHaveBeenCalled()
+
+    // Fast-forward 5 seconds
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(getDeviceStatusById).toHaveBeenCalledWith(1)
+
+    vi.useRealTimers()
+  }, 10000)
 })
