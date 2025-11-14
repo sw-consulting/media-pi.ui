@@ -45,7 +45,10 @@ vi.mock('@/stores/device.statuses.store.js', () => ({
 
 vi.mock('@/stores/alert.store.js', () => ({
   useAlertStore: () => ({
-    error: alertError
+    error: alertError,
+    __mockRefs: {
+      alert: ref(null)
+    }
   })
 }))
 
