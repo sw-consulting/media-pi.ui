@@ -101,6 +101,40 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
+  const buildDeviceUrl = (id, segments = []) => {
+    const normalizedSegments = Array.isArray(segments) ? segments : [segments]
+    const encodedSegments = normalizedSegments
+      .filter(segment => segment !== undefined && segment !== null && segment !== '')
+      .map(segment => encodeURIComponent(String(segment)))
+
+    return [baseUrl, encodeURIComponent(String(id)), ...encodedSegments].join('/')
+  }
+
+  const executeDeviceRequest = async (method, id, segments = [], body) => {
+    loading.value = true
+    error.value = null
+
+    const url = buildDeviceUrl(id, segments)
+    const methodName = method.toLowerCase()
+
+    try {
+      if (!fetchWrapper[methodName]) {
+        throw new Error(`Unsupported method: ${method}`)
+      }
+
+      if (methodName === 'get' || methodName === 'delete') {
+        return await fetchWrapper[methodName](url)
+      }
+
+      return await fetchWrapper[methodName](url, body ?? {})
+    } catch (err) {
+      error.value = err
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function listServices(id) {
     loading.value = true
     error.value = null
@@ -223,6 +257,17 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
+  const checkStorage = (id) => executeDeviceRequest('get', id, ['storage', 'check'])
+  const getPlaylist = (id) => executeDeviceRequest('get', id, ['playlist', 'get'])
+  const updatePlaylist = (id, params) => executeDeviceRequest('put', id, ['playlist', 'update'], params)
+  const getSchedule = (id) => executeDeviceRequest('get', id, ['schedule', 'get'])
+  const updateSchedule = (id, params) => executeDeviceRequest('put', id, ['schedule', 'update'], params)
+  const getAudio = (id) => executeDeviceRequest('get', id, ['audio', 'get'])
+  const updateAudio = (id, params) => executeDeviceRequest('put', id, ['audio', 'update'], params)
+  const reloadSystem = (id) => executeDeviceRequest('post', id, ['system', 'reload'])
+  const rebootSystem = (id) => executeDeviceRequest('post', id, ['system', 'reboot'])
+  const shutdownSystem = (id) => executeDeviceRequest('post', id, ['system', 'shutdown'])
+
   return {
     devices,
     device,
@@ -244,7 +289,17 @@ export const useDevicesStore = defineStore('devices', () => {
     stopService,
     restartService,
     enableService,
-    disableService
+    disableService,
+    checkStorage,
+    getPlaylist,
+    updatePlaylist,
+    getSchedule,
+    updateSchedule,
+    getAudio,
+    updateAudio,
+    reloadSystem,
+    rebootSystem,
+    shutdownSystem
   }
 })
 

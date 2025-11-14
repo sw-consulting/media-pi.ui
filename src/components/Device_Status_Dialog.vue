@@ -88,7 +88,7 @@ watch(() => props.deviceId, () => {
   <v-dialog v-model="internalOpen"  class="status-dialog">
     <v-card class="status-card">
       <v-card-title>
-        <div class="d-flex align-center justify-space-between w-100">
+        <div class="primary-heading">
           <div>
             <font-awesome-icon :icon="status?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'" :class="onlineClass" class="mr-2"/>
             <span>Состояние устройства</span>

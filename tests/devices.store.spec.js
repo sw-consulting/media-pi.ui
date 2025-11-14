@@ -291,6 +291,56 @@ describe('devices.store', () => {
     expect(store.error).toBe(mockError)
     expect(store.serviceResponse).toBe(null)
   })
+
+  it('checkStorage calls fetchWrapper.get with expected url and returns response', async () => {
+    const store = useDevicesStore()
+    const mockResponse = { status: 'ok' }
+    fetchWrapper.get.mockResolvedValueOnce(mockResponse)
+    const response = await store.checkStorage(42)
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith(
+      expect.stringContaining('/devices/42/storage/check')
+    )
+    expect(response).toBe(mockResponse)
+    expect(store.loading).toBe(false)
+  })
+
+  it('updatePlaylist calls fetchWrapper.put with payload', async () => {
+    const store = useDevicesStore()
+    const payload = { playlist: ['video1'] }
+    fetchWrapper.put.mockResolvedValueOnce({ success: true })
+    const response = await store.updatePlaylist(7, payload)
+
+    expect(fetchWrapper.put).toHaveBeenCalledWith(
+      expect.stringContaining('/devices/7/playlist/update'),
+      payload
+    )
+    expect(response).toEqual({ success: true })
+    expect(store.loading).toBe(false)
+  })
+
+  it('reloadSystem calls fetchWrapper.post with empty payload', async () => {
+    const store = useDevicesStore()
+    fetchWrapper.post.mockResolvedValueOnce({ acknowledged: true })
+    const response = await store.reloadSystem(5)
+
+    expect(fetchWrapper.post).toHaveBeenCalledWith(
+      expect.stringContaining('/devices/5/system/reload'),
+      {}
+    )
+    expect(response).toEqual({ acknowledged: true })
+    expect(store.loading).toBe(false)
+  })
+
+  it('rebootSystem propagates errors and sets error state', async () => {
+    const store = useDevicesStore()
+    const mockError = new Error('Reboot failed')
+    fetchWrapper.post.mockRejectedValueOnce(mockError)
+
+    await expect(store.rebootSystem(8)).rejects.toThrow('Reboot failed')
+    expect(store.error).toBe(mockError)
+    expect(store.loading).toBe(false)
+  })
 })
 
 

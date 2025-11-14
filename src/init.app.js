@@ -38,7 +38,9 @@ import {
   faBan,
   faTags,
   faFilm,
-  faCircleXmark
+  faCircleXmark,
+  faPowerOff,
+  faRetweet
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -78,7 +80,9 @@ library.add(
   faBan,
   faTags,
   faFilm,
-  faCircleXmark
+  faCircleXmark,
+  faPowerOff,
+  faRetweet
 )
 
 import 'vuetify/styles'
