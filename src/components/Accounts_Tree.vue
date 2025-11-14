@@ -620,7 +620,7 @@ onBeforeUnmount(() => {
       </v-alert>
     </v-card>
 
-    <!-- Device Management Dialog -->
+    <!-- Device Status Dialog -->
     <DeviceStatusDialog 
       v-if="statusDialogDeviceId"
       v-model="statusDialogOpen"
