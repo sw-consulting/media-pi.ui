@@ -75,7 +75,7 @@ defineProps({
           icon="fa-solid fa-plus"
           :item="defaultValue"
           @click="push(defaultValue)"
-          class="button-o-c field-container-plus"
+          class="field-container-plus"
           :tooltip-text="addTooltip"
         />
         
@@ -97,8 +97,9 @@ defineProps({
             :item="idx"
             @click="move(idx, idx - 1)"
             :disabled="idx === 0"
-            class="button-o-c field-container-move field-container-move-up"
             :tooltip-text="moveUpTooltip"
+            class="padding-0"
+            classBtn="padding-0"
           />
 
           <ActionButton
@@ -106,8 +107,9 @@ defineProps({
             :item="idx"
             @click="move(idx, idx + 1)"
             :disabled="idx === fields.length - 1"
-            class="button-o-c field-container-move field-container-move-down"
             :tooltip-text="moveDownTooltip"
+            class="padding-0"
+            classBtn="padding-0"
           />
         </template>
 
@@ -117,7 +119,8 @@ defineProps({
           :item="idx"
           @click="remove(idx)"
           :disabled="fields.length === 1"
-          class="button-o-c ml-2"
+          class="padding-0"
+          classBtn="padding-0"
           :tooltip-text="removeTooltip"
         />
       </div>
@@ -125,81 +128,3 @@ defineProps({
   </FieldArray>
 </template>
 
-<style scoped>
-/* Moved styles from main.css - keeping exactly as they were */
-.field-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.button-o-c {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  background-color: #f8f9fa;
-  color: #495057;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  flex-shrink: 0;
-}
-
-.button-o-c:hover {
-  background-color: #e9ecef;
-  border-color: #adb5bd;
-}
-
-.button-o-c:active {
-  background-color: #dee2e6;
-  border-color: #6c757d;
-}
-
-.button-o-c:disabled {
-  background-color: #e9ecef;
-  border-color: #dee2e6;
-  color: #adb5bd;
-  cursor: not-allowed;
-}
-
-.button-o-c.field-container-plus {
-  background-color: #d4edda;
-  border-color: #c3e6cb;
-  color: #155724;
-}
-
-.button-o-c.field-container-plus:hover {
-  background-color: #c3e6cb;
-  border-color: #b1dfbb;
-}
-
-.field-container-plus:focus {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-
-.button-o-c.field-container-plus:focus {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-
-.button-o-c.field-container-move:focus {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-
-.button-o-c.field-container-plus:active {
-  background-color: #b1dfbb;
-  border-color: #a1d2aa;
-}
-
-.ml-2 {
-  margin-left: 8px;
-}
-</style>

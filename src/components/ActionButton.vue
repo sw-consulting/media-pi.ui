@@ -22,7 +22,7 @@ defineEmits(['click'])
         v-bind="props"
         :disabled="disabled"
       >
-        <font-awesome-icon :size="iconSize" :icon="icon"  class="button-o-c"/>
+        <font-awesome-icon :size="iconSize" :icon="icon"  :class="['button-o-c'], $attrs.classBtn"/>
       </button>
     </template>
   </v-tooltip>
