@@ -628,7 +628,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- Device Management Dialog -->
-    <DeviceManagementDialog 
+    <DeviceManagementDialog
       v-if="managementDialogDeviceId"
       v-model="managementDialogOpen"
       :device-id="managementDialogDeviceId"

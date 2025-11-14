@@ -30,6 +30,23 @@ const { statuses } = storeToRefs(deviceStatusesStore)
 // Manual refresh override: prioritizes explicit refresh over SSE
 const manualStatus = ref(null)
 
+watch(
+  () => statuses.value,
+  (newStatuses) => {
+    if (!manualStatus.value) return
+    const id = props.deviceId
+    if (!id) {
+      manualStatus.value = null
+      return
+    }
+    const live = (newStatuses || []).find((status) => status?.deviceId === id)
+    if (live) {
+      manualStatus.value = null
+    }
+  },
+  { deep: true }
+)
+
 const internalOpen = ref(props.modelValue)
 watch(() => props.modelValue, (value) => { internalOpen.value = value })
 watch(internalOpen, (value) => emit('update:modelValue', value))
