@@ -19,11 +19,54 @@ const emit = defineEmits(['update:modelValue'])
 const devicesStore = useDevicesStore()
 const deviceStatusesStore = useDeviceStatusesStore()
 const alertStore = useAlertStore()
+const alertRefs = storeToRefs(alertStore) || {}
+const alert = alertRefs.alert
+
+const clearAlert = () => {
+  if (alertStore && typeof alertStore.clear === 'function') alertStore.clear()
+}
 const { statuses } = storeToRefs(deviceStatusesStore)
+
+// Manual refresh override: prioritizes explicit refresh over SSE
+const manualStatus = ref(null)
 
 const internalOpen = ref(props.modelValue)
 watch(() => props.modelValue, (value) => { internalOpen.value = value })
 watch(internalOpen, (value) => emit('update:modelValue', value))
+
+async function fetchDeviceStatus() {
+  if (!props.deviceId) return
+  try {
+    const result = await deviceStatusesStore.getById(props.deviceId)
+    // Ensure the dialog shows the freshly fetched value even if SSE also updates
+    manualStatus.value = result || null
+  } catch (err) {
+    console.error('Failed to fetch device status', err)
+    alertStore.error('Не удалось обновить статус устройства')
+  }
+}
+
+// Initialize device status when dialog opens
+watch(internalOpen, async (isOpen) => {
+  if (isOpen && props.deviceId) {
+    await fetchDeviceStatus()
+  }
+}, { immediate: true })
+
+// If deviceId changes while dialog is open, refresh status
+watch(() => props.deviceId, async (id) => {
+  if (internalOpen.value && id) {
+    await fetchDeviceStatus()
+  }
+})
+
+// Clear manual override when dialog closes or device changes
+watch(internalOpen, (v) => {
+  if (!v) manualStatus.value = null
+})
+watch(() => props.deviceId, () => {
+  manualStatus.value = null
+})
 
 const informationalPanels = [
   { key: 'timers', title: 'Настройки таймеров' },
@@ -35,6 +78,11 @@ const currentStatus = computed(() => {
   const id = props.deviceId
   if (!id) return null
 
+  // If user refreshed, prefer that value over SSE
+  if (manualStatus.value && manualStatus.value.deviceId === id) {
+    return manualStatus.value
+  }
+  
   const live = (statuses.value || []).find((s) => s?.deviceId === id)
   if (live) return live
 
@@ -42,8 +90,10 @@ const currentStatus = computed(() => {
   return device?.deviceStatus || null
 })
 
+const onlineClass = computed(() => currentStatus.value?.isOnline ? 'text-success' : 'text-danger')
+  
 const isOnline = computed(() => Boolean(currentStatus.value?.isOnline))
-const isDisabled = computed(() => !isOnline.value)
+const isDisabled = computed(() => !currentStatus.value || !isOnline.value)
 
 const runWithDevice = async (handler) => {
   if (!props.deviceId || typeof handler !== 'function') return
@@ -64,19 +114,20 @@ const shutdown = () => runWithDevice(devicesStore.shutdownSystem)
   <v-dialog v-model="internalOpen" class="management-dialog">
     <v-card class="management-card">
       <v-card-title>
-        <div class="d-flex align-center justify-space-between w-100">
+        <div class="primary-heading">
+          <font-awesome-icon :icon="currentStatus?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'" :class="onlineClass" class="mr-2"/>
           <span>Управление устройством</span>
         </div>
       </v-card-title>
       <v-card-text>
         <div class="panel-grid">
           <fieldset v-for="panel in informationalPanels" :key="panel.key" class="panel">
-            <legend>{{ panel.title }}</legend>
+            <legend class="primary-heading">{{ panel.title }}</legend>
             <div class="panel-content" />
           </fieldset>
 
           <fieldset class="panel">
-            <legend>Управление системой</legend>
+            <legend class="primary-heading">Управление системой</legend>
             <div class="panel-content system-actions">
               <button
                 class="button-o-c primary"
@@ -84,6 +135,7 @@ const shutdown = () => runWithDevice(devicesStore.shutdownSystem)
                 :disabled="isDisabled"
                 @click="applyChanges"
               >
+                <font-awesome-icon size="1x" icon="fa-solid fa-download" class="mr-1" />
                 Применить изменения
               </button>
               <button
@@ -92,6 +144,7 @@ const shutdown = () => runWithDevice(devicesStore.shutdownSystem)
                 :disabled="isDisabled"
                 @click="reboot"
               >
+                <font-awesome-icon size="1x" icon="fa-solid fa-retweet" class="mr-1" />
                 Перезагрузить
               </button>
               <button
@@ -100,6 +153,7 @@ const shutdown = () => runWithDevice(devicesStore.shutdownSystem)
                 :disabled="isDisabled"
                 @click="shutdown"
               >
+                <font-awesome-icon size="1x" icon="fa-solid fa-power-off" class="mr-1" />
                 Выключить
               </button>
             </div>
@@ -108,14 +162,18 @@ const shutdown = () => runWithDevice(devicesStore.shutdownSystem)
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <button
-          class="button-o-c primary"
+        <button 
+          class="button-o-c primary"    
           type="button"
-          @click="internalOpen = false"
-        >
-          Закрыть
+          @click="internalOpen = false">
+            <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
+            Закрыть
         </button>
       </v-card-actions>
+      <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+        <button @click="clearAlert()" class="btn btn-link close">×</button>
+        {{ alert.message }}
+      </div>
     </v-card>
   </v-dialog>
 </template>
@@ -142,50 +200,43 @@ const shutdown = () => runWithDevice(devicesStore.shutdownSystem)
 }
 
 .panel legend {
-  font-weight: 600;
   padding: 0 0.5rem;
-  color: var(--button-secondary-bg);
+  font-size: 1.1rem;
 }
 
 .panel-content {
-  min-height: 80px;
+  min-height: 40px;
 }
 
 .system-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
 }
 
 .button-o-c {
   color: var(--button-secondary-bg);
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
-  margin: 0.5rem 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 0.75rem;
+  margin: 0.5rem;
   transition: 0.4s;
   border: 1px solid var(--primary-color);
-  border-radius: 6px;
-  min-width: 180px;
-}
-
-.button-o-c:hover,
-.button-o-c:focus {
-  outline: none;
-  box-shadow: 0px 2px 10px var(--primary-color);
-  color: var(--primary-color);
+  cursor: pointer;
 }
 
 .button-o-c:disabled {
   opacity: 0.6;
-  box-shadow: none;
   cursor: not-allowed;
 }
 
-.button-o-c.warning {
-  border-color: #f59e0b;
-}
-
-.button-o-c.danger {
-  border-color: #ef4444;
+.button-o-c:hover:not(:disabled), .button-o-c:focus:not(:disabled) {
+  outline: none;
+  box-shadow: 0px 2px 10px var(--primary-color);
+  color: var(--primary-color);
 }
 </style>

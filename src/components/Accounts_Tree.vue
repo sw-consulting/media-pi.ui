@@ -57,6 +57,7 @@ import { useConfirmation } from '@/helpers/confirmation.js'
 import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpers/user.helpers.js'
 import ActionButton from '@/components/ActionButton.vue'
 import DeviceStatusDialog from '@/components/Device_Status_Dialog.vue'
+import DeviceManagementDialog from '@/components/Device_Management_Dialog.vue'
 import InlineAssignment from '@/components/InlineAssignment.vue'
 
 const router = useRouter()
@@ -82,12 +83,24 @@ const transitioningDevices = ref(new Set())
 const statusDialogOpen = ref(false)
 const statusDialogDeviceId = ref(null)
 
+const managementDialogOpen = ref(false)
+const managementDialogDeviceId = ref(null)
+
+
 const openDeviceStatus = (item) => {
   const id = getDeviceIdFromNodeId(item.id)
   if (!id) return
   statusDialogDeviceId.value = id
   statusDialogOpen.value = true
 }
+
+const openDeviceManagement = (item) => {
+  const id = getDeviceIdFromNodeId(item.id)
+  if (!id) return
+  managementDialogDeviceId.value = id
+  managementDialogOpen.value = true
+}
+
 
 // Initialize tree helper
 const {
@@ -522,6 +535,10 @@ onBeforeUnmount(() => {
                 :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                 @click="openDeviceStatus" 
               />
+              <ActionButton :item="item" icon="fa-solid fa-list" tooltip-text="Управление устройством" 
+                :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                @click="openDeviceManagement" 
+              />
               <!-- Determine context: top-level unassigned vs account-assigned -->
               <template v-if="isTopLevelUnassignedDevice(item)">
                 <!-- Top level unassigned devices: SystemAdministrator, InstallationEngineer -->
@@ -603,11 +620,18 @@ onBeforeUnmount(() => {
       </v-alert>
     </v-card>
 
-    <!-- Device Status Dialog -->
+    <!-- Device Management Dialog -->
     <DeviceStatusDialog 
       v-if="statusDialogDeviceId"
       v-model="statusDialogOpen"
       :device-id="statusDialogDeviceId"
+    />
+
+    <!-- Device Management Dialog -->
+    <DeviceManagementDialog 
+      v-if="managementDialogDeviceId"
+      v-model="managementDialogOpen"
+      :device-id="managementDialogDeviceId"
     />
     
     <!-- Global alert messages -->

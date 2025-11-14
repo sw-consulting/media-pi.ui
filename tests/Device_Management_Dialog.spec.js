@@ -11,6 +11,7 @@ import DeviceManagementDialog from '@/components/Device_Management_Dialog.vue'
 const statusesRef = ref([])
 
 const getDeviceById = vi.hoisted(() => vi.fn())
+const getDeviceStatusById = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const reloadSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const rebootSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const shutdownSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
@@ -37,7 +38,8 @@ vi.mock('@/stores/device.statuses.store.js', () => ({
   useDeviceStatusesStore: () => ({
     __mockRefs: {
       statuses: statusesRef
-    }
+    },
+    getById: getDeviceStatusById
   })
 }))
 
@@ -64,6 +66,7 @@ describe('Device_Management_Dialog.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     alertError.mockReset()
+    getDeviceStatusById.mockReset()
     statusesRef.value = []
     getDeviceById.mockImplementation((id) => (
       id === 1
@@ -139,5 +142,49 @@ describe('Device_Management_Dialog.vue', () => {
 
     expect(wrapper.emitted('update:modelValue')).toBeTruthy()
     expect(wrapper.emitted('update:modelValue').pop()).toEqual([false])
+  })
+
+  it('initializes device status when dialog opens', async () => {
+    mount(DeviceManagementDialog, {
+      props: { modelValue: true, deviceId: 1 },
+      global: { stubs: globalStubs }
+    })
+
+    // Wait for Vue reactivity and async operations
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(getDeviceStatusById).toHaveBeenCalledWith(1)
+  })
+
+  it('fetches device status when deviceId changes while dialog is open', async () => {
+    const wrapper = mount(DeviceManagementDialog, {
+      props: { modelValue: true, deviceId: 1 },
+      global: { stubs: globalStubs }
+    })
+
+    // Wait for initial mount and clear the mock
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(getDeviceStatusById).toHaveBeenCalledWith(1)
+    getDeviceStatusById.mockClear()
+
+    await wrapper.setProps({ deviceId: 2 })
+
+    expect(getDeviceStatusById).toHaveBeenCalledWith(2)
+  })
+
+  it('disables system buttons when no status data is available', async () => {
+    // Mock getDeviceById to return null (no cached status)
+    getDeviceById.mockImplementation(() => null)
+    // Clear any existing status data
+    statusesRef.value = []
+
+    const wrapper = mount(DeviceManagementDialog, {
+      props: { modelValue: true, deviceId: 1 },
+      global: { stubs: globalStubs }
+    })
+
+    const buttons = wrapper.findAll('.system-actions button')
+    expect(buttons).toHaveLength(3)
+    buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeDefined())
   })
 })
