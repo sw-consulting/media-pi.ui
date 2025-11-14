@@ -136,7 +136,7 @@ const shutdown = () => runWithDevice(devicesStore.shutdownSystem)
                 @click="applyChanges"
               >
                 <font-awesome-icon size="1x" icon="fa-solid fa-download" class="mr-1" />
-                Применить изменения
+                Применить
               </button>
               <button
                 class="button-o-c warning"
