@@ -35,6 +35,14 @@ defineProps({
     type: String,
     default: 'Удалить элемент'
   },
+  moveUpTooltip: {
+    type: String,
+    default: 'Переместить вверх'
+  },
+  moveDownTooltip: {
+    type: String,
+    default: 'Переместить вниз'
+  },
   defaultValue: {
     type: [String, Number],
     default: ''
@@ -46,16 +54,20 @@ defineProps({
   hasError: {
     type: Boolean,
     default: false
+  },
+  ordered: {
+    type: Boolean,
+    default: false
   }
 })
 </script>
 
 <template>
-  <FieldArray :name="name" v-slot="{ fields, push, remove }">
+  <FieldArray :name="name" v-slot="{ fields, push, remove, move }">
     <div v-for="(field, idx) in fields" :key="field.key" class="form-group mb-2">
       <label v-if="idx === 0" class="label">{{ label }}:</label>
       <div v-else class="label"></div>
-      
+
       <div class="field-container">
         <!-- Plus button positioned to the left for first option -->
         <ActionButton 
@@ -78,7 +90,27 @@ defineProps({
             </option>
           </template>
         </Field>
-        
+
+        <template v-if="ordered">
+          <ActionButton
+            icon="fa-solid fa-chevron-up"
+            :item="idx"
+            @click="move(idx, idx - 1)"
+            :disabled="idx === 0"
+            class="button-o-c field-container-move field-container-move-up"
+            :tooltip-text="moveUpTooltip"
+          />
+
+          <ActionButton
+            icon="fa-solid fa-chevron-down"
+            :item="idx"
+            @click="move(idx, idx + 1)"
+            :disabled="idx === fields.length - 1"
+            class="button-o-c field-container-move field-container-move-down"
+            :tooltip-text="moveDownTooltip"
+          />
+        </template>
+
         <!-- Minus button always after select -->
         <ActionButton
           icon="fa-solid fa-minus"
@@ -94,14 +126,7 @@ defineProps({
 </template>
 
 <style scoped>
-/* Moved styles from main.css - keeping exactly as they were */
-.field-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.button-o-c {
+::v-deep(.button-o-c) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -115,53 +140,50 @@ defineProps({
   transition: all 0.2s ease-in-out;
   flex-shrink: 0;
 }
-
-.button-o-c:hover {
+::v-deep(.button-o-c:hover) {
   background-color: #e9ecef;
   border-color: #adb5bd;
 }
-
-.button-o-c:active {
+::v-deep(.button-o-c:active) {
   background-color: #dee2e6;
   border-color: #6c757d;
 }
-
-.button-o-c:disabled {
+::v-deep(.button-o-c:disabled) {
   background-color: #e9ecef;
   border-color: #dee2e6;
   color: #adb5bd;
   cursor: not-allowed;
 }
-
-.button-o-c.field-container-plus {
+::v-deep(.button-o-c.field-container-plus) {
   background-color: #d4edda;
   border-color: #c3e6cb;
   color: #155724;
 }
-
-.button-o-c.field-container-plus:hover {
+::v-deep(.button-o-c.field-container-plus:hover) {
   background-color: #c3e6cb;
   border-color: #b1dfbb;
 }
-
 .field-container-plus:focus {
   outline: none;
   border: none;
   box-shadow: none;
 }
-
-.button-o-c.field-container-plus:focus {
+::v-deep(.button-o-c.field-container-plus:focus) {
   outline: none;
   border: none;
   box-shadow: none;
 }
-
-.button-o-c.field-container-plus:active {
+::v-deep(.button-o-c.field-container-move:focus) {
+  outline: none;
+  border: none;
+  box-shadow: none;
+}
+::v-deep(.button-o-c.field-container-plus:active) {
   background-color: #b1dfbb;
   border-color: #a1d2aa;
 }
-
 .ml-2 {
   margin-left: 8px;
 }
 </style>
+

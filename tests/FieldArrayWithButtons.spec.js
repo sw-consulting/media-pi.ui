@@ -180,18 +180,67 @@ describe('FieldArrayWithButtons', () => {
 
   it('renders custom tooltips', async () => {
     const wrapper = createWrapper({
+      ordered: true,
       addTooltip: 'Custom Add',
-      removeTooltip: 'Custom Remove'
-    })
+      removeTooltip: 'Custom Remove',
+      moveUpTooltip: 'Move Up',
+      moveDownTooltip: 'Move Down'
+    }, { testField: ['', ''] })
     await flushPromises()
-    
+
     // Check ActionButton components directly
     const actionButtons = wrapper.findAllComponents({ name: 'ActionButton' })
     const plusButton = actionButtons.find(btn => btn.classes().includes('field-container-plus'))
     const minusButton = actionButtons.find(btn => btn.classes().includes('ml-2'))
-    
+    const moveUpButton = actionButtons.find(btn => btn.classes().includes('field-container-move-up') && !btn.attributes('disabled'))
+    const moveDownButton = actionButtons.find(btn => btn.classes().includes('field-container-move-down') && !btn.attributes('disabled'))
+
     expect(plusButton.props('tooltipText')).toBe('Custom Add')
     expect(minusButton.props('tooltipText')).toBe('Custom Remove')
+    expect(moveUpButton?.props('tooltipText')).toBe('Move Up')
+    expect(moveDownButton?.props('tooltipText')).toBe('Move Down')
+  })
+
+  it('renders move buttons when ordered is true', async () => {
+    const wrapper = createWrapper({ ordered: true }, { testField: ['', ''] })
+    await flushPromises()
+
+    const moveUpButtons = wrapper.findAll('button.field-container-move-up')
+    const moveDownButtons = wrapper.findAll('button.field-container-move-down')
+
+    expect(moveUpButtons).toHaveLength(2)
+    expect(moveDownButtons).toHaveLength(2)
+
+    expect(moveUpButtons[0].attributes('disabled')).toBeDefined()
+    expect(moveDownButtons[1].attributes('disabled')).toBeDefined()
+  })
+
+  it('moves items when move buttons are clicked', async () => {
+    const wrapper = createWrapper(
+      {
+        ordered: true,
+        fieldType: 'input',
+        fieldProps: { type: 'text' }
+      },
+      { testField: ['first', 'second', 'third'] }
+    )
+    await flushPromises()
+
+    const getValues = () => wrapper.findAll('input').map(input => input.element.value)
+
+    expect(getValues()).toEqual(['first', 'second', 'third'])
+
+    const firstDownButton = wrapper.findAll('button.field-container-move-down')[0]
+    await firstDownButton.trigger('click')
+    await flushPromises()
+
+    expect(getValues()).toEqual(['second', 'first', 'third'])
+
+    const secondUpButton = wrapper.findAll('button.field-container-move-up')[1]
+    await secondUpButton.trigger('click')
+    await flushPromises()
+
+    expect(getValues()).toEqual(['first', 'second', 'third'])
   })
 
   it('uses custom default value when adding fields', async () => {

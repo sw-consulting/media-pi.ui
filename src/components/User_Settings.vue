@@ -338,7 +338,7 @@ function onSubmit(values) {
         </div>
       </div>
 
-       <div v-if="showAndEditCredentials()" class="form-group">
+      <div v-if="showAndEditCredentials()" class="form-group">
         <label for="roleSelect" class="label">Роль:</label>
         <select id="roleSelect" v-model="selectedRole" class="form-control input">
           <option v-for="option in roleOptions" :key="option.value" :value="option.value" >
