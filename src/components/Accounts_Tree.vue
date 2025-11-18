@@ -531,7 +531,7 @@ onBeforeUnmount(() => {
             <!-- Action buttons for individual device nodes -->
             <div v-else-if="item.id.startsWith('device-')" class="tree-actions">
               <!-- Always allow viewing device status -->
-              <ActionButton :item="item" icon="fa-solid fa-list" tooltip-text="Состояние устройства" 
+              <ActionButton :item="item" icon="fa-solid fa-book-skull" tooltip-text="Системная информация" 
                 :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                 @click="openDeviceStatus" 
               />
@@ -635,7 +635,7 @@ onBeforeUnmount(() => {
     />
     
     <!-- Global alert messages -->
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+    <div v-if="alert && !statusDialogOpen && !managementDialogOpen" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
     </div>

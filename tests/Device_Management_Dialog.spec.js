@@ -17,6 +17,8 @@ const rebootSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const shutdownSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const getAudio = vi.hoisted(() => vi.fn(() => Promise.resolve({ output: 'hdmi' })))
 const updateAudio = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const getPlaylist = vi.hoisted(() => vi.fn(() => Promise.resolve({ source: '', destination: '' })))
+const updatePlaylist = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const alertError = vi.hoisted(() => vi.fn())
 const alertSuccess = vi.hoisted(() => vi.fn())
 
@@ -35,7 +37,9 @@ vi.mock('@/stores/devices.store.js', () => ({
     rebootSystem,
     shutdownSystem,
     getAudio,
-    updateAudio
+    updateAudio,
+    getPlaylist,
+    updatePlaylist
   })
 }))
 
@@ -90,9 +94,13 @@ describe('Device_Management_Dialog.vue', () => {
     shutdownSystem.mockReset()
     getAudio.mockReset()
     updateAudio.mockReset()
+    getPlaylist.mockReset()
+    updatePlaylist.mockReset()
     statusesRef.value = []
     getAudio.mockResolvedValue({ output: 'hdmi' })
     updateAudio.mockResolvedValue()
+    getPlaylist.mockResolvedValue({ source: '', destination: '' })
+    updatePlaylist.mockResolvedValue()
     getDeviceById.mockImplementation((id) => (
       id === 1
         ? {
@@ -310,6 +318,66 @@ describe('Device_Management_Dialog.vue', () => {
 
       expect(getAudio).not.toHaveBeenCalled()
       expect(wrapper.find('.audio-selector').element.value).toBe('hdmi')
+    })
+  })
+
+  describe('Playlist settings', () => {
+    it('loads playlist settings when dialog opens with online device', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+
+      mountDialog()
+
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      expect(getPlaylist).toHaveBeenCalledWith(1)
+    })
+
+    it('updates playlist fields when read button clicked', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+      getPlaylist.mockResolvedValue({ source: 'yandex/path', destination: '/local/path' })
+
+      const wrapper = mountDialog()
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      const readButton = wrapper.find('.playlist-settings button')
+      await readButton.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(getPlaylist).toHaveBeenCalledWith(1)
+      expect(wrapper.find('#playlist-source').element.value).toBe('yandex/path')
+      expect(wrapper.find('#playlist-destination').element.value).toBe('/local/path')
+    })
+
+    it('saves playlist settings when save button clicked', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+      const wrapper = mountDialog()
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      await wrapper.find('#playlist-source').setValue('new/source')
+      await wrapper.find('#playlist-destination').setValue('new/destination')
+
+      const saveButton = wrapper.find('.playlist-settings button:nth-of-type(2)')
+      await saveButton.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(updatePlaylist).toHaveBeenCalledWith(1, { source: 'new/source', destination: 'new/destination' })
+      expect(alertSuccess).toHaveBeenCalledWith('Настройки плей-листа успешно сохранены')
+    })
+
+    it('disables playlist controls when device is offline', async () => {
+      const wrapper = mountDialog()
+
+      expect(wrapper.find('#playlist-source').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('#playlist-destination').attributes('disabled')).toBeDefined()
+      const buttons = wrapper.findAll('.playlist-settings button')
+      expect(buttons).toHaveLength(2)
+      buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeDefined())
     })
   })
 

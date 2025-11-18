@@ -18,8 +18,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const informationalPanels = [
-  { key: 'timers', title: 'Настройки таймеров' },
-  { key: 'playlist', title: 'Настройки плей-листа' }
+  { key: 'timers', title: 'Настройки таймеров' }
 ]
 
 const devicesStore = useDevicesStore()
@@ -42,7 +41,9 @@ const operationInProgress = ref({
   reboot: false,
   shutdown: false,
   audioUpdate: false,
-  audioSave: false
+  audioSave: false,
+  playlistUpdate: false,
+  playlistSave: false
 })
 
 const systemOperationTimers = ref({
@@ -54,6 +55,12 @@ const systemOperationTimers = ref({
 // Audio settings state
 const audioSettings = ref({
   output: 'hdmi' // default to hdmi
+})
+
+// Playlist settings state
+const playlistSettings = ref({
+  source: '',
+  destination: ''
 })
 
 watch(
@@ -93,6 +100,8 @@ const currentStatus = computed(() => {
   return device?.deviceStatus || null
 })
 
+const device = computed(() => devicesStore.getDeviceById(props.deviceId))
+
 async function fetchDeviceStatus() {
   if (!props.deviceId) return
   try {
@@ -123,6 +132,12 @@ watch(internalOpen, (v) => {
   if (!v) {
     manualStatus.value = null
     resetSystemOperations()
+    // Clear global alerts when the dialog is closed to avoid overlapping UI
+    try {
+      clearAlert()
+    } catch {
+      // swallow errors silently
+    }
   }
 })
 watch(() => props.deviceId, () => {
@@ -135,6 +150,7 @@ watch(() => currentStatus.value?.isOnline, async (isOnline, wasOnline) => {
   // Only load audio settings when device comes online (was offline, now online)
   if (isOnline && wasOnline === false && internalOpen.value && props.deviceId) {
     await updateAudioSettings()
+    await updatePlaylistSettings()
   }
 })
 
@@ -147,18 +163,24 @@ async function initializeDevice() {
   const status = currentStatus.value
   if (status?.isOnline) {
     await updateAudioSettings()
+    await updatePlaylistSettings()
   } else {
     // Set default audio value silently when device is offline
     audioSettings.value.output = 'hdmi'
+    playlistSettings.value.source = ''
+    playlistSettings.value.destination = ''
   }
 }
 
 const onlineClass = computed(() => currentStatus.value?.isOnline ? 'text-success' : 'text-danger')
 
+// Note: playlist status column removed — UI simplified to source/destination only
+
 const isDisabled = computed(() => !currentStatus.value?.isOnline)
 const hasAnyOperationInProgress = computed(() =>
   operationInProgress.value.apply || operationInProgress.value.reboot || operationInProgress.value.shutdown ||
-  operationInProgress.value.audioUpdate || operationInProgress.value.audioSave
+  operationInProgress.value.audioUpdate || operationInProgress.value.audioSave ||
+  operationInProgress.value.playlistUpdate || operationInProgress.value.playlistSave
 )
 
 const resetSystemOperations = () => {
@@ -200,6 +222,35 @@ async function saveAudioSettings() {
     alertStore.error('Не удалось сохранить настройки аудио: ' + (err?.message || 'Неизвестная ошибка'))
   } finally {
     operationInProgress.value.audioSave = false
+  }
+}
+
+// Playlist methods
+async function updatePlaylistSettings() {
+  operationInProgress.value.playlistUpdate = true
+  try {
+    const result = await devicesStore.getPlaylist(props.deviceId)
+    playlistSettings.value.source = result?.source || ''
+    playlistSettings.value.destination = result?.destination || ''
+  } catch (err) {
+    alertStore.error('Не удалось загрузить настройки плей-листа: ' + (err?.message || 'Неизвестная ошибка'))
+  } finally {
+    operationInProgress.value.playlistUpdate = false
+  }
+}
+
+async function savePlaylistSettings() {
+  operationInProgress.value.playlistSave = true
+  try {
+    await devicesStore.updatePlaylist(props.deviceId, {
+      source: playlistSettings.value.source,
+      destination: playlistSettings.value.destination
+    })
+    alertStore.success('Настройки плей-листа успешно сохранены')
+  } catch (err) {
+    alertStore.error('Не удалось сохранить настройки плей-листа: ' + (err?.message || 'Неизвестная ошибка'))
+  } finally {
+    operationInProgress.value.playlistSave = false
   }
 }
 
@@ -267,7 +318,7 @@ onBeforeUnmount(() => {
       <v-card-title>
         <div class="primary-heading">
           <font-awesome-icon :icon="currentStatus?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'" :class="onlineClass" class="mr-2"/>
-          <span>Управление устройством</span>
+          <span>Управление устройством{{ device?.name ? ': ' + device.name : '' }}</span>
         </div>
       </v-card-title>
       <v-card-text>
@@ -275,6 +326,59 @@ onBeforeUnmount(() => {
           <fieldset v-for="panel in informationalPanels" :key="panel.key" class="panel">
             <legend class="primary-heading">{{ panel.title }}</legend>
             <div class="panel-content" />
+          </fieldset>
+
+          <fieldset class="panel">
+            <legend class="primary-heading">Настройки плей-листа</legend>
+            <div class="panel-content playlist-settings">
+              <div class="playlist-grid">
+                <label class="playlist-label" for="playlist-source">Яндекс диск</label>
+                <input
+                  id="playlist-source"
+                  v-model="playlistSettings.source"
+                  type="text"
+                  class="playlist-input"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                />
+                <button
+                  class="button-o-c"
+                  type="button"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                  @click="updatePlaylistSettings"
+                >
+                  <font-awesome-icon
+                    size="1x"
+                    :icon="operationInProgress.playlistUpdate ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
+                    :class="{ 'fa-spin': operationInProgress.playlistUpdate }"
+                    class="mr-1"
+                  />
+                  {{ operationInProgress.playlistUpdate ? 'Читается...' : 'Прочитать' }}
+                </button>
+
+                <label class="playlist-label" for="playlist-destination">Локальный диск</label>
+                <input
+                  id="playlist-destination"
+                  v-model="playlistSettings.destination"
+                  type="text"
+                  class="playlist-input"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                />
+                <button
+                  class="button-o-c"
+                  type="button"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                  @click="savePlaylistSettings"
+                >
+                  <font-awesome-icon
+                    size="1x"
+                    :icon="operationInProgress.playlistSave ? 'fa-solid fa-spinner' : 'fa-regular fa-save'"
+                    :class="{ 'fa-spin': operationInProgress.playlistSave }"
+                    class="mr-1"
+                  />
+                  {{ operationInProgress.playlistSave ? 'Сохраняется...' : 'Сохранить' }}
+                </button>
+              </div>
+            </div>
           </fieldset>
 
           <fieldset class="panel">
@@ -336,7 +440,7 @@ onBeforeUnmount(() => {
                   :class="{ 'fa-spin': operationInProgress.apply }"
                   class="mr-1"
                 />
-                {{ operationInProgress.apply ? 'Применяется...' : 'Применить' }}
+                {{ operationInProgress.apply ? 'Изменения применяются...' : 'Применить изменения' }}
               </button>
               <button
                 class="button-o-c"
@@ -433,6 +537,45 @@ onBeforeUnmount(() => {
   justify-content: center;
   align-items: center;
 }
+
+.playlist-settings {
+  display: flex;
+  justify-content: center;
+}
+
+.playlist-grid {
+  display: grid;
+  /* three columns: labels, inputs, buttons; two rows are provided by the markup order */
+  grid-template-columns: 140px 1fr auto;
+  grid-auto-rows: auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  width: 100%;
+}
+
+.playlist-label {
+  font-size: 1rem;
+  color: var(--text-color);
+}
+
+.playlist-input {
+  padding: 0 0.75rem;
+  height: 36px;
+  line-height: 36px;
+  box-sizing: border-box;
+  border: 1px solid var(--primary-color);
+  border-radius: 4px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  width: 100%;
+}
+
+.playlist-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* playlist-status column removed */
 
 .audio-label {
   font-size: 1rem;

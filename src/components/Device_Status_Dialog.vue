@@ -75,7 +75,16 @@ async function refreshNow () {
 
 // Clear manual override when dialog closes or device changes
 watch(internalOpen, (v) => {
-  if (!v) manualStatus.value = null
+  if (!v) {
+    manualStatus.value = null
+    // Clear global alerts when the dialog is closed to avoid overlapping UI
+    try {
+      const alertStore = useAlertStore()
+      if (alertStore && typeof alertStore.clear === 'function') alertStore.clear()
+    } catch {
+      // swallow errors - not critical
+    }
+  }
 })
 watch(() => props.deviceId, () => {
   manualStatus.value = null
@@ -90,7 +99,7 @@ watch(() => props.deviceId, () => {
         <div class="primary-heading">
           <div>
             <font-awesome-icon :icon="status?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'" :class="onlineClass" class="mr-2"/>
-            <span>Состояние устройства</span>
+            <span>Системная информация об устройстве{{ device?.name ? ': ' + device.name : '' }}</span>
           </div>
         </div>
       </v-card-title>
