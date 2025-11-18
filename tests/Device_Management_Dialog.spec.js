@@ -122,9 +122,11 @@ describe('Device_Management_Dialog.vue', () => {
       { deviceId: 1, isOnline: true }
     ]
     await wrapper.vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await wrapper.vm.$nextTick()
 
     const refreshedButtons = wrapper.findAll('.system-actions button')
-    refreshedButtons.forEach((btn) => expect(btn.attributes('disabled')).toBeFalsy())
+    refreshedButtons.forEach((btn) => expect(btn.attributes('disabled')).toBeUndefined())
   })
 
   it('invokes reloadSystem when apply button is clicked', async () => {
@@ -134,7 +136,6 @@ describe('Device_Management_Dialog.vue', () => {
     const wrapper = mountDialog()
 
     const [applyBtn] = wrapper.findAll('.system-actions button')
-    
     await applyBtn.trigger('click')
     await wrapper.vm.$nextTick()
     expect(reloadSystem).toHaveBeenCalledWith(1)
@@ -147,7 +148,6 @@ describe('Device_Management_Dialog.vue', () => {
     const wrapper = mountDialog()
 
     const [, rebootBtn] = wrapper.findAll('.system-actions button')
-    
     await rebootBtn.trigger('click')
     await wrapper.vm.$nextTick()
     expect(rebootSystem).toHaveBeenCalledWith(1)
@@ -160,7 +160,6 @@ describe('Device_Management_Dialog.vue', () => {
     const wrapper = mountDialog()
 
     const [, , shutdownBtn] = wrapper.findAll('.system-actions button')
-    
     await shutdownBtn.trigger('click')
     await wrapper.vm.$nextTick()
     expect(shutdownSystem).toHaveBeenCalledWith(1)
@@ -236,7 +235,7 @@ describe('Device_Management_Dialog.vue', () => {
 
   it('fetches device status after reboot and shutdown operations with proper timeouts', async () => {
     vi.useFakeTimers()
-    
+
     statusesRef.value = [
       { deviceId: 1, isOnline: true }
     ]
@@ -279,38 +278,39 @@ describe('Device_Management_Dialog.vue', () => {
     vi.useRealTimers()
   }, 10000)
 
-  // Audio settings tests
-  it('loads audio settings when dialog opens with online device', async () => {
-    statusesRef.value = [
-      { deviceId: 1, isOnline: true }
-    ]
-    
-    mount(DeviceManagementDialog, {
-      props: { modelValue: true, deviceId: 1 },
-      global: { stubs: globalStubs }
+  describe('Audio settings', () => {
+    it('loads audio settings when dialog opens with online device', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+
+      mount(DeviceManagementDialog, {
+        props: { modelValue: true, deviceId: 1 },
+        global: { stubs: globalStubs }
+      })
+
+      // Wait for Vue reactivity and async operations
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      expect(getAudio).toHaveBeenCalledWith(1)
     })
 
-    // Wait for Vue reactivity and async operations
-    await new Promise(resolve => setTimeout(resolve, 10))
+    it('sets default audio settings when dialog opens with offline device', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: false }
+      ]
 
-    expect(getAudio).toHaveBeenCalledWith(1)
-  })
+      const wrapper = mount(DeviceManagementDialog, {
+        props: { modelValue: true, deviceId: 1 },
+        global: { stubs: globalStubs }
+      })
 
-  it('sets default audio settings when dialog opens with offline device', async () => {
-    statusesRef.value = [
-      { deviceId: 1, isOnline: false }
-    ]
-    
-    const wrapper = mount(DeviceManagementDialog, {
-      props: { modelValue: true, deviceId: 1 },
-      global: { stubs: globalStubs }
+      // Wait for Vue reactivity and async operations
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      expect(getAudio).not.toHaveBeenCalled()
+      expect(wrapper.find('.audio-selector').element.value).toBe('hdmi')
     })
-
-    // Wait for Vue reactivity and async operations
-    await new Promise(resolve => setTimeout(resolve, 10))
-
-    expect(getAudio).not.toHaveBeenCalled()
-    expect(wrapper.find('.audio-selector').element.value).toBe('hdmi')
   })
 
   it('displays audio selector with correct options', async () => {
@@ -337,7 +337,7 @@ describe('Device_Management_Dialog.vue', () => {
       { deviceId: 1, isOnline: true }
     ]
     getAudio.mockResolvedValueOnce({ output: 'unknown' })
-    
+
     const wrapper = mountDialog()
     await new Promise(resolve => setTimeout(resolve, 10))
     await wrapper.vm.$nextTick()
@@ -351,7 +351,7 @@ describe('Device_Management_Dialog.vue', () => {
       { deviceId: 1, isOnline: true }
     ]
     getAudio.mockResolvedValueOnce({ output: 'invalid-option' })
-    
+
     const wrapper = mountDialog()
     await new Promise(resolve => setTimeout(resolve, 10))
     await wrapper.vm.$nextTick()
@@ -366,7 +366,7 @@ describe('Device_Management_Dialog.vue', () => {
     ]
     const wrapper = mountDialog()
     await new Promise(resolve => setTimeout(resolve, 10))
-    
+
     // Mock the next call to getAudio to return jack
     getAudio.mockResolvedValueOnce({ output: 'jack' })
 
@@ -430,7 +430,7 @@ describe('Device_Management_Dialog.vue', () => {
     statusesRef.value = [
       { deviceId: 1, isOnline: true }
     ]
-    
+
     const wrapper = mountDialog()
     await new Promise(resolve => setTimeout(resolve, 20))
     await wrapper.vm.$nextTick()
@@ -440,10 +440,10 @@ describe('Device_Management_Dialog.vue', () => {
 
     expect(selector.exists()).toBe(true)
     expect(buttons).toHaveLength(2)
-    
+
     // Verify the buttons are clickable when online
-    expect(selector.attributes('disabled')).toBeFalsy()
-    buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeFalsy())
+    expect(selector.attributes('disabled')).toBeUndefined()
+    buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeUndefined())
   })
 
   it('displays error when getAudio fails with online device', async () => {
@@ -451,7 +451,7 @@ describe('Device_Management_Dialog.vue', () => {
       { deviceId: 1, isOnline: true }
     ]
     getAudio.mockRejectedValueOnce(new Error('Network error'))
-    
+
     const wrapper = mountDialog()
     await new Promise(resolve => setTimeout(resolve, 10))
     await wrapper.vm.$nextTick()
@@ -464,7 +464,7 @@ describe('Device_Management_Dialog.vue', () => {
       { deviceId: 1, isOnline: true }
     ]
     updateAudio.mockRejectedValueOnce(new Error('Save error'))
-    
+
     const wrapper = mountDialog()
     await new Promise(resolve => setTimeout(resolve, 0))
     await wrapper.vm.$nextTick()
@@ -527,7 +527,7 @@ describe('Device_Management_Dialog.vue', () => {
     statusesRef.value = [
       { deviceId: 1, isOnline: true }
     ]
-    
+
     const wrapper = mountDialog()
     await new Promise(resolve => setTimeout(resolve, 10))
     await wrapper.vm.$nextTick()
