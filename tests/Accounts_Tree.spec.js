@@ -463,13 +463,13 @@ describe('Accounts_Tree.vue', () => {
       await resolveAll()
 
       // Simulate device group assignment in progress
-      wrapper.vm.deviceGroupAssignmentState = {
+      wrapper.vm.deviceGroupAssignmentState.value = {
         1: { editMode: true, selectedGroupId: null }
       }
       await wrapper.vm.$nextTick()
 
       // Verify that the assignment state is correctly set
-      expect(wrapper.vm.deviceGroupAssignmentState[1].editMode).toBe(true)
+      expect(wrapper.vm.deviceGroupAssignmentState.value[1].editMode).toBe(true)
       
       // Verify that getDeviceIdFromNodeId function would work with our test data
       const testItem = { id: 'device-1-account-1-unassigned' }
@@ -477,7 +477,7 @@ describe('Accounts_Tree.vue', () => {
       expect(deviceId).toBe(1)
       
       // Verify that when editMode is true, buttons would be disabled
-      const isInEditMode = wrapper.vm.deviceGroupAssignmentState[deviceId]?.editMode
+      const isInEditMode = wrapper.vm.deviceGroupAssignmentState.value[deviceId]?.editMode
       expect(isInEditMode).toBe(true)
     })
   })

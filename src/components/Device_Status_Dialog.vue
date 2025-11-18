@@ -124,7 +124,7 @@ watch(() => props.deviceId, () => {
         <ServicesList
           ref="servicesListRef"
           :device-id="props.deviceId"
-          :accessible="status?.isOnline"
+          :accessible="!!status?.isOnline"
           :open="internalOpen"
         />
       </v-card-text>

@@ -1,8 +1,8 @@
-<script setup>
 // Copyright (c) 2025 sw.consulting
 // This file is a part of Media Pi  frontend application
+<script setup>
 
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import { useDevicesStore } from '@/stores/devices.store.js'
@@ -16,6 +16,11 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
+
+const informationalPanels = [
+  { key: 'timers', title: 'Настройки таймеров' },
+  { key: 'playlist', title: 'Настройки плей-листа' }
+]
 
 const devicesStore = useDevicesStore()
 const deviceStatusesStore = useDeviceStatusesStore()
@@ -38,6 +43,12 @@ const operationInProgress = ref({
   shutdown: false,
   audioUpdate: false,
   audioSave: false
+})
+
+const systemOperationTimers = ref({
+  apply: null,
+  reboot: null,
+  shutdown: null
 })
 
 // Audio settings state
@@ -66,11 +77,6 @@ const internalOpen = ref(props.modelValue)
 watch(() => props.modelValue, (value) => { internalOpen.value = value })
 watch(internalOpen, (value) => emit('update:modelValue', value))
 
-const informationalPanels = [
-  { key: 'timers', title: 'Настройки таймеров' },
-  { key: 'playlist', title: 'Настройки плей-листа' }
-]
-
 const currentStatus = computed(() => {
   const id = props.deviceId
   if (!id) return null
@@ -79,7 +85,7 @@ const currentStatus = computed(() => {
   if (manualStatus.value && manualStatus.value.deviceId === id) {
     return manualStatus.value
   }
-  
+
   const live = (statuses.value || []).find((s) => s?.deviceId === id)
   if (live) return live
 
@@ -114,25 +120,29 @@ watch(() => props.deviceId, async (id) => {
 
 // Clear manual override when dialog closes or device changes
 watch(internalOpen, (v) => {
-  if (!v) manualStatus.value = null
+  if (!v) {
+    manualStatus.value = null
+    resetSystemOperations()
+  }
 })
 watch(() => props.deviceId, () => {
   manualStatus.value = null
+  resetSystemOperations()
 })
 
 // Watch for device coming online to load audio settings
 watch(() => currentStatus.value?.isOnline, async (isOnline, wasOnline) => {
   // Only load audio settings when device comes online (was offline, now online)
-  if (isOnline && !wasOnline && internalOpen.value && props.deviceId) {
+  if (isOnline && wasOnline === false && internalOpen.value && props.deviceId) {
     await updateAudioSettings()
   }
 })
 
 async function initializeDevice() {
   if (!props.deviceId) return
-  
+
   await fetchDeviceStatus()
-  
+
   // Only load audio settings if device is online, otherwise set default
   const status = currentStatus.value
   if (status?.isOnline) {
@@ -146,10 +156,22 @@ async function initializeDevice() {
 const onlineClass = computed(() => currentStatus.value?.isOnline ? 'text-success' : 'text-danger')
 
 const isDisabled = computed(() => !currentStatus.value?.isOnline)
-const hasAnyOperationInProgress = computed(() => 
+const hasAnyOperationInProgress = computed(() =>
   operationInProgress.value.apply || operationInProgress.value.reboot || operationInProgress.value.shutdown ||
   operationInProgress.value.audioUpdate || operationInProgress.value.audioSave
 )
+
+const resetSystemOperations = () => {
+  Object.keys(systemOperationTimers.value).forEach((key) => {
+    if (systemOperationTimers.value[key]) {
+      clearTimeout(systemOperationTimers.value[key])
+      systemOperationTimers.value[key] = null
+    }
+  })
+  Object.keys(operationInProgress.value).forEach((key) => {
+    operationInProgress.value[key] = false
+  })
+}
 
 // Audio methods
 async function updateAudioSettings() {
@@ -182,56 +204,61 @@ async function saveAudioSettings() {
 }
 
 const runWithDevice = async (handler) => {
-  if (!props.deviceId || typeof handler !== 'function') return
+  if (!props.deviceId || typeof handler !== 'function') return false
   try {
     await handler(props.deviceId)
+    return true
   } catch (err) {
     const message = err?.message || 'Ошибка выполнения операции'
     alertStore.error(message)
+    return false
+  }
+}
+
+const runSystemOperation = async (key, handler, timeout) => {
+  if (!['apply', 'reboot', 'shutdown'].includes(key)) return
+  resetSystemOperationTimer(key)
+  operationInProgress.value[key] = true
+  const success = await runWithDevice(handler)
+  if (!success) {
+    operationInProgress.value[key] = false
+    return
+  }
+
+  const deviceIdAtStart = props.deviceId
+  systemOperationTimers.value[key] = setTimeout(async () => {
+    if (!internalOpen.value || props.deviceId !== deviceIdAtStart) {
+      operationInProgress.value[key] = false
+      return
+    }
+    await fetchDeviceStatus()
+    operationInProgress.value[key] = false
+    systemOperationTimers.value[key] = null
+  }, timeout)
+}
+
+const resetSystemOperationTimer = (key) => {
+  if (systemOperationTimers.value[key]) {
+    clearTimeout(systemOperationTimers.value[key])
+    systemOperationTimers.value[key] = null
   }
 }
 
 const apply = async () => {
-  operationInProgress.value.apply = true
-  try {
-    await runWithDevice(devicesStore.reloadSystem)
-    setTimeout(async () => {
-      await fetchDeviceStatus()
-      operationInProgress.value.apply = false
-    }, timeouts.apply)
-  } catch {
-    operationInProgress.value.apply = false
-    // Error is already handled by runWithDevice
-  }
+  await runSystemOperation('apply', devicesStore.reloadSystem, timeouts.apply)
 }
 
 const reboot = async () => {
-  operationInProgress.value.reboot = true
-  try {
-    await runWithDevice(devicesStore.rebootSystem)
-    setTimeout(async () => {
-      await fetchDeviceStatus()
-      operationInProgress.value.reboot = false
-    }, timeouts.reboot)
-  } catch {
-    operationInProgress.value.reboot = false
-    // Error is already handled by runWithDevice
-  }
+  await runSystemOperation('reboot', devicesStore.rebootSystem, timeouts.reboot)
 }
 
 const shutdown = async () => {
-  operationInProgress.value.shutdown = true
-  try {
-    await runWithDevice(devicesStore.shutdownSystem)
-    setTimeout(async () => {
-      await fetchDeviceStatus()
-      operationInProgress.value.shutdown = false
-    }, timeouts.shutdown)
-  } catch {
-    operationInProgress.value.shutdown = false
-    // Error is already handled by runWithDevice
-  }
+  await runSystemOperation('shutdown', devicesStore.shutdownSystem, timeouts.shutdown)
 }
+
+onBeforeUnmount(() => {
+  resetSystemOperations()
+})
 </script>
 
 <template>
@@ -254,9 +281,9 @@ const shutdown = async () => {
             <legend class="primary-heading">Настройки аудио</legend>
             <div class="panel-content audio-settings">
               <label for="audio-output" class="audio-label">Аудиовыход</label>
-              <select 
+              <select
                 id="audio-output"
-                v-model="audioSettings.output" 
+                v-model="audioSettings.output"
                 class="audio-selector"
                 :disabled="isDisabled || hasAnyOperationInProgress"
               >
@@ -269,11 +296,11 @@ const shutdown = async () => {
                 :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="updateAudioSettings"
               >
-                <font-awesome-icon 
-                  size="1x" 
-                  :icon="operationInProgress.audioUpdate ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'" 
+                <font-awesome-icon
+                  size="1x"
+                  :icon="operationInProgress.audioUpdate ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
                   :class="{ 'fa-spin': operationInProgress.audioUpdate }"
-                  class="mr-1" 
+                  class="mr-1"
                 />
                 {{ operationInProgress.audioUpdate ? 'Читается...' : 'Прочитать' }}
               </button>
@@ -283,11 +310,11 @@ const shutdown = async () => {
                 :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="saveAudioSettings"
               >
-                <font-awesome-icon 
-                  size="1x" 
-                  :icon="operationInProgress.audioSave ? 'fa-solid fa-spinner' : 'fa-regular fa-save'" 
+                <font-awesome-icon
+                  size="1x"
+                  :icon="operationInProgress.audioSave ? 'fa-solid fa-spinner' : 'fa-regular fa-save'"
                   :class="{ 'fa-spin': operationInProgress.audioSave }"
-                  class="mr-1" 
+                  class="mr-1"
                 />
                 {{ operationInProgress.audioSave ? 'Сохраняется...' : 'Сохранить' }}
               </button>
@@ -303,11 +330,11 @@ const shutdown = async () => {
                 :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="apply"
               >
-                <font-awesome-icon 
-                  size="1x" 
-                  :icon="operationInProgress.apply ? 'fa-solid fa-spinner' : 'fa-solid fa-download'" 
+                <font-awesome-icon
+                  size="1x"
+                  :icon="operationInProgress.apply ? 'fa-solid fa-spinner' : 'fa-solid fa-download'"
                   :class="{ 'fa-spin': operationInProgress.apply }"
-                  class="mr-1" 
+                  class="mr-1"
                 />
                 {{ operationInProgress.apply ? 'Применяется...' : 'Применить' }}
               </button>
@@ -317,11 +344,11 @@ const shutdown = async () => {
                 :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="reboot"
               >
-                <font-awesome-icon 
-                  size="1x" 
-                  :icon="operationInProgress.reboot ? 'fa-solid fa-spinner' : 'fa-solid fa-retweet'" 
+                <font-awesome-icon
+                  size="1x"
+                  :icon="operationInProgress.reboot ? 'fa-solid fa-spinner' : 'fa-solid fa-retweet'"
                   :class="{ 'fa-spin': operationInProgress.reboot }"
-                  class="mr-1" 
+                  class="mr-1"
                 />
                 {{ operationInProgress.reboot ? 'Перезагружается...' : 'Перезагрузить' }}
               </button>
@@ -331,11 +358,11 @@ const shutdown = async () => {
                 :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="shutdown"
               >
-                <font-awesome-icon 
-                  size="1x" 
-                  :icon="operationInProgress.shutdown ? 'fa-solid fa-spinner' : 'fa-solid fa-power-off'" 
+                <font-awesome-icon
+                  size="1x"
+                  :icon="operationInProgress.shutdown ? 'fa-solid fa-spinner' : 'fa-solid fa-power-off'"
                   :class="{ 'fa-spin': operationInProgress.shutdown }"
-                  class="mr-1" 
+                  class="mr-1"
                 />
                 {{ operationInProgress.shutdown ? 'Выключается...' : 'Выключить' }}
               </button>
@@ -345,8 +372,8 @@ const shutdown = async () => {
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <button 
-          class="button-o-c primary"    
+        <button
+          class="button-o-c primary"
           type="button"
           @click="internalOpen = false">
             <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
