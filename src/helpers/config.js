@@ -57,3 +57,24 @@ export const apiUrl = config.apiUrl
  * }
  */
 export const enableLog = config.enableLog
+
+/**
+ * System operation timeout constants (in milliseconds)
+ * @type {Object}
+ */
+export const timeouts = {
+  // Timeout after reboot operation before refreshing status
+  reboot: window.RUNTIME_CONFIG?.timeouts?.reboot ||
+          import.meta.env.VITE_REBOOT_TIMEOUT ||
+          30000, // 30 seconds
+
+  // Timeout after shutdown operation before refreshing status
+  shutdown: window.RUNTIME_CONFIG?.timeouts?.shutdown ||
+           import.meta.env.VITE_SHUTDOWN_TIMEOUT ||
+           5000, // 5 seconds
+
+  // Timeout after apply operation before refreshing status
+  apply: window.RUNTIME_CONFIG?.timeouts?.apply ||
+         import.meta.env.VITE_APPLY_TIMEOUT ||
+         10000 // 10 seconds
+}

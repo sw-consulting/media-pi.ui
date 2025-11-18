@@ -52,6 +52,14 @@ vi.mock('@/stores/alert.store.js', () => ({
   })
 }))
 
+vi.mock('@/helpers/config.js', () => ({
+  timeouts: {
+    apply: 10000,
+    reboot: 30000,
+    shutdown: 5000
+  }
+}))
+
 const globalStubs = {
   'v-dialog': {
     props: ['modelValue'],
@@ -70,6 +78,9 @@ describe('Device_Management_Dialog.vue', () => {
     vi.clearAllMocks()
     alertError.mockReset()
     getDeviceStatusById.mockReset()
+    reloadSystem.mockReset()
+    rebootSystem.mockReset()
+    shutdownSystem.mockReset()
     statusesRef.value = []
     getDeviceById.mockImplementation((id) => (
       id === 1
@@ -105,21 +116,42 @@ describe('Device_Management_Dialog.vue', () => {
     refreshedButtons.forEach((btn) => expect(btn.attributes('disabled')).toBeUndefined())
   })
 
-  it('invokes corresponding store actions when buttons are clicked', async () => {
+  it('invokes reloadSystem when apply button is clicked', async () => {
     statusesRef.value = [
       { deviceId: 1, isOnline: true }
     ]
     const wrapper = mountDialog()
 
-    const [applyBtn, rebootBtn, shutdownBtn] = wrapper.findAll('.system-actions button')
-
+    const [applyBtn] = wrapper.findAll('.system-actions button')
+    
     await applyBtn.trigger('click')
+    await wrapper.vm.$nextTick()
     expect(reloadSystem).toHaveBeenCalledWith(1)
+  })
 
+  it('invokes rebootSystem when reboot button is clicked', async () => {
+    statusesRef.value = [
+      { deviceId: 1, isOnline: true }
+    ]
+    const wrapper = mountDialog()
+
+    const [, rebootBtn] = wrapper.findAll('.system-actions button')
+    
     await rebootBtn.trigger('click')
+    await wrapper.vm.$nextTick()
     expect(rebootSystem).toHaveBeenCalledWith(1)
+  })
 
+  it('invokes shutdownSystem when shutdown button is clicked', async () => {
+    statusesRef.value = [
+      { deviceId: 1, isOnline: true }
+    ]
+    const wrapper = mountDialog()
+
+    const [, , shutdownBtn] = wrapper.findAll('.system-actions button')
+    
     await shutdownBtn.trigger('click')
+    await wrapper.vm.$nextTick()
     expect(shutdownSystem).toHaveBeenCalledWith(1)
   })
 
@@ -191,7 +223,7 @@ describe('Device_Management_Dialog.vue', () => {
     buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeDefined())
   })
 
-  it('fetches device status 5 seconds after reboot and shutdown operations', async () => {
+  it('fetches device status after reboot and shutdown operations with proper timeouts', async () => {
     vi.useFakeTimers()
     
     statusesRef.value = [
@@ -208,24 +240,28 @@ describe('Device_Management_Dialog.vue', () => {
 
     const [, rebootBtn, shutdownBtn] = wrapper.findAll('.system-actions button')
 
-    // Test reboot button
+    // Test reboot button (30 second timeout)
     await rebootBtn.trigger('click')
+    await wrapper.vm.$nextTick()
     expect(rebootSystem).toHaveBeenCalledWith(1)
     expect(getDeviceStatusById).not.toHaveBeenCalled()
 
-    // Fast-forward 5 seconds
-    await vi.advanceTimersByTimeAsync(5000)
+    // Fast-forward 30 seconds for reboot
+    await vi.advanceTimersByTimeAsync(30000)
+    await wrapper.vm.$nextTick()
 
     expect(getDeviceStatusById).toHaveBeenCalledWith(1)
     getDeviceStatusById.mockClear()
 
-    // Test shutdown button
+    // Test shutdown button (5 second timeout)
     await shutdownBtn.trigger('click')
+    await wrapper.vm.$nextTick()
     expect(shutdownSystem).toHaveBeenCalledWith(1)
     expect(getDeviceStatusById).not.toHaveBeenCalled()
 
-    // Fast-forward 5 seconds
+    // Fast-forward 5 seconds for shutdown
     await vi.advanceTimersByTimeAsync(5000)
+    await wrapper.vm.$nextTick()
 
     expect(getDeviceStatusById).toHaveBeenCalledWith(1)
 
