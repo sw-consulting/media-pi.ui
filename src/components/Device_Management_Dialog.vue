@@ -1,13 +1,14 @@
+<script setup>
 // Copyright (c) 2025 sw.consulting
 // This file is a part of Media Pi  frontend application
 
-<script setup>
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import { timeouts } from '@/helpers/config.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -29,6 +30,13 @@ const { statuses } = storeToRefs(deviceStatusesStore)
 
 // Manual refresh override: prioritizes explicit refresh over SSE
 const manualStatus = ref(null)
+
+// Track ongoing operations to disable controls
+const operationInProgress = ref({
+  apply: false,
+  reboot: false,
+  shutdown: false
+})
 
 watch(
   () => statuses.value,
@@ -107,9 +115,11 @@ const currentStatus = computed(() => {
 })
 
 const onlineClass = computed(() => currentStatus.value?.isOnline ? 'text-success' : 'text-danger')
-  
-const isOnline = computed(() => Boolean(currentStatus.value?.isOnline))
-const isDisabled = computed(() => !currentStatus.value || !isOnline.value)
+
+const isDisabled = computed(() => !currentStatus.value?.isOnline)
+const hasAnyOperationInProgress = computed(() => 
+  operationInProgress.value.apply || operationInProgress.value.reboot || operationInProgress.value.shutdown
+)
 
 const runWithDevice = async (handler) => {
   if (!props.deviceId || typeof handler !== 'function') return
@@ -121,22 +131,46 @@ const runWithDevice = async (handler) => {
   }
 }
 
-const applyChanges = () => runWithDevice(devicesStore.reloadSystem)
+const apply = async () => {
+  operationInProgress.value.apply = true
+  try {
+    await runWithDevice(devicesStore.reloadSystem)
+    setTimeout(async () => {
+      await fetchDeviceStatus()
+      operationInProgress.value.apply = false
+    }, timeouts.apply)
+  } catch (err) {
+    operationInProgress.value.apply = false
+    // Error is already handled by runWithDevice
+  }
+}
 
 const reboot = async () => {
-  await runWithDevice(devicesStore.rebootSystem)
-  // Wait 30 seconds and then fetch status to reflect the reboot
-  setTimeout(async () => {
-    await fetchDeviceStatus()
-  }, 30000)
+  operationInProgress.value.reboot = true
+  try {
+    await runWithDevice(devicesStore.rebootSystem)
+    setTimeout(async () => {
+      await fetchDeviceStatus()
+      operationInProgress.value.reboot = false
+    }, timeouts.reboot)
+  } catch (err) {
+    operationInProgress.value.reboot = false
+    // Error is already handled by runWithDevice
+  }
 }
 
 const shutdown = async () => {
-  await runWithDevice(devicesStore.shutdownSystem)
-  // Wait 5 seconds and then fetch status to reflect the shutdown
-  setTimeout(async () => {
-    await fetchDeviceStatus()
-  }, 5000)
+  operationInProgress.value.shutdown = true
+  try {
+    await runWithDevice(devicesStore.shutdownSystem)
+    setTimeout(async () => {
+      await fetchDeviceStatus()
+      operationInProgress.value.shutdown = false
+    }, timeouts.shutdown)
+  } catch (err) {
+    operationInProgress.value.shutdown = false
+    // Error is already handled by runWithDevice
+  }
 }
 </script>
 
@@ -162,29 +196,44 @@ const shutdown = async () => {
               <button
                 class="button-o-c primary"
                 type="button"
-                :disabled="isDisabled"
-                @click="applyChanges"
+                :disabled="isDisabled || hasAnyOperationInProgress"
+                @click="apply"
               >
-                <font-awesome-icon size="1x" icon="fa-solid fa-download" class="mr-1" />
-                Применить
+                <font-awesome-icon 
+                  size="1x" 
+                  :icon="operationInProgress.apply ? 'fa-solid fa-spinner' : 'fa-solid fa-download'" 
+                  :class="{ 'fa-spin': operationInProgress.apply }"
+                  class="mr-1" 
+                />
+                {{ operationInProgress.apply ? 'Применяется...' : 'Применить' }}
               </button>
               <button
                 class="button-o-c warning"
                 type="button"
-                :disabled="isDisabled"
+                :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="reboot"
               >
-                <font-awesome-icon size="1x" icon="fa-solid fa-retweet" class="mr-1" />
-                Перезагрузить
+                <font-awesome-icon 
+                  size="1x" 
+                  :icon="operationInProgress.reboot ? 'fa-solid fa-spinner' : 'fa-solid fa-retweet'" 
+                  :class="{ 'fa-spin': operationInProgress.reboot }"
+                  class="mr-1" 
+                />
+                {{ operationInProgress.reboot ? 'Перезагружается...' : 'Перезагрузить' }}
               </button>
               <button
                 class="button-o-c danger"
                 type="button"
-                :disabled="isDisabled"
+                :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="shutdown"
               >
-                <font-awesome-icon size="1x" icon="fa-solid fa-power-off" class="mr-1" />
-                Выключить
+                <font-awesome-icon 
+                  size="1x" 
+                  :icon="operationInProgress.shutdown ? 'fa-solid fa-spinner' : 'fa-solid fa-power-off'" 
+                  :class="{ 'fa-spin': operationInProgress.shutdown }"
+                  class="mr-1" 
+                />
+                {{ operationInProgress.shutdown ? 'Выключается...' : 'Выключить' }}
               </button>
             </div>
           </fieldset>
@@ -268,5 +317,18 @@ const shutdown = async () => {
   outline: none;
   box-shadow: 0px 2px 10px var(--primary-color);
   color: var(--primary-color);
+}
+
+.fa-spin {
+  animation: fa-spin 2s infinite linear;
+}
+
+@keyframes fa-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>

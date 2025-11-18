@@ -45,7 +45,6 @@ const status = computed(() => {
 const device = computed(() => devicesStore.getDeviceById(props.deviceId))
 
 const onlineClass = computed(() => status.value?.isOnline ? 'text-success' : 'text-danger')
-const isAccessible = computed(() => Boolean(status.value?.isOnline))
 
 function fmtDate(value) {
   if (!value) return '—'
@@ -125,7 +124,7 @@ watch(() => props.deviceId, () => {
         <ServicesList
           ref="servicesListRef"
           :device-id="props.deviceId"
-          :accessible="isAccessible"
+          :accessible="status?.isOnline"
           :open="internalOpen"
         />
       </v-card-text>
