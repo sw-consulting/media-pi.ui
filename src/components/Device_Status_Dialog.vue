@@ -90,7 +90,7 @@ watch(() => props.deviceId, () => {
         <div class="primary-heading">
           <div>
             <font-awesome-icon :icon="status?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'" :class="onlineClass" class="mr-2"/>
-            <span>Состояние устройства</span>
+            <span>Системная информация об устройстве{{ device?.name ? ': ' + device.name : '' }}</span>
           </div>
         </div>
       </v-card-title>

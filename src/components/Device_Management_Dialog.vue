@@ -18,8 +18,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const informationalPanels = [
-  { key: 'timers', title: 'Настройки таймеров' },
-  { key: 'playlist', title: 'Настройки плей-листа' }
+  { key: 'timers', title: 'Настройки таймеров' }
 ]
 
 const devicesStore = useDevicesStore()
@@ -105,6 +104,8 @@ const currentStatus = computed(() => {
   const device = devicesStore.getDeviceById(id)
   return device?.deviceStatus || null
 })
+
+const device = computed(() => devicesStore.getDeviceById(props.deviceId))
 
 async function fetchDeviceStatus() {
   if (!props.deviceId) return
@@ -322,7 +323,7 @@ onBeforeUnmount(() => {
       <v-card-title>
         <div class="primary-heading">
           <font-awesome-icon :icon="currentStatus?.isOnline ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'" :class="onlineClass" class="mr-2"/>
-          <span>Управление устройством</span>
+          <span>Управление устройством{{ device?.name ? ': ' + device.name : '' }}</span>
         </div>
       </v-card-title>
       <v-card-text>
