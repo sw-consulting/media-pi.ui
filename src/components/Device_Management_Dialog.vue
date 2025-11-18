@@ -35,7 +35,14 @@ const manualStatus = ref(null)
 const operationInProgress = ref({
   apply: false,
   reboot: false,
-  shutdown: false
+  shutdown: false,
+  audioUpdate: false,
+  audioSave: false
+})
+
+// Audio settings state
+const audioSettings = ref({
+  output: 'hdmi' // default to hdmi
 })
 
 watch(
@@ -59,43 +66,9 @@ const internalOpen = ref(props.modelValue)
 watch(() => props.modelValue, (value) => { internalOpen.value = value })
 watch(internalOpen, (value) => emit('update:modelValue', value))
 
-async function fetchDeviceStatus() {
-  if (!props.deviceId) return
-  try {
-    const result = await deviceStatusesStore.getById(props.deviceId)
-    // Ensure the dialog shows the freshly fetched value even if SSE also updates
-    manualStatus.value = result || null
-  } catch (err) {
-    alertStore.error('Не удалось обновить статус устройства: ' + (err?.message || 'Неизвестная ошибка'))
-  }
-}
-
-// Initialize device status when dialog opens
-watch(internalOpen, async (isOpen) => {
-  if (isOpen && props.deviceId) {
-    await fetchDeviceStatus()
-  }
-}, { immediate: true })
-
-// If deviceId changes while dialog is open, refresh status
-watch(() => props.deviceId, async (id) => {
-  if (internalOpen.value && id) {
-    await fetchDeviceStatus()
-  }
-})
-
-// Clear manual override when dialog closes or device changes
-watch(internalOpen, (v) => {
-  if (!v) manualStatus.value = null
-})
-watch(() => props.deviceId, () => {
-  manualStatus.value = null
-})
-
 const informationalPanels = [
   { key: 'timers', title: 'Настройки таймеров' },
-  { key: 'playlist', title: 'Настройки плей-листа' },
-  { key: 'audio', title: 'Настройки аудио' }
+  { key: 'playlist', title: 'Настройки плей-листа' }
 ]
 
 const currentStatus = computed(() => {
@@ -114,12 +87,99 @@ const currentStatus = computed(() => {
   return device?.deviceStatus || null
 })
 
+async function fetchDeviceStatus() {
+  if (!props.deviceId) return
+  try {
+    const result = await deviceStatusesStore.getById(props.deviceId)
+    // Ensure the dialog shows the freshly fetched value even if SSE also updates
+    manualStatus.value = result || null
+  } catch (err) {
+    alertStore.error('Не удалось обновить статус устройства: ' + (err?.message || 'Неизвестная ошибка'))
+  }
+}
+
+// Initialize device status when dialog opens
+watch(internalOpen, async (isOpen) => {
+  if (isOpen && props.deviceId) {
+    await initializeDevice()
+  }
+}, { immediate: true })
+
+// If deviceId changes while dialog is open, refresh status
+watch(() => props.deviceId, async (id) => {
+  if (internalOpen.value && id) {
+    await initializeDevice()
+  }
+})
+
+// Clear manual override when dialog closes or device changes
+watch(internalOpen, (v) => {
+  if (!v) manualStatus.value = null
+})
+watch(() => props.deviceId, () => {
+  manualStatus.value = null
+})
+
+// Watch for device coming online to load audio settings
+watch(() => currentStatus.value?.isOnline, async (isOnline, wasOnline) => {
+  // Only load audio settings when device comes online (was offline, now online)
+  if (isOnline && !wasOnline && internalOpen.value && props.deviceId) {
+    await updateAudioSettings()
+  }
+})
+
+async function initializeDevice() {
+  if (!props.deviceId) return
+  
+  await fetchDeviceStatus()
+  
+  // Only load audio settings if device is online, otherwise set default
+  const status = currentStatus.value
+  if (status?.isOnline) {
+    await updateAudioSettings()
+  } else {
+    // Set default audio value silently when device is offline
+    audioSettings.value.output = 'hdmi'
+  }
+}
+
 const onlineClass = computed(() => currentStatus.value?.isOnline ? 'text-success' : 'text-danger')
 
 const isDisabled = computed(() => !currentStatus.value?.isOnline)
 const hasAnyOperationInProgress = computed(() => 
-  operationInProgress.value.apply || operationInProgress.value.reboot || operationInProgress.value.shutdown
+  operationInProgress.value.apply || operationInProgress.value.reboot || operationInProgress.value.shutdown ||
+  operationInProgress.value.audioUpdate || operationInProgress.value.audioSave
 )
+
+// Audio methods
+async function updateAudioSettings() {
+  operationInProgress.value.audioUpdate = true
+  try {
+    const result = await devicesStore.getAudio(props.deviceId)
+    if (result?.output === 'unknown' || !['hdmi', 'jack'].includes(result?.output)) {
+      alertStore.error('Неизвестный тип аудио выхода. Установлено значение по умолчанию: HDMI')
+      audioSettings.value.output = 'hdmi'
+    } else {
+      audioSettings.value.output = result.output
+    }
+  } catch (err) {
+    alertStore.error('Не удалось загрузить настройки аудио: ' + (err?.message || 'Неизвестная ошибка'))
+  } finally {
+    operationInProgress.value.audioUpdate = false
+  }
+}
+
+async function saveAudioSettings() {
+  operationInProgress.value.audioSave = true
+  try {
+    await devicesStore.updateAudio(props.deviceId, { output: audioSettings.value.output })
+    alertStore.success('Настройки аудио успешно сохранены')
+  } catch (err) {
+    alertStore.error('Не удалось сохранить настройки аудио: ' + (err?.message || 'Неизвестная ошибка'))
+  } finally {
+    operationInProgress.value.audioSave = false
+  }
+}
 
 const runWithDevice = async (handler) => {
   if (!props.deviceId || typeof handler !== 'function') return
@@ -139,7 +199,7 @@ const apply = async () => {
       await fetchDeviceStatus()
       operationInProgress.value.apply = false
     }, timeouts.apply)
-  } catch (err) {
+  } catch {
     operationInProgress.value.apply = false
     // Error is already handled by runWithDevice
   }
@@ -153,7 +213,7 @@ const reboot = async () => {
       await fetchDeviceStatus()
       operationInProgress.value.reboot = false
     }, timeouts.reboot)
-  } catch (err) {
+  } catch {
     operationInProgress.value.reboot = false
     // Error is already handled by runWithDevice
   }
@@ -167,7 +227,7 @@ const shutdown = async () => {
       await fetchDeviceStatus()
       operationInProgress.value.shutdown = false
     }, timeouts.shutdown)
-  } catch (err) {
+  } catch {
     operationInProgress.value.shutdown = false
     // Error is already handled by runWithDevice
   }
@@ -191,10 +251,54 @@ const shutdown = async () => {
           </fieldset>
 
           <fieldset class="panel">
+            <legend class="primary-heading">Настройки аудио</legend>
+            <div class="panel-content audio-settings">
+              <label for="audio-output" class="audio-label">Аудиовыход</label>
+              <select 
+                id="audio-output"
+                v-model="audioSettings.output" 
+                class="audio-selector"
+                :disabled="isDisabled || hasAnyOperationInProgress"
+              >
+                <option value="hdmi">HDMI audio</option>
+                <option value="jack">3.5'' jack audio</option>
+              </select>
+              <button
+                class="button-o-c"
+                type="button"
+                :disabled="isDisabled || hasAnyOperationInProgress"
+                @click="updateAudioSettings"
+              >
+                <font-awesome-icon 
+                  size="1x" 
+                  :icon="operationInProgress.audioUpdate ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'" 
+                  :class="{ 'fa-spin': operationInProgress.audioUpdate }"
+                  class="mr-1" 
+                />
+                {{ operationInProgress.audioUpdate ? 'Читается...' : 'Прочитать' }}
+              </button>
+              <button
+                class="button-o-c"
+                type="button"
+                :disabled="isDisabled || hasAnyOperationInProgress"
+                @click="saveAudioSettings"
+              >
+                <font-awesome-icon 
+                  size="1x" 
+                  :icon="operationInProgress.audioSave ? 'fa-solid fa-spinner' : 'fa-regular fa-save'" 
+                  :class="{ 'fa-spin': operationInProgress.audioSave }"
+                  class="mr-1" 
+                />
+                {{ operationInProgress.audioSave ? 'Сохраняется...' : 'Сохранить' }}
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset class="panel">
             <legend class="primary-heading">Управление системой</legend>
             <div class="panel-content system-actions">
               <button
-                class="button-o-c primary"
+                class="button-o-c"
                 type="button"
                 :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="apply"
@@ -208,7 +312,7 @@ const shutdown = async () => {
                 {{ operationInProgress.apply ? 'Применяется...' : 'Применить' }}
               </button>
               <button
-                class="button-o-c warning"
+                class="button-o-c"
                 type="button"
                 :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="reboot"
@@ -222,7 +326,7 @@ const shutdown = async () => {
                 {{ operationInProgress.reboot ? 'Перезагружается...' : 'Перезагрузить' }}
               </button>
               <button
-                class="button-o-c danger"
+                class="button-o-c"
                 type="button"
                 :disabled="isDisabled || hasAnyOperationInProgress"
                 @click="shutdown"
@@ -293,6 +397,48 @@ const shutdown = async () => {
   gap: 0.75rem;
   justify-content: center;
   align-items: center;
+}
+
+.audio-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.audio-label {
+  font-size: 1rem;
+  color: var(--text-color);
+  margin-right: 0.5rem;
+  line-height: 36px;
+  vertical-align: middle;
+}
+
+.audio-selector {
+  padding: 0 0.75rem;
+  height: 36px;
+  line-height: 36px;
+  box-sizing: border-box;
+  border: 1px solid var(--primary-color);
+  border-radius: 4px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  min-width: 140px;
+  display: inline-block;
+  vertical-align: middle;
+
+  /* keep a subtle chevron only */
+  padding-right: 2.25rem; /* room for chevron */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 12px;
+}
+
+.audio-selector:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .button-o-c {
