@@ -40,12 +40,14 @@ import {
   faFilm,
   faCircleXmark,
   faPowerOff,
-  faRetweet
+  faRetweet,
+  faSpinner
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
   faCircle,
   faCircleQuestion,
+  faSave,
 } from '@fortawesome/free-regular-svg-icons'
 
 library.add(
@@ -82,7 +84,9 @@ library.add(
   faFilm,
   faCircleXmark,
   faPowerOff,
-  faRetweet
+  faRetweet,
+  faSave,
+  faSpinner
 )
 
 import 'vuetify/styles'
