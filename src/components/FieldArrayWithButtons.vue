@@ -36,7 +36,7 @@ defineProps({
     default: 'Удалить элемент'
   },
   defaultValue: {
-    type: [String, Number],
+    type: [String, Number, Object],
     default: ''
   },
   fieldProps: {
@@ -48,6 +48,18 @@ defineProps({
     default: false
   }
 })
+
+const cloneDefaultValue = (value) => {
+  if (value && typeof value === 'object') {
+    try {
+      return JSON.parse(JSON.stringify(value))
+    } catch {
+      return { ...value }
+    }
+  }
+
+  return value
+}
 </script>
 
 <template>
@@ -58,27 +70,38 @@ defineProps({
       
       <div class="field-container">
         <!-- Plus button positioned to the left for first option -->
-        <ActionButton 
+        <ActionButton
           v-if="idx === 0"
           icon="fa-solid fa-plus"
           :item="defaultValue"
-          @click="push(defaultValue)"
+          @click="push(cloneDefaultValue(defaultValue))"
           class="button-o-c field-container-plus"
           :tooltip-text="addTooltip"
         />
-        
-        <Field :name="`${name}[${idx}]`" :as="fieldType" :id="`${name}_${idx}`"
-          class="form-control input field-container-select" :class="{ 'is-invalid': hasError }"
-          v-bind="fieldProps"
+
+        <slot
+          name="field"
+          :field-name="`${name}[${idx}]`"
+          :index="idx"
+          :field="field"
         >
-          <option v-if="fieldType === 'select'" value="">{{ placeholder }}</option>
-          <template v-if="fieldType === 'select'">
-            <option v-for="option in options" :key="option.value" :value="option.value">
-              {{ option.text }}
-            </option>
-          </template>
-        </Field>
-        
+          <Field
+            :name="`${name}[${idx}]`"
+            :as="fieldType"
+            :id="`${name}_${idx}`"
+            class="form-control input field-container-select"
+            :class="{ 'is-invalid': hasError }"
+            v-bind="fieldProps"
+          >
+            <option v-if="fieldType === 'select'" value="">{{ placeholder }}</option>
+            <template v-if="fieldType === 'select'">
+              <option v-for="option in options" :key="option.value" :value="option.value">
+                {{ option.text }}
+              </option>
+            </template>
+          </Field>
+        </slot>
+
         <!-- Minus button always after select -->
         <ActionButton
           icon="fa-solid fa-minus"

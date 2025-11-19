@@ -3,7 +3,7 @@
 // This file is a part of Media Pi  frontend application
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
 import DeviceManagementDialog from '@/components/Device_Management_Dialog.vue'
@@ -19,6 +19,12 @@ const getAudio = vi.hoisted(() => vi.fn(() => Promise.resolve({ output: 'hdmi' }
 const updateAudio = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const getPlaylist = vi.hoisted(() => vi.fn(() => Promise.resolve({ source: '', destination: '' })))
 const updatePlaylist = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const getSchedule = vi.hoisted(() => vi.fn(() => Promise.resolve({
+  playlist: ['00:00'],
+  video: ['00:00'],
+  rest: [{ start: '00:00', stop: '00:00' }]
+})))
+const updateSchedule = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const alertError = vi.hoisted(() => vi.fn())
 const alertSuccess = vi.hoisted(() => vi.fn())
 
@@ -39,7 +45,9 @@ vi.mock('@/stores/devices.store.js', () => ({
     getAudio,
     updateAudio,
     getPlaylist,
-    updatePlaylist
+    updatePlaylist,
+    getSchedule,
+    updateSchedule
   })
 }))
 
@@ -80,7 +88,8 @@ const globalStubs = {
   'v-card-title': { template: '<div class="v-card-title"><slot /></div>' },
   'v-card-text': { template: '<div class="v-card-text"><slot /></div>' },
   'v-card-actions': { template: '<div class="v-card-actions"><slot /></div>' },
-  'v-spacer': { template: '<div class="v-spacer"></div>' }
+  'v-spacer': { template: '<div class="v-spacer"></div>' },
+  'v-tooltip': { template: '<div class="v-tooltip"><slot /></div>' }
 }
 
 describe('Device_Management_Dialog.vue', () => {
@@ -96,11 +105,19 @@ describe('Device_Management_Dialog.vue', () => {
     updateAudio.mockReset()
     getPlaylist.mockReset()
     updatePlaylist.mockReset()
+    getSchedule.mockReset()
+    updateSchedule.mockReset()
     statusesRef.value = []
     getAudio.mockResolvedValue({ output: 'hdmi' })
     updateAudio.mockResolvedValue()
     getPlaylist.mockResolvedValue({ source: '', destination: '' })
     updatePlaylist.mockResolvedValue()
+    getSchedule.mockResolvedValue({
+      playlist: ['00:00'],
+      video: ['00:00'],
+      rest: [{ start: '00:00', stop: '00:00' }]
+    })
+    updateSchedule.mockResolvedValue()
     getDeviceById.mockImplementation((id) => (
       id === 1
         ? {
@@ -285,6 +302,42 @@ describe('Device_Management_Dialog.vue', () => {
 
     vi.useRealTimers()
   }, 10000)
+
+  describe('Schedule timer settings', () => {
+    it('loads schedule settings when dialog opens with online device', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+
+      mount(DeviceManagementDialog, {
+        props: { modelValue: true, deviceId: 1 },
+        global: { stubs: globalStubs }
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      expect(getSchedule).toHaveBeenCalledWith(1)
+    })
+
+    it('invokes getSchedule when read button is clicked', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+      const wrapper = mountDialog()
+
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      await wrapper.vm.$nextTick()
+      getSchedule.mockClear()
+
+      const [readButton] = wrapper.findAll('.timer-buttons button')
+      await readButton.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(getSchedule).toHaveBeenCalledWith(1)
+    })
+
+    // Additional schedule timer interactions are covered via read button test above
+  })
 
   describe('Audio settings', () => {
     it('loads audio settings when dialog opens with online device', async () => {

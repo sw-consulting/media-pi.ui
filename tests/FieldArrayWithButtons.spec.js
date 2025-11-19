@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { Form } from 'vee-validate'
+import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
@@ -255,7 +255,7 @@ describe('FieldArrayWithButtons', () => {
     const wrapper = mount({
       template: `
         <Form :validation-schema="schema" :initial-values="{ managers: [''] }" v-slot="{ errors }">
-          <FieldArrayWithButtons 
+          <FieldArrayWithButtons
             name="managers"
             label="Test Field"
             :has-error="!!errors.managers"
@@ -271,15 +271,65 @@ describe('FieldArrayWithButtons', () => {
       }
     })
     await flushPromises()
-    
+
     expect(wrapper.find('#managers_0').exists()).toBe(true)
-    
+
     // Add another field
     const plusButton = wrapper.find('button.field-container-plus')
     await plusButton.trigger('click')
     await flushPromises()
-    
+
     expect(wrapper.find('#managers_1').exists()).toBe(true)
+  })
+
+  it('supports custom slot rendering and clones object default values', async () => {
+    const schema = Yup.object().shape({
+      rest: Yup.array().of(
+        Yup.object({
+          start: Yup.string().required(),
+          stop: Yup.string().required()
+        })
+      )
+    })
+
+    const wrapper = mount({
+      template: `
+        <Form :validation-schema="schema" :initial-values="{ rest: [{ start: '08:00', stop: '09:00' }] }">
+          <FieldArrayWithButtons
+            name="rest"
+            label="Rest"
+            :default-value="{ start: '00:00', stop: '00:00' }"
+          >
+            <template v-slot:field="{ fieldName, index }">
+              <Field
+                :name="fieldName + '.start'"
+                type="time"
+                :id="'start_' + index"
+                class="rest-start"
+              />
+            </template>
+          </FieldArrayWithButtons>
+        </Form>
+      `,
+      components: { Form, Field, FieldArrayWithButtons },
+      setup() {
+        return { schema }
+      }
+    })
+
+    await flushPromises()
+    const inputs = wrapper.findAll('.rest-start')
+    expect(inputs).toHaveLength(1)
+
+    await inputs[0].setValue('10:00')
+
+    const plusButton = wrapper.find('button.field-container-plus')
+    await plusButton.trigger('click')
+    await flushPromises()
+
+    const updatedInputs = wrapper.findAll('.rest-start')
+    expect(updatedInputs).toHaveLength(2)
+    expect(updatedInputs[1].element.value).toBe('00:00')
   })
 })
 
