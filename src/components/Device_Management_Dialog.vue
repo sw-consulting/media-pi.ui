@@ -749,8 +749,9 @@ onBeforeUnmount(() => {
 
 .timers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
+  grid-template-columns: 27% 27% 45%;
+  gap: 0 0.2rem;
+
 }
 
 .timers-column {
@@ -761,7 +762,6 @@ onBeforeUnmount(() => {
 }
 
 .timer-column-title {
-  font-weight: 600;
   text-align: center;
   margin-bottom: 0.5rem;
 }

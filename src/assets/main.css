@@ -447,6 +447,12 @@ a,
   margin-left: 0;
 }
 
+.field-container-plus:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+
 /* When a FieldArray wants to hide the label but keep the plus button visible,
    the component will add a `no-label` class to the surrounding `.form-group`.
    These rules make the label visually hidden while keeping the plus button
