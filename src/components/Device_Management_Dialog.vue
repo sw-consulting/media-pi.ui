@@ -300,7 +300,7 @@ const serviceRows = computed(() => {
       key: 'upload',
       label: 'Загрузка',
       isActive: Boolean(status.playlistUploadServiceStatus),
-      statusLabel: status.playlistUploadServiceStatus ? 'Запущено' : 'Остановлено',
+      statusLabel: status.playlistUploadServiceStatus ? 'Запущена' : 'Остановлена',
       actionLabel: status.playlistUploadServiceStatus ? 'Остановить' : 'Запустить',
       action: status.playlistUploadServiceStatus ? stopUploadService : startUploadService,
       operationKey: status.playlistUploadServiceStatus ? 'stopUploadService' : 'startUploadService'
@@ -612,7 +612,9 @@ onBeforeUnmount(() => {
                         :class="{ 'fa-spin': operationInProgress[row.operationKey] }"
                         class="mr-1"
                       />
-                      {{ row.actionLabel }}
+                        {{ operationInProgress[row.operationKey]
+                          ? (row.isActive ? 'Останавливается...' : 'Запускается...')
+                          : row.actionLabel }}
                     </button>
                   </div>
                 </template>
@@ -949,7 +951,7 @@ onBeforeUnmount(() => {
 
 .service-grid {
   display: grid;
-  grid-template-columns: 180px 1fr 170px;
+  grid-template-columns: 180px 1fr minmax(180px, 320px);
   row-gap: 0.5rem;
   column-gap: 0.75rem;
   align-items: center;
@@ -966,10 +968,20 @@ onBeforeUnmount(() => {
   justify-content: flex-start;
 }
 
-.service-buttons {
-  display: flex;
-  justify-content: flex-end;
+.service-action .button-o-c {
+  white-space: nowrap;
+  max-width: 100%;
 }
+
+.service-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    width: 100%;
+  }
 
 .timers-settings {
   display: flex;
