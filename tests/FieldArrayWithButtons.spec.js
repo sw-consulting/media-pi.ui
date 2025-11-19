@@ -251,6 +251,36 @@ describe('FieldArrayWithButtons', () => {
     expect(wrapper.find('.button-o-c.ml-2').exists()).toBe(true)
   })
 
+  it('applies no-label layout when hideLabel is true', async () => {
+    const wrapper = createWrapper({ hideLabel: true })
+    await flushPromises()
+
+    // Root form-group should have no-label class
+    const group = wrapper.find('.form-group.no-label')
+    expect(group.exists()).toBe(true)
+
+    // Plus button still visible
+    expect(group.find('.button-o-c.field-container-plus').exists()).toBe(true)
+
+    // Label node still rendered for first item (for accessibility / structure)
+    const labelEl = group.find('label.label')
+    expect(labelEl.exists()).toBe(true)
+  })
+
+  it('renders spacer for alignment on subsequent rows when hideLabel is true', async () => {
+    const wrapper = createWrapper({ hideLabel: true }, { testField: ['', 'second'] })
+    await flushPromises()
+
+    const groups = wrapper.findAll('.form-group.no-label')
+    expect(groups).toHaveLength(2)
+
+    // First group should have plus button
+    expect(groups[0].find('.field-container-plus').exists()).toBe(true)
+    // Second group should NOT have plus button but should have spacer
+    expect(groups[1].find('.field-container-plus').exists()).toBe(false)
+    expect(groups[1].find('.field-container-plus-spacer').exists()).toBe(true)
+  })
+
   it('generates correct field IDs', async () => {
     const wrapper = mount({
       template: `

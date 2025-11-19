@@ -456,6 +456,7 @@ onBeforeUnmount(() => {
                     <FieldArrayWithButtons
                       name="playlist"
                       label="Загрузка"
+                      :hide-label="true"
                       field-type="input"
                       :field-props="timeFieldProps"
                       placeholder="HH:mm"
@@ -468,6 +469,7 @@ onBeforeUnmount(() => {
                     <FieldArrayWithButtons
                       name="video"
                       label="Воспроизведение"
+                      :hide-label="true"
                       field-type="input"
                       :field-props="timeFieldProps"
                       placeholder="HH:mm"
@@ -480,6 +482,7 @@ onBeforeUnmount(() => {
                     <FieldArrayWithButtons
                       name="rest"
                       label="Время отдыха"
+                      :hide-label="true"
                       :default-value="restDefaultValue"
                       :has-error="hasErrorsForPrefix(scheduleErrors, 'rest')"
                     >

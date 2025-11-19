@@ -14,6 +14,11 @@ defineProps({
     type: String,
     required: true
   },
+  // When true, hides the label visually while keeping the plus button aligned.
+  hideLabel: {
+    type: Boolean,
+    default: false
+  },
   fieldType: {
     type: String,
     default: 'select',
@@ -64,7 +69,12 @@ const cloneDefaultValue = (value) => {
 
 <template>
   <FieldArray :name="name" v-slot="{ fields, push, remove }">
-    <div v-for="(field, idx) in fields" :key="field.key" class="form-group mb-2">
+    <div
+      v-for="(field, idx) in fields"
+      :key="field.key"
+      :class="['form-group', 'mb-2', { 'no-label': hideLabel }]"
+    >
+      <!-- Keep label node for first index; CSS will hide it when hideLabel is true -->
       <label v-if="idx === 0" class="label">{{ label }}:</label>
       <div v-else class="label"></div>
       
@@ -78,6 +88,11 @@ const cloneDefaultValue = (value) => {
           class="button-o-c field-container-plus"
           :tooltip-text="addTooltip"
         />
+        <!-- Spacer to keep alignment when label hidden and no plus button on subsequent rows -->
+        <div
+          v-else-if="hideLabel"
+          class="field-container-plus-spacer"
+        ></div>
 
         <slot
           name="field"
@@ -116,75 +131,3 @@ const cloneDefaultValue = (value) => {
   </FieldArray>
 </template>
 
-<style scoped>
-/* Moved styles from main.css - keeping exactly as they were */
-.field-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.button-o-c {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  background-color: #f8f9fa;
-  color: #495057;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  flex-shrink: 0;
-}
-
-.button-o-c:hover {
-  background-color: #e9ecef;
-  border-color: #adb5bd;
-}
-
-.button-o-c:active {
-  background-color: #dee2e6;
-  border-color: #6c757d;
-}
-
-.button-o-c:disabled {
-  background-color: #e9ecef;
-  border-color: #dee2e6;
-  color: #adb5bd;
-  cursor: not-allowed;
-}
-
-.button-o-c.field-container-plus {
-  background-color: #d4edda;
-  border-color: #c3e6cb;
-  color: #155724;
-}
-
-.button-o-c.field-container-plus:hover {
-  background-color: #c3e6cb;
-  border-color: #b1dfbb;
-}
-
-.field-container-plus:focus {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-
-.button-o-c.field-container-plus:focus {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-
-.button-o-c.field-container-plus:active {
-  background-color: #b1dfbb;
-  border-color: #a1d2aa;
-}
-
-.ml-2 {
-  margin-left: 8px;
-}
-</style>
