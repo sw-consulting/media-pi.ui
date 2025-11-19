@@ -925,13 +925,13 @@ onBeforeUnmount(() => {
 
 .panel-grid {
   display: grid;
-  gap: 1rem;
+  gap: 0.5rem;
 }
 
 .panel {
   border: 2px solid var(--primary-color-dark);
   border-radius: 12px;
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .panel legend {
@@ -946,19 +946,19 @@ onBeforeUnmount(() => {
 .service-settings {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.4rem;
 }
 
 .service-grid {
   display: grid;
   grid-template-columns: 180px 1fr minmax(180px, 320px);
-  row-gap: 0.5rem;
+  row-gap: 0.25rem;
   column-gap: 0.75rem;
   align-items: center;
 }
 
 .service-cell {
-  min-height: 32px;
+  min-height: 28px;
   display: flex;
   align-items: center;
 }
@@ -978,8 +978,8 @@ onBeforeUnmount(() => {
     justify-content: center;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 1rem;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
     width: 100%;
   }
 
@@ -1014,8 +1014,8 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1rem;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .rest-field-pair {
@@ -1058,10 +1058,10 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 140px 1fr;
   grid-auto-rows: auto;
-  gap: 0.5rem 0.75rem;
+  gap: 0.5rem 0.5rem;
   align-items: center;
   width: 100%;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .playlist-buttons {
@@ -1136,7 +1136,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   height: 36px;
   padding: 0 0.75rem;
-  margin: 0.5rem;
+  margin: 0.25rem;
   transition: 0.4s;
   border: 1px solid var(--primary-color);
   cursor: pointer;
@@ -1167,8 +1167,8 @@ onBeforeUnmount(() => {
 }
 
 .alert {
-  margin: 1rem;
-  padding: 1rem;
+  margin: 0.5rem;
+  padding: 0.75rem;
   border-radius: 8px;
 }
 </style>
