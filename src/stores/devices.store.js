@@ -267,6 +267,11 @@ export const useDevicesStore = defineStore('devices', () => {
   const reloadSystem = (id) => executeDeviceRequest('post', id, ['system', 'reload'])
   const rebootSystem = (id) => executeDeviceRequest('post', id, ['system', 'reboot'])
   const shutdownSystem = (id) => executeDeviceRequest('post', id, ['system', 'shutdown'])
+  const startPlayback = (id) => executeDeviceRequest('post', id, ['playback', 'start'])
+  const stopPlayback = (id) => executeDeviceRequest('post', id, ['playback', 'stop'])
+  const startUpload = (id) => executeDeviceRequest('post', id, ['playlist', 'start-upload'])
+  const stopUpload = (id) => executeDeviceRequest('post', id, ['playlist', 'stop-upload'])
+  const getServiceStatus = (id) => executeDeviceRequest('get', id, ['service', 'status'])
 
   return {
     devices,
@@ -298,7 +303,12 @@ export const useDevicesStore = defineStore('devices', () => {
     updateAudio,
     reloadSystem,
     rebootSystem,
-    shutdownSystem
+    shutdownSystem,
+    startPlayback,
+    stopPlayback,
+    startUpload,
+    stopUpload,
+    getServiceStatus
   }
 })
 
