@@ -292,18 +292,7 @@ describe('devices.store', () => {
     expect(store.serviceResponse).toBe(null)
   })
 
-  it('checkStorage calls fetchWrapper.get with expected url and returns response', async () => {
-    const store = useDevicesStore()
-    const mockResponse = { status: 'ok' }
-    fetchWrapper.get.mockResolvedValueOnce(mockResponse)
-    const response = await store.checkStorage(42)
 
-    expect(fetchWrapper.get).toHaveBeenCalledWith(
-      expect.stringContaining('/devices/42/storage/check')
-    )
-    expect(response).toBe(mockResponse)
-    expect(store.loading).toBe(false)
-  })
 
   it('updatePlaylist calls fetchWrapper.put with payload', async () => {
     const store = useDevicesStore()
