@@ -273,6 +273,8 @@ export const useDevicesStore = defineStore('devices', () => {
   const stopUpload = (id) => executeDeviceRequest('post', id, ['playlist', 'stop-upload'])
   const getServiceStatus = (id) => executeDeviceRequest('get', id, ['service', 'status'])
 
+console.log('[devices.store] init typeof getServiceStatus:', typeof getServiceStatus)
+
   return {
     devices,
     device,
