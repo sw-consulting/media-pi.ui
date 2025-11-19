@@ -1041,8 +1041,8 @@ onBeforeUnmount(() => {
   grid-auto-rows: auto;
   gap: 0.5rem 0.5rem;
   align-items: center;
-  width: 100%;
-  margin-bottom: 0.5rem;
+  width: 70%;
+  margin: 0 auto 0.5rem auto;
 }
 
 .playlist-label {
