@@ -457,10 +457,10 @@ onBeforeUnmount(() => {
               >
                 <div class="timers-grid">
                   <div class="timers-column">
-                    <div class="timer-column-title">Загрузка</div>
+                    <div class="timer-column-title">Загрузка плей-листа</div>
                     <FieldArrayWithButtons
                       name="playlist"
-                      label="Загрузка"
+                      label=""
                       :hide-label="true"
                       field-type="input"
                       :field-props="timeFieldProps"
@@ -471,10 +471,10 @@ onBeforeUnmount(() => {
                     />
                   </div>
                   <div class="timers-column">
-                    <div class="timer-column-title">Воспроизведение</div>
+                    <div class="timer-column-title">Загрузка видео</div>
                     <FieldArrayWithButtons
                       name="video"
-                      label="Воспроизведение"
+                      label=""
                       :hide-label="true"
                       field-type="input"
                       :field-props="timeFieldProps"
@@ -566,6 +566,17 @@ onBeforeUnmount(() => {
                   class="playlist-input"
                   :disabled="isDisabled || hasAnyOperationInProgress"
                 />
+
+                <label class="playlist-label" for="playlist-destination">Локальный диск</label>
+                <input
+                  id="playlist-destination"
+                  v-model="playlistSettings.destination"
+                  type="text"
+                  class="playlist-input"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                />
+              </div>
+              <div class="playlist-buttons">
                 <button
                   class="button-o-c"
                   type="button"
@@ -580,15 +591,6 @@ onBeforeUnmount(() => {
                   />
                   {{ operationInProgress.playlistUpdate ? 'Читается...' : 'Прочитать' }}
                 </button>
-
-                <label class="playlist-label" for="playlist-destination">Локальный диск</label>
-                <input
-                  id="playlist-destination"
-                  v-model="playlistSettings.destination"
-                  type="text"
-                  class="playlist-input"
-                  :disabled="isDisabled || hasAnyOperationInProgress"
-                />
                 <button
                   class="button-o-c"
                   type="button"
@@ -817,17 +819,25 @@ onBeforeUnmount(() => {
 
 .playlist-settings {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
 }
 
 .playlist-grid {
   display: grid;
-  /* three columns: labels, inputs, buttons; two rows are provided by the markup order */
-  grid-template-columns: 140px 1fr auto;
+  grid-template-columns: 140px 1fr;
   grid-auto-rows: auto;
   gap: 0.5rem 0.75rem;
   align-items: center;
   width: 100%;
+  margin-bottom: 1rem;
+}
+
+.playlist-buttons {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .playlist-label {
