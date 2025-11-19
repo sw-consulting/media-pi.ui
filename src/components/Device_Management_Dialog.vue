@@ -923,7 +923,6 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
-
 .service-action {
   display: flex;
   justify-content: flex-start;
