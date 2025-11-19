@@ -51,6 +51,10 @@ defineProps({
   hasError: {
     type: Boolean,
     default: false
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -87,6 +91,7 @@ const cloneDefaultValue = (value) => {
           @click="push(cloneDefaultValue(defaultValue))"
           class="button-o-c field-container-plus"
           :tooltip-text="addTooltip"
+          :disabled="disabled"
         />
         <!-- Spacer to keep alignment when label hidden and no plus button on subsequent rows -->
         <div
@@ -106,6 +111,7 @@ const cloneDefaultValue = (value) => {
             :id="`${name}_${idx}`"
             class="form-control input field-container-select"
             :class="{ 'is-invalid': hasError }"
+            :disabled="disabled"
             v-bind="fieldProps"
           >
             <option v-if="fieldType === 'select'" value="">{{ placeholder }}</option>
@@ -122,7 +128,7 @@ const cloneDefaultValue = (value) => {
           icon="fa-solid fa-minus"
           :item="idx"
           @click="remove(idx)"
-          :disabled="fields.length === 1"
+          :disabled="disabled || fields.length === 1"
           class="button-o-c ml-2"
           :tooltip-text="removeTooltip"
         />

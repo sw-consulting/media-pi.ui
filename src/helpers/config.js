@@ -35,7 +35,7 @@ export const config = {
   // Logging configuration with fallback chain
   enableLog: window.RUNTIME_CONFIG?.enableLog ||   // Runtime config (highest priority)
              import.meta.env.VITE_ENABLE_LOG ||    // Build-time env variable
-             true                                   // Default fallback (enabled)
+             true                                  // Default fallback (enabled)
 }
 
 /**
@@ -56,7 +56,7 @@ export const apiUrl = config.apiUrl
  *   console.log('Debug information')
  * }
  */
-export const enableLog = config.enableLog
+export const enableLog = true // config.enableLog
 
 /**
  * System operation timeout constants (in milliseconds)

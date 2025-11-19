@@ -83,8 +83,8 @@ const timeValueSchema = Yup.string()
   .required('Укажите время в формате HH:mm')
   .matches(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Некорректный формат времени HH:mm')
 const scheduleValidationSchema = Yup.object({
-  playlist: Yup.array().of(timeValueSchema).min(1, 'Добавьте время загрузки'),
-  video: Yup.array().of(timeValueSchema).min(1, 'Добавьте время воспроизведения'),
+  playlist: Yup.array().of(timeValueSchema).min(1, 'Добавьте время загрузки плей-листа'),
+  video: Yup.array().of(timeValueSchema).min(1, 'Добавьте время воспроизведения видео'),
   rest: Yup.array()
     .of(
       Yup.object({
@@ -348,21 +348,26 @@ async function updateScheduleSettings() {
 
 async function saveScheduleSettings() {
   if (!scheduleFormRef.value) return
-  const validationResult = await scheduleFormRef.value.validate()
-  if (!validationResult.valid) {
+  const { valid } = await scheduleFormRef.value.validate()
+  if (!valid) {
     alertStore.error('Исправьте ошибки в настройках таймеров, чтобы продолжить')
     return
   }
 
+  // Get current reactive form values instead of initial scheduleFormValues
+  const liveValues = scheduleFormRef.value.values || scheduleFormValues.value
+
+  const payload = {
+    playlist: [...(liveValues.playlist || [])],
+    video: [...(liveValues.video || [])],
+    rest: (liveValues.rest || []).map((item) => ({ start: item.start, stop: item.stop }))
+  }
+  
   operationInProgress.value.scheduleSave = true
   try {
-    const values = validationResult.values || scheduleFormValues.value
-    const payload = {
-      playlist: [...(values.playlist || [])],
-      video: [...(values.video || [])],
-      rest: (values.rest || []).map((item) => ({ start: item.start, stop: item.stop }))
-    }
     await devicesStore.updateSchedule(props.deviceId, payload)
+    // Sync internal copy so reopening dialog shows what was just saved
+    scheduleFormValues.value = payload
     alertStore.success('Настройки таймеров успешно сохранены')
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки таймеров: ' + (err?.message || 'Неизвестная ошибка'))
@@ -462,6 +467,7 @@ onBeforeUnmount(() => {
                       placeholder="HH:mm"
                       :default-value="defaultTimeValue"
                       :has-error="hasErrorsForPrefix(scheduleErrors, 'playlist')"
+                      :disabled="isDisabled || hasAnyOperationInProgress"
                     />
                   </div>
                   <div class="timers-column">
@@ -475,6 +481,7 @@ onBeforeUnmount(() => {
                       placeholder="HH:mm"
                       :default-value="defaultTimeValue"
                       :has-error="hasErrorsForPrefix(scheduleErrors, 'video')"
+                      :disabled="isDisabled || hasAnyOperationInProgress"
                     />
                   </div>
                   <div class="timers-column">
@@ -485,6 +492,7 @@ onBeforeUnmount(() => {
                       :hide-label="true"
                       :default-value="restDefaultValue"
                       :has-error="hasErrorsForPrefix(scheduleErrors, 'rest')"
+                      :disabled="isDisabled || hasAnyOperationInProgress"
                     >
                       <template #field="{ fieldName: restFieldName }">
                         <div class="rest-field-pair">
@@ -495,6 +503,7 @@ onBeforeUnmount(() => {
                             :class="{ 'is-invalid': hasErrorsForPrefix(scheduleErrors, `${restFieldName}.start`) }"
                             type="time"
                             step="60"
+                            :disabled="isDisabled || hasAnyOperationInProgress"
                           />
                           <span class="rest-separator">—</span>
                           <Field
@@ -504,6 +513,7 @@ onBeforeUnmount(() => {
                             :class="{ 'is-invalid': hasErrorsForPrefix(scheduleErrors, `${restFieldName}.stop`) }"
                             type="time"
                             step="60"
+                            :disabled="isDisabled || hasAnyOperationInProgress"
                           />
                         </div>
                       </template>
