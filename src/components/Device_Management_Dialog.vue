@@ -63,11 +63,6 @@ const playlistSettings = ref({
   destination: ''
 })
 
-const playlistStatuses = ref({
-  yandexMounted: false,
-  isLoading: false
-})
-
 watch(
   () => statuses.value,
   (newStatuses) => {
@@ -137,6 +132,12 @@ watch(internalOpen, (v) => {
   if (!v) {
     manualStatus.value = null
     resetSystemOperations()
+    // Clear global alerts when the dialog is closed to avoid overlapping UI
+    try {
+      clearAlert()
+    } catch {
+      // swallow errors silently
+    }
   }
 })
 watch(() => props.deviceId, () => {
@@ -173,13 +174,7 @@ async function initializeDevice() {
 
 const onlineClass = computed(() => currentStatus.value?.isOnline ? 'text-success' : 'text-danger')
 
-const yandexDiskStatus = computed(() =>
-  playlistStatuses.value.yandexMounted ? 'Яндекс диск смонтирован' : 'Яндекс диск не смонтирован'
-)
-
-const playlistLoadingStatus = computed(() =>
-  playlistStatuses.value.isLoading ? 'Идёт загрузка' : 'Загрузка остановлена'
-)
+// Note: playlist status column removed — UI simplified to source/destination only
 
 const isDisabled = computed(() => !currentStatus.value?.isOnline)
 const hasAnyOperationInProgress = computed(() =>
@@ -344,8 +339,7 @@ onBeforeUnmount(() => {
                   type="text"
                   class="playlist-input"
                   :disabled="isDisabled || hasAnyOperationInProgress"
-                >
-                <span class="playlist-status">{{ yandexDiskStatus }}</span>
+                />
                 <button
                   class="button-o-c"
                   type="button"
@@ -368,8 +362,7 @@ onBeforeUnmount(() => {
                   type="text"
                   class="playlist-input"
                   :disabled="isDisabled || hasAnyOperationInProgress"
-                >
-                <span class="playlist-status">{{ playlistLoadingStatus }}</span>
+                />
                 <button
                   class="button-o-c"
                   type="button"
@@ -447,7 +440,7 @@ onBeforeUnmount(() => {
                   :class="{ 'fa-spin': operationInProgress.apply }"
                   class="mr-1"
                 />
-                {{ operationInProgress.apply ? 'Применяется...' : 'Применить' }}
+                {{ operationInProgress.apply ? 'Изменения применяются...' : 'Применить изменения' }}
               </button>
               <button
                 class="button-o-c"
@@ -552,7 +545,9 @@ onBeforeUnmount(() => {
 
 .playlist-grid {
   display: grid;
-  grid-template-columns: 1fr 1.5fr 1.5fr 1fr;
+  /* three columns: labels, inputs, buttons; two rows are provided by the markup order */
+  grid-template-columns: 140px 1fr auto;
+  grid-auto-rows: auto;
   gap: 0.5rem 0.75rem;
   align-items: center;
   width: 100%;
@@ -580,9 +575,7 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
-.playlist-status {
-  font-size: 0.95rem;
-}
+/* playlist-status column removed */
 
 .audio-label {
   font-size: 1rem;
