@@ -367,7 +367,7 @@ async function saveScheduleSettings() {
   try {
     await devicesStore.updateSchedule(props.deviceId, payload)
     // Sync internal copy so reopening dialog shows what was just saved
-    scheduleFormValues.value = payload
+    applyScheduleValues(payload)
     alertStore.success('Настройки таймеров сохранены')
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки таймеров: ' + (err?.message || 'Неизвестная ошибка'))
