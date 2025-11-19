@@ -924,10 +924,12 @@ onBeforeUnmount(() => {
 
 .service-grid {
   display: grid;
-  grid-template-columns: 180px 1fr minmax(180px, 320px);
+  grid-template-columns: 160px 1fr minmax(140px, 260px);
   row-gap: 0.25rem;
   column-gap: 0.75rem;
   align-items: center;
+  width: 70%;
+  margin: 0 auto;
 }
 
 .service-cell {
