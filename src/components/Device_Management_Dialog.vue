@@ -483,7 +483,7 @@ onBeforeUnmount(() => {
                       :default-value="restDefaultValue"
                       :has-error="hasErrorsForPrefix(scheduleErrors, 'rest')"
                     >
-                      <template #field="{ fieldName: restFieldName, index }">
+                      <template #field="{ fieldName: restFieldName }">
                         <div class="rest-field-pair">
                           <Field
                             :name="`${restFieldName}.start`"

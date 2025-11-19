@@ -3,7 +3,7 @@
 // This file is a part of Media Pi  frontend application
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
 
 import DeviceManagementDialog from '@/components/Device_Management_Dialog.vue'
