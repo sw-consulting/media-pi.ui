@@ -769,7 +769,7 @@ onBeforeUnmount(() => {
 
 .timers-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.67fr;
+  grid-template-columns: 27% 27% 45%;
   gap: 0 0.2rem;
 }
 
