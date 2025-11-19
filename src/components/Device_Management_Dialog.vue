@@ -53,14 +53,20 @@ const operationInProgress = ref({
   scheduleUpdate: false,
   scheduleSave: false,
   serviceStatus: false,
-  playbackToggle: false,
-  uploadToggle: false
+  stopPlaybackService: false,
+  startPlaybackService: false,
+  stopUploadService: false,
+  startUploadService: false
 })
 
 const systemOperationTimers = ref({
   apply: null,
   reboot: null,
-  shutdown: null
+  shutdown: null,
+  stopPlaybackService: null,
+  startPlaybackService: null,
+  stopUploadService: null,
+  startUploadService: null
 })
 
 // Audio settings state
@@ -288,7 +294,7 @@ const serviceRows = computed(() => {
       statusLabel: status.playbackServiceStatus ? 'Запущено' : 'Остановлено',
       actionLabel: status.playbackServiceStatus ? 'Остановить' : 'Запустить',
       action: status.playbackServiceStatus ? stopPlaybackService : startPlaybackService,
-      operationKey: 'playbackToggle'
+      operationKey: status.playbackServiceStatus ? 'stopPlaybackService' : 'startPlaybackService'
     },
     {
       key: 'upload',
@@ -297,7 +303,7 @@ const serviceRows = computed(() => {
       statusLabel: status.playlistUploadServiceStatus ? 'Запущено' : 'Остановлено',
       actionLabel: status.playlistUploadServiceStatus ? 'Остановить' : 'Запустить',
       action: status.playlistUploadServiceStatus ? stopUploadService : startUploadService,
-      operationKey: 'uploadToggle'
+      operationKey: status.playlistUploadServiceStatus ? 'stopUploadService' : 'startUploadService'
     },
     {
       key: 'yadisk',
@@ -444,20 +450,21 @@ async function updateServiceStatus() {
   }
 }
 
-const toggleService = async (operationKey, handler) => {
-  if (!handler) return
-  operationInProgress.value[operationKey] = true
-  const success = await runWithDevice(handler)
-  if (success) {
-    await updateServiceStatus()
-  }
-  operationInProgress.value[operationKey] = false
+const startPlaybackService = async () => {
+  await runServiceOperation('startPlaybackService', devicesStore.startPlayback, 3000)
 }
 
-const startPlaybackService = () => toggleService('playbackToggle', devicesStore.startPlayback)
-const stopPlaybackService = () => toggleService('playbackToggle', devicesStore.stopPlayback)
-const startUploadService = () => toggleService('uploadToggle', devicesStore.startUpload)
-const stopUploadService = () => toggleService('uploadToggle', devicesStore.stopUpload)
+const stopPlaybackService = async () => {
+  await runServiceOperation('stopPlaybackService', devicesStore.stopPlayback, 3000)
+}
+
+const startUploadService = async () => {
+  await runServiceOperation('startUploadService', devicesStore.startUpload, 3000)
+}
+
+const stopUploadService = async () => {
+  await runServiceOperation('stopUploadService', devicesStore.stopUpload, 3000)
+}
 
 const runWithDevice = async (handler) => {
   if (!props.deviceId || typeof handler !== 'function') return false
@@ -469,6 +476,37 @@ const runWithDevice = async (handler) => {
     alertStore.error(message)
     return false
   }
+}
+
+const runServiceOperation = async (key, handler, timeout) => {
+  if (!['startPlaybackService', 'stopPlaybackService', 'startUploadService', 'stopUploadService'].includes(key)) return
+  resetSystemOperationTimer(key)
+  operationInProgress.value[key] = true
+  const success = await runWithDevice(handler)
+  if (!success) {
+    operationInProgress.value[key] = false
+    return
+  }
+
+  const deviceIdAtStart = props.deviceId
+  systemOperationTimers.value[key] = setTimeout(async () => {
+    if (!internalOpen.value || props.deviceId !== deviceIdAtStart) {
+      operationInProgress.value[key] = false
+      return
+    }
+    await updateServiceStatus()
+    operationInProgress.value[key] = false
+    systemOperationTimers.value[key] = null
+    
+    // Show completion message based on operation type
+    const completionMessages = {
+      startPlaybackService: 'Служба воспроизведения запущена',
+      stopPlaybackService: 'Служба воспроизведения остановлена',
+      startUploadService: 'Служба загрузки запущена',
+      stopUploadService: 'Служба загрузки остановлена'
+    }
+    alertStore.success(completionMessages[key])
+  }, timeout)
 }
 
 const runSystemOperation = async (key, handler, timeout) => {
