@@ -25,6 +25,15 @@ const getSchedule = vi.hoisted(() => vi.fn(() => Promise.resolve({
   rest: [{ start: '00:00', stop: '00:00' }]
 })))
 const updateSchedule = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const getServiceStatus = vi.hoisted(() => vi.fn(() => Promise.resolve({
+  playbackServiceStatus: false,
+  playlistUploadServiceStatus: false,
+  yaDiskMountStatus: false
+})))
+const startPlayback = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const stopPlayback = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const startUpload = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const stopUpload = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const alertError = vi.hoisted(() => vi.fn())
 const alertSuccess = vi.hoisted(() => vi.fn())
 
@@ -47,7 +56,12 @@ vi.mock('@/stores/devices.store.js', () => ({
     getPlaylist,
     updatePlaylist,
     getSchedule,
-    updateSchedule
+    updateSchedule,
+    getServiceStatus,
+    startPlayback,
+    stopPlayback,
+    startUpload,
+    stopUpload
   })
 }))
 
@@ -107,6 +121,11 @@ describe('Device_Management_Dialog.vue', () => {
     updatePlaylist.mockReset()
     getSchedule.mockReset()
     updateSchedule.mockReset()
+    getServiceStatus.mockReset()
+    startPlayback.mockReset()
+    stopPlayback.mockReset()
+    startUpload.mockReset()
+    stopUpload.mockReset()
     statusesRef.value = []
     getAudio.mockResolvedValue({ output: 'hdmi' })
     updateAudio.mockResolvedValue()
@@ -118,6 +137,15 @@ describe('Device_Management_Dialog.vue', () => {
       rest: [{ start: '00:00', stop: '00:00' }]
     })
     updateSchedule.mockResolvedValue()
+    getServiceStatus.mockResolvedValue({
+      playbackServiceStatus: false,
+      playlistUploadServiceStatus: false,
+      yaDiskMountStatus: false
+    })
+    startPlayback.mockResolvedValue()
+    stopPlayback.mockResolvedValue()
+    startUpload.mockResolvedValue()
+    stopUpload.mockResolvedValue()
     getDeviceById.mockImplementation((id) => (
       id === 1
         ? {
@@ -240,6 +268,86 @@ describe('Device_Management_Dialog.vue', () => {
     await wrapper.setProps({ deviceId: 2 })
 
     expect(getDeviceStatusById).toHaveBeenCalledWith(2)
+  })
+
+  describe('Service management', () => {
+    it('loads and displays service statuses when dialog opens with online device', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+      getServiceStatus.mockResolvedValue({
+        playbackServiceStatus: true,
+        playlistUploadServiceStatus: false,
+        yaDiskMountStatus: true
+      })
+
+      const wrapper = mountDialog()
+
+      await new Promise((resolve) => setTimeout(resolve, 15))
+      await wrapper.vm.$nextTick()
+
+      expect(getServiceStatus).toHaveBeenCalledWith(1)
+      const statuses = wrapper.findAll('.service-status')
+      expect(statuses).toHaveLength(3)
+      expect(statuses[0].text()).toBe('Запущено')
+      expect(statuses[1].text()).toBe('Остановлено')
+      expect(statuses[2].text()).toBe('Смонтирован')
+    })
+
+    it('invokes startPlayback and refreshes status when playback is stopped', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+
+      const wrapper = mountDialog()
+
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      await wrapper.vm.$nextTick()
+      getServiceStatus.mockClear()
+
+      const button = wrapper.find('[data-test="service-action-playback"]')
+      expect(button.text()).toContain('Запустить')
+
+      await button.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(startPlayback).toHaveBeenCalledWith(1)
+      expect(getServiceStatus).toHaveBeenCalledWith(1)
+    })
+
+    it('invokes stopPlayback and refreshes status when playback is running', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+      getServiceStatus.mockResolvedValue({
+        playbackServiceStatus: true,
+        playlistUploadServiceStatus: false,
+        yaDiskMountStatus: false
+      })
+
+      const wrapper = mountDialog()
+
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      await wrapper.vm.$nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      getServiceStatus.mockClear()
+
+      const button = wrapper.find('[data-test="service-action-playback"]')
+      expect(button.text()).toContain('Остановить')
+
+      await button.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(stopPlayback).toHaveBeenCalledWith(1)
+      expect(getServiceStatus).toHaveBeenCalledWith(1)
+    })
+
+    it('disables service controls when device is offline', () => {
+      const wrapper = mountDialog()
+      const buttons = wrapper.findAll('.service-settings button')
+      expect(buttons.length).toBeGreaterThan(0)
+      buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeDefined())
+    })
   })
 
   it('disables system buttons when no status data is available', async () => {
@@ -616,6 +724,7 @@ describe('Device_Management_Dialog.vue', () => {
       { deviceId: 2, isOnline: true }
     ]
     await wrapper.setProps({ deviceId: 2 })
+    await new Promise((resolve) => setTimeout(resolve, 10))
     await wrapper.vm.$nextTick()
 
     expect(getAudio).toHaveBeenCalledWith(2)
