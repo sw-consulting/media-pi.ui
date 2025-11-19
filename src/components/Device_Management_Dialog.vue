@@ -44,6 +44,8 @@ const serviceStatus = ref({ ...defaultServiceStatus })
 // Track ongoing operations to disable controls
 const operationInProgress = ref({
   apply: false,
+  readAll: false,
+  saveAll: false,
   reboot: false,
   shutdown: false,
   audioUpdate: false,
@@ -246,10 +248,7 @@ watch(() => props.deviceId, () => {
 watch(() => currentStatus.value?.isOnline, async (isOnline, wasOnline) => {
   // Only load audio settings when device comes online (was offline, now online)
   if (isOnline && wasOnline === false && internalOpen.value && props.deviceId) {
-    await updateServiceStatus()
-    await updateAudioSettings()
-    await updatePlaylistSettings()
-    await updateScheduleSettings()
+    await readAllSettings()
   } else if (isOnline === false && internalOpen.value) {
     resetServiceStatus()
   }
@@ -263,10 +262,7 @@ async function initializeDevice() {
   // Only load audio settings if device is online, otherwise set default
   const status = currentStatus.value
   if (status?.isOnline) {
-    await updateServiceStatus()
-    await updateAudioSettings()
-    await updatePlaylistSettings()
-    await updateScheduleSettings()
+    await readAllSettings()
   } else {
     resetServiceStatus()
     // Set default audio value silently when device is offline
@@ -339,8 +335,10 @@ async function updateAudioSettings() {
     } else {
       audioSettings.value.output = result.output
     }
+    return true
   } catch (err) {
     alertStore.error('Не удалось загрузить настройки аудио: ' + (err?.message || 'Неизвестная ошибка'))
+    return false
   } finally {
     operationInProgress.value.audioUpdate = false
   }
@@ -351,8 +349,10 @@ async function saveAudioSettings() {
   try {
     await devicesStore.updateAudio(props.deviceId, { output: audioSettings.value.output })
     alertStore.success('Настройки аудио сохранены')
+    return true
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки аудио: ' + (err?.message || 'Неизвестная ошибка'))
+    return false
   } finally {
     operationInProgress.value.audioSave = false
   }
@@ -365,8 +365,10 @@ async function updatePlaylistSettings() {
     const result = await devicesStore.getPlaylist(props.deviceId)
     playlistSettings.value.source = result?.source || ''
     playlistSettings.value.destination = result?.destination || ''
+    return true
   } catch (err) {
     alertStore.error('Не удалось загрузить настройки плей-листа: ' + (err?.message || 'Неизвестная ошибка'))
+    return false
   } finally {
     operationInProgress.value.playlistUpdate = false
   }
@@ -380,8 +382,10 @@ async function savePlaylistSettings() {
       destination: playlistSettings.value.destination
     })
     alertStore.success('Настройки плей-листа сохранены')
+    return true
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки плей-листа: ' + (err?.message || 'Неизвестная ошибка'))
+    return false
   } finally {
     operationInProgress.value.playlistSave = false
   }
@@ -392,23 +396,25 @@ async function updateScheduleSettings() {
   try {
     const result = await devicesStore.getSchedule(props.deviceId)
     applyScheduleValues(result || createDefaultScheduleValues())
+    return true
   } catch (err) {
     alertStore.error('Не удалось загрузить настройки таймеров: ' + (err?.message || 'Неизвестная ошибка'))
+    return false
   } finally {
     operationInProgress.value.scheduleUpdate = false
   }
 }
 
 async function saveScheduleSettings() {
-  if (!scheduleFormRef.value) return
-  const { valid } = await scheduleFormRef.value.validate()
-  if (!valid) {
+  const formRef = scheduleFormRef.value
+  const validationResult = formRef ? await formRef.validate() : { valid: true }
+  if (!validationResult.valid) {
     alertStore.error('Исправьте ошибки в настройках таймеров, чтобы продолжить')
-    return
+    return false
   }
 
   // Get current reactive form values instead of initial scheduleFormValues
-  const liveValues = scheduleFormRef.value.values || scheduleFormValues.value
+  const liveValues = formRef?.values || scheduleFormValues.value
 
   const payload = {
     playlist: [...(liveValues.playlist || [])],
@@ -422,8 +428,10 @@ async function saveScheduleSettings() {
     // Sync internal copy so reopening dialog shows what was just saved
     applyScheduleValues(payload)
     alertStore.success('Настройки таймеров сохранены')
+    return true
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки таймеров: ' + (err?.message || 'Неизвестная ошибка'))
+    return false
   } finally {
     operationInProgress.value.scheduleSave = false
   }
@@ -443,10 +451,42 @@ async function updateServiceStatus() {
   try {
     const result = await devicesStore.getServiceStatus(props.deviceId)
     applyServiceStatus(result)
+    return true
   } catch (err) {
     alertStore.error('Не удалось получить статус сервисов: ' + (err?.message || 'Неизвестная ошибка'))
+    return false
   } finally {
     operationInProgress.value.serviceStatus = false
+  }
+}
+
+async function readAllSettings() {
+  operationInProgress.value.readAll = true
+  try {
+    await Promise.all([
+      updateServiceStatus(),
+      updateAudioSettings(),
+      updatePlaylistSettings(),
+      updateScheduleSettings()
+    ])
+  } finally {
+    operationInProgress.value.readAll = false
+  }
+}
+
+async function saveAllSettings() {
+  operationInProgress.value.saveAll = true
+  try {
+    const results = await Promise.all([
+      saveAudioSettings(),
+      savePlaylistSettings(),
+      saveScheduleSettings()
+    ])
+    if (results.every(Boolean)) {
+      alertStore.success('Все настройки сохранены')
+    }
+  } finally {
+    operationInProgress.value.saveAll = false
   }
 }
 
@@ -619,22 +659,6 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </div>
-              <div class="service-buttons">
-                <button
-                  class="button-o-c"
-                  type="button"
-                  :disabled="isDisabled || hasAnyOperationInProgress"
-                  @click="updateServiceStatus"
-                >
-                  <font-awesome-icon
-                    size="1x"
-                    :icon="operationInProgress.serviceStatus ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
-                    :class="{ 'fa-spin': operationInProgress.serviceStatus }"
-                    class="mr-1"
-                  />
-                  {{ operationInProgress.serviceStatus ? 'Читается...' : 'Прочитать' }}
-                </button>
-              </div>
             </div>
           </fieldset>
 
@@ -713,36 +737,6 @@ onBeforeUnmount(() => {
                     </FieldArrayWithButtons>
                   </div>
                 </div>
-                <div class="timer-buttons">
-                  <button
-                    class="button-o-c"
-                    type="button"
-                    :disabled="isDisabled || hasAnyOperationInProgress"
-                    @click="updateScheduleSettings"
-                  >
-                    <font-awesome-icon
-                      size="1x"
-                      :icon="operationInProgress.scheduleUpdate ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
-                      :class="{ 'fa-spin': operationInProgress.scheduleUpdate }"
-                      class="mr-1"
-                    />
-                    {{ operationInProgress.scheduleUpdate ? 'Читается...' : 'Прочитать' }}
-                  </button>
-                  <button
-                    class="button-o-c"
-                    type="button"
-                    :disabled="isDisabled || hasAnyOperationInProgress"
-                    @click="saveScheduleSettings"
-                  >
-                    <font-awesome-icon
-                      size="1x"
-                      :icon="operationInProgress.scheduleSave ? 'fa-solid fa-spinner' : 'fa-regular fa-save'"
-                      :class="{ 'fa-spin': operationInProgress.scheduleSave }"
-                      class="mr-1"
-                    />
-                    {{ operationInProgress.scheduleSave ? 'Сохраняется...' : 'Сохранить' }}
-                  </button>
-                </div>
               </Form>
             </div>
           </fieldset>
@@ -769,36 +763,6 @@ onBeforeUnmount(() => {
                   :disabled="isDisabled || hasAnyOperationInProgress"
                 />
               </div>
-              <div class="playlist-buttons">
-                <button
-                  class="button-o-c"
-                  type="button"
-                  :disabled="isDisabled || hasAnyOperationInProgress"
-                  @click="updatePlaylistSettings"
-                >
-                  <font-awesome-icon
-                    size="1x"
-                    :icon="operationInProgress.playlistUpdate ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
-                    :class="{ 'fa-spin': operationInProgress.playlistUpdate }"
-                    class="mr-1"
-                  />
-                  {{ operationInProgress.playlistUpdate ? 'Читается...' : 'Прочитать' }}
-                </button>
-                <button
-                  class="button-o-c"
-                  type="button"
-                  :disabled="isDisabled || hasAnyOperationInProgress"
-                  @click="savePlaylistSettings"
-                >
-                  <font-awesome-icon
-                    size="1x"
-                    :icon="operationInProgress.playlistSave ? 'fa-solid fa-spinner' : 'fa-regular fa-save'"
-                    :class="{ 'fa-spin': operationInProgress.playlistSave }"
-                    class="mr-1"
-                  />
-                  {{ operationInProgress.playlistSave ? 'Сохраняется...' : 'Сохранить' }}
-                </button>
-              </div>
             </div>
           </fieldset>
 
@@ -815,82 +779,91 @@ onBeforeUnmount(() => {
                 <option value="hdmi">HDMI audio</option>
                 <option value="jack">3.5'' jack audio</option>
               </select>
-              <button
-                class="button-o-c"
-                type="button"
-                :disabled="isDisabled || hasAnyOperationInProgress"
-                @click="updateAudioSettings"
-              >
-                <font-awesome-icon
-                  size="1x"
-                  :icon="operationInProgress.audioUpdate ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
-                  :class="{ 'fa-spin': operationInProgress.audioUpdate }"
-                  class="mr-1"
-                />
-                {{ operationInProgress.audioUpdate ? 'Читается...' : 'Прочитать' }}
-              </button>
-              <button
-                class="button-o-c"
-                type="button"
-                :disabled="isDisabled || hasAnyOperationInProgress"
-                @click="saveAudioSettings"
-              >
-                <font-awesome-icon
-                  size="1x"
-                  :icon="operationInProgress.audioSave ? 'fa-solid fa-spinner' : 'fa-regular fa-save'"
-                  :class="{ 'fa-spin': operationInProgress.audioSave }"
-                  class="mr-1"
-                />
-                {{ operationInProgress.audioSave ? 'Сохраняется...' : 'Сохранить' }}
-              </button>
             </div>
           </fieldset>
 
           <fieldset class="panel">
             <legend class="primary-heading">Управление системой</legend>
             <div class="panel-content system-actions">
-              <button
-                class="button-o-c"
-                type="button"
-                :disabled="isDisabled || hasAnyOperationInProgress"
-                @click="apply"
-              >
-                <font-awesome-icon
-                  size="1x"
-                  :icon="operationInProgress.apply ? 'fa-solid fa-spinner' : 'fa-solid fa-download'"
-                  :class="{ 'fa-spin': operationInProgress.apply }"
-                  class="mr-1"
-                />
-                {{ operationInProgress.apply ? 'Изменения применяются...' : 'Применить изменения' }}
-              </button>
-              <button
-                class="button-o-c"
-                type="button"
-                :disabled="isDisabled || hasAnyOperationInProgress"
-                @click="reboot"
-              >
-                <font-awesome-icon
-                  size="1x"
-                  :icon="operationInProgress.reboot ? 'fa-solid fa-spinner' : 'fa-solid fa-retweet'"
-                  :class="{ 'fa-spin': operationInProgress.reboot }"
-                  class="mr-1"
-                />
-                {{ operationInProgress.reboot ? 'Перезагружается...' : 'Перезагрузить' }}
-              </button>
-              <button
-                class="button-o-c"
-                type="button"
-                :disabled="isDisabled || hasAnyOperationInProgress"
-                @click="shutdown"
-              >
-                <font-awesome-icon
-                  size="1x"
-                  :icon="operationInProgress.shutdown ? 'fa-solid fa-spinner' : 'fa-solid fa-power-off'"
-                  :class="{ 'fa-spin': operationInProgress.shutdown }"
-                  class="mr-1"
-                />
-                {{ operationInProgress.shutdown ? 'Выключается...' : 'Выключить' }}
-              </button>
+              <div class="system-row">
+                <button
+                  class="button-o-c"
+                  type="button"
+                  data-test="system-read"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                  @click="readAllSettings"
+                >
+                  <font-awesome-icon
+                    size="1x"
+                    :icon="operationInProgress.readAll ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
+                    :class="{ 'fa-spin': operationInProgress.readAll }"
+                    class="mr-1"
+                  />
+                  {{ operationInProgress.readAll ? 'Читается...' : 'Прочитать' }}
+                </button>
+                <button
+                  class="button-o-c"
+                  type="button"
+                  data-test="system-save"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                  @click="saveAllSettings"
+                >
+                  <font-awesome-icon
+                    size="1x"
+                    :icon="operationInProgress.saveAll ? 'fa-solid fa-spinner' : 'fa-regular fa-save'"
+                    :class="{ 'fa-spin': operationInProgress.saveAll }"
+                    class="mr-1"
+                  />
+                  {{ operationInProgress.saveAll ? 'Сохраняется...' : 'Сохранить' }}
+                </button>
+                <button
+                  class="button-o-c"
+                  type="button"
+                  data-test="system-apply"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                  @click="apply"
+                >
+                  <font-awesome-icon
+                    size="1x"
+                    :icon="operationInProgress.apply ? 'fa-solid fa-spinner' : 'fa-solid fa-download'"
+                    :class="{ 'fa-spin': operationInProgress.apply }"
+                    class="mr-1"
+                  />
+                  {{ operationInProgress.apply ? 'Изменения применяются...' : 'Применить изменения' }}
+                </button>
+              </div>
+              <div class="system-row">
+                <button
+                  class="button-o-c"
+                  type="button"
+                  data-test="system-reboot"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                  @click="reboot"
+                >
+                  <font-awesome-icon
+                    size="1x"
+                    :icon="operationInProgress.reboot ? 'fa-solid fa-spinner' : 'fa-solid fa-retweet'"
+                    :class="{ 'fa-spin': operationInProgress.reboot }"
+                    class="mr-1"
+                  />
+                  {{ operationInProgress.reboot ? 'Перезагружается...' : 'Перезагрузить' }}
+                </button>
+                <button
+                  class="button-o-c"
+                  type="button"
+                  data-test="system-shutdown"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                  @click="shutdown"
+                >
+                  <font-awesome-icon
+                    size="1x"
+                    :icon="operationInProgress.shutdown ? 'fa-solid fa-spinner' : 'fa-solid fa-power-off'"
+                    :class="{ 'fa-spin': operationInProgress.shutdown }"
+                    class="mr-1"
+                  />
+                  {{ operationInProgress.shutdown ? 'Выключается...' : 'Выключить' }}
+                </button>
+              </div>
             </div>
           </fieldset>
         </div>
@@ -1034,17 +1007,24 @@ onBeforeUnmount(() => {
 
 .system-actions {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.system-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
 }
 
 .audio-settings {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
 }
 
@@ -1062,13 +1042,6 @@ onBeforeUnmount(() => {
   align-items: center;
   width: 100%;
   margin-bottom: 0.5rem;
-}
-
-.playlist-buttons {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
 }
 
 .playlist-label {
