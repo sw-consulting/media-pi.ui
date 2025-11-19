@@ -1009,22 +1009,23 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
 }
 
 .system-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  justify-content: flex-start;
+  justify-content: center;
   width: 100%;
 }
 
 .audio-settings {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: flex-start;
+  gap: 0.5rem;
+  justify-content: center;
   align-items: center;
 }
 
