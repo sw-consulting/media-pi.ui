@@ -447,6 +447,44 @@ a,
   margin-left: 0;
 }
 
+.field-container-plus:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+
+/* When a FieldArray wants to hide the label but keep the plus button visible,
+   the component will add a `no-label` class to the surrounding `.form-group`.
+   These rules make the label visually hidden while keeping the plus button
+   in the normal flow so it remains visible and reachable. */
+.form-group.no-label .label {
+  display: none; /* remove label from layout so fields shift left */
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.form-group.no-label {
+  gap: 0; /* remove extra gap left by label */
+}
+.form-group.no-label .field-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form-group.no-label .field-container-plus {
+  position: static; /* participate in normal flow */
+  margin-left: 0;
+  margin-right: 8px;
+}
+.form-group.no-label .field-container-select {
+  width: 100%; /* allow select/input to take full remaining width */
+}
+.form-group.no-label .field-container-plus-spacer {
+  width: 40px;
+  min-width: 40px;
+  display: inline-flex;
+}
+
 .field-container-select {
   width: calc(100% - 30px);
 }

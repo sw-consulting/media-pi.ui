@@ -4,11 +4,14 @@
 
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { Form, Field } from 'vee-validate'
+import * as Yup from 'yup'
 
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { timeouts } from '@/helpers/config.js'
+import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -16,10 +19,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
-
-const informationalPanels = [
-  { key: 'timers', title: 'Настройки таймеров' }
-]
 
 const devicesStore = useDevicesStore()
 const deviceStatusesStore = useDeviceStatusesStore()
@@ -43,7 +42,9 @@ const operationInProgress = ref({
   audioUpdate: false,
   audioSave: false,
   playlistUpdate: false,
-  playlistSave: false
+  playlistSave: false,
+  scheduleUpdate: false,
+  scheduleSave: false
 })
 
 const systemOperationTimers = ref({
@@ -62,6 +63,84 @@ const playlistSettings = ref({
   source: '',
   destination: ''
 })
+
+const defaultTimeValue = '00:00'
+const createDefaultRestPair = () => ({ start: defaultTimeValue, stop: defaultTimeValue })
+const createDefaultScheduleValues = () => ({
+  playlist: [defaultTimeValue],
+  video: [defaultTimeValue],
+  rest: [createDefaultRestPair()]
+})
+
+const scheduleFormValues = ref(createDefaultScheduleValues())
+const scheduleFormRef = ref(null)
+const timeFieldProps = Object.freeze({
+  type: 'time',
+  step: 60
+})
+const restDefaultValue = Object.freeze(createDefaultRestPair())
+const timeValueSchema = Yup.string()
+  .required('Укажите время в формате HH:mm')
+  .matches(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Некорректный формат времени HH:mm')
+const scheduleValidationSchema = Yup.object({
+  playlist: Yup.array().of(timeValueSchema).min(1, 'Добавьте время загрузки плей-листа'),
+  video: Yup.array().of(timeValueSchema).min(1, 'Добавьте время воспроизведения видео'),
+  rest: Yup.array()
+    .of(
+      Yup.object({
+        start: timeValueSchema,
+        stop: timeValueSchema
+      })
+    )
+    .min(1, 'Добавьте период отдыха')
+})
+
+const hasErrorsForPrefix = (errors = {}, prefix) => {
+  if (!prefix) return false
+  return Object.keys(errors).some((key) => key.startsWith(prefix))
+}
+
+const sanitizeFieldName = (value) => {
+  if (!value) return ''
+  return value
+    .replace(/[^a-zA-Z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+}
+
+const normalizeTimeList = (list) => {
+  if (Array.isArray(list) && list.length) {
+    const sanitized = list
+      .map((item) => (typeof item === 'string' && item.trim() ? item.trim() : null))
+      .filter(Boolean)
+    if (sanitized.length) return sanitized
+  }
+  return [defaultTimeValue]
+}
+
+const normalizeRestList = (list) => {
+  if (Array.isArray(list) && list.length) {
+    const sanitized = list
+      .map((item) => ({
+        start: typeof item?.start === 'string' && item.start.trim() ? item.start.trim() : defaultTimeValue,
+        stop: typeof item?.stop === 'string' && item.stop.trim() ? item.stop.trim() : defaultTimeValue
+      }))
+    if (sanitized.length) return sanitized
+  }
+  return [createDefaultRestPair()]
+}
+
+const applyScheduleValues = (values) => {
+  const normalized = {
+    playlist: normalizeTimeList(values?.playlist),
+    video: normalizeTimeList(values?.video),
+    rest: normalizeRestList(values?.rest)
+  }
+  scheduleFormValues.value = normalized
+  if (scheduleFormRef.value) {
+    scheduleFormRef.value.resetForm({ values: normalized })
+  }
+}
 
 watch(
   () => statuses.value,
@@ -151,6 +230,7 @@ watch(() => currentStatus.value?.isOnline, async (isOnline, wasOnline) => {
   if (isOnline && wasOnline === false && internalOpen.value && props.deviceId) {
     await updateAudioSettings()
     await updatePlaylistSettings()
+    await updateScheduleSettings()
   }
 })
 
@@ -164,11 +244,13 @@ async function initializeDevice() {
   if (status?.isOnline) {
     await updateAudioSettings()
     await updatePlaylistSettings()
+    await updateScheduleSettings()
   } else {
     // Set default audio value silently when device is offline
     audioSettings.value.output = 'hdmi'
     playlistSettings.value.source = ''
     playlistSettings.value.destination = ''
+    applyScheduleValues(createDefaultScheduleValues())
   }
 }
 
@@ -178,9 +260,7 @@ const onlineClass = computed(() => currentStatus.value?.isOnline ? 'text-success
 
 const isDisabled = computed(() => !currentStatus.value?.isOnline)
 const hasAnyOperationInProgress = computed(() =>
-  operationInProgress.value.apply || operationInProgress.value.reboot || operationInProgress.value.shutdown ||
-  operationInProgress.value.audioUpdate || operationInProgress.value.audioSave ||
-  operationInProgress.value.playlistUpdate || operationInProgress.value.playlistSave
+  Object.values(operationInProgress.value).some(Boolean)
 )
 
 const resetSystemOperations = () => {
@@ -217,7 +297,7 @@ async function saveAudioSettings() {
   operationInProgress.value.audioSave = true
   try {
     await devicesStore.updateAudio(props.deviceId, { output: audioSettings.value.output })
-    alertStore.success('Настройки аудио успешно сохранены')
+    alertStore.success('Настройки аудио сохранены')
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки аудио: ' + (err?.message || 'Неизвестная ошибка'))
   } finally {
@@ -246,11 +326,53 @@ async function savePlaylistSettings() {
       source: playlistSettings.value.source,
       destination: playlistSettings.value.destination
     })
-    alertStore.success('Настройки плей-листа успешно сохранены')
+    alertStore.success('Настройки плей-листа сохранены')
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки плей-листа: ' + (err?.message || 'Неизвестная ошибка'))
   } finally {
     operationInProgress.value.playlistSave = false
+  }
+}
+
+async function updateScheduleSettings() {
+  operationInProgress.value.scheduleUpdate = true
+  try {
+    const result = await devicesStore.getSchedule(props.deviceId)
+    applyScheduleValues(result || createDefaultScheduleValues())
+  } catch (err) {
+    alertStore.error('Не удалось загрузить настройки таймеров: ' + (err?.message || 'Неизвестная ошибка'))
+  } finally {
+    operationInProgress.value.scheduleUpdate = false
+  }
+}
+
+async function saveScheduleSettings() {
+  if (!scheduleFormRef.value) return
+  const { valid } = await scheduleFormRef.value.validate()
+  if (!valid) {
+    alertStore.error('Исправьте ошибки в настройках таймеров, чтобы продолжить')
+    return
+  }
+
+  // Get current reactive form values instead of initial scheduleFormValues
+  const liveValues = scheduleFormRef.value.values || scheduleFormValues.value
+
+  const payload = {
+    playlist: [...(liveValues.playlist || [])],
+    video: [...(liveValues.video || [])],
+    rest: (liveValues.rest || []).map((item) => ({ start: item.start, stop: item.stop }))
+  }
+  
+  operationInProgress.value.scheduleSave = true
+  try {
+    await devicesStore.updateSchedule(props.deviceId, payload)
+    // Sync internal copy so reopening dialog shows what was just saved
+    applyScheduleValues(payload)
+    alertStore.success('Настройки таймеров сохранены')
+  } catch (err) {
+    alertStore.error('Не удалось сохранить настройки таймеров: ' + (err?.message || 'Неизвестная ошибка'))
+  } finally {
+    operationInProgress.value.scheduleSave = false
   }
 }
 
@@ -285,6 +407,14 @@ const runSystemOperation = async (key, handler, timeout) => {
     await fetchDeviceStatus()
     operationInProgress.value[key] = false
     systemOperationTimers.value[key] = null
+    
+    // Show completion message based on operation type
+    const completionMessages = {
+      apply: 'Изменения применены, выполнен перезапуск сервисов',
+      reboot: 'Устройство перезагружено',
+      shutdown: 'Устройство выключено'
+    }
+    alertStore.success(completionMessages[key])
   }, timeout)
 }
 
@@ -323,9 +453,113 @@ onBeforeUnmount(() => {
       </v-card-title>
       <v-card-text>
         <div class="panel-grid">
-          <fieldset v-for="panel in informationalPanels" :key="panel.key" class="panel">
-            <legend class="primary-heading">{{ panel.title }}</legend>
-            <div class="panel-content" />
+          <fieldset class="panel">
+            <legend class="primary-heading">Настройки таймеров</legend>
+            <div class="panel-content timers-settings">
+              <Form
+                ref="scheduleFormRef"
+                class="timers-form"
+                :initial-values="scheduleFormValues"
+                :validation-schema="scheduleValidationSchema"
+                v-slot="{ errors: scheduleErrors }"
+              >
+                <div class="timers-grid">
+                  <div class="timers-column">
+                    <div class="timer-column-title">Загрузка плей-листа</div>
+                    <FieldArrayWithButtons
+                      name="playlist"
+                      label=""
+                      :hide-label="true"
+                      field-type="input"
+                      :field-props="timeFieldProps"
+                      placeholder="HH:mm"
+                      :default-value="defaultTimeValue"
+                      :has-error="hasErrorsForPrefix(scheduleErrors, 'playlist')"
+                      :disabled="isDisabled || hasAnyOperationInProgress"
+                    />
+                  </div>
+                  <div class="timers-column">
+                    <div class="timer-column-title">Загрузка видео</div>
+                    <FieldArrayWithButtons
+                      name="video"
+                      label=""
+                      :hide-label="true"
+                      field-type="input"
+                      :field-props="timeFieldProps"
+                      placeholder="HH:mm"
+                      :default-value="defaultTimeValue"
+                      :has-error="hasErrorsForPrefix(scheduleErrors, 'video')"
+                      :disabled="isDisabled || hasAnyOperationInProgress"
+                    />
+                  </div>
+                  <div class="timers-column">
+                    <div class="timer-column-title">Время отдыха</div>
+                    <FieldArrayWithButtons
+                      name="rest"
+                      label="Время отдыха"
+                      :hide-label="true"
+                      :default-value="restDefaultValue"
+                      :has-error="hasErrorsForPrefix(scheduleErrors, 'rest')"
+                      :disabled="isDisabled || hasAnyOperationInProgress"
+                    >
+                      <template #field="{ fieldName: restFieldName }">
+                        <div class="rest-field-pair">
+                          <Field
+                            :name="`${restFieldName}.start`"
+                            :id="`${sanitizeFieldName(restFieldName)}_start`"
+                            class="form-control input timer-input"
+                            :class="{ 'is-invalid': hasErrorsForPrefix(scheduleErrors, `${restFieldName}.start`) }"
+                            type="time"
+                            step="60"
+                            :disabled="isDisabled || hasAnyOperationInProgress"
+                          />
+                          <span class="rest-separator">—</span>
+                          <Field
+                            :name="`${restFieldName}.stop`"
+                            :id="`${sanitizeFieldName(restFieldName)}_stop`"
+                            class="form-control input timer-input"
+                            :class="{ 'is-invalid': hasErrorsForPrefix(scheduleErrors, `${restFieldName}.stop`) }"
+                            type="time"
+                            step="60"
+                            :disabled="isDisabled || hasAnyOperationInProgress"
+                          />
+                        </div>
+                      </template>
+                    </FieldArrayWithButtons>
+                  </div>
+                </div>
+                <div class="timer-buttons">
+                  <button
+                    class="button-o-c"
+                    type="button"
+                    :disabled="isDisabled || hasAnyOperationInProgress"
+                    @click="updateScheduleSettings"
+                  >
+                    <font-awesome-icon
+                      size="1x"
+                      :icon="operationInProgress.scheduleUpdate ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
+                      :class="{ 'fa-spin': operationInProgress.scheduleUpdate }"
+                      class="mr-1"
+                    />
+                    {{ operationInProgress.scheduleUpdate ? 'Читается...' : 'Прочитать' }}
+                  </button>
+                  <button
+                    class="button-o-c"
+                    type="button"
+                    :disabled="isDisabled || hasAnyOperationInProgress"
+                    @click="saveScheduleSettings"
+                  >
+                    <font-awesome-icon
+                      size="1x"
+                      :icon="operationInProgress.scheduleSave ? 'fa-solid fa-spinner' : 'fa-regular fa-save'"
+                      :class="{ 'fa-spin': operationInProgress.scheduleSave }"
+                      class="mr-1"
+                    />
+                    {{ operationInProgress.scheduleSave ? 'Сохраняется...' : 'Сохранить' }}
+                  </button>
+                </div>
+              </Form>
+            </div>
           </fieldset>
 
           <fieldset class="panel">
@@ -340,6 +574,17 @@ onBeforeUnmount(() => {
                   class="playlist-input"
                   :disabled="isDisabled || hasAnyOperationInProgress"
                 />
+
+                <label class="playlist-label" for="playlist-destination">Локальный диск</label>
+                <input
+                  id="playlist-destination"
+                  v-model="playlistSettings.destination"
+                  type="text"
+                  class="playlist-input"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                />
+              </div>
+              <div class="playlist-buttons">
                 <button
                   class="button-o-c"
                   type="button"
@@ -354,15 +599,6 @@ onBeforeUnmount(() => {
                   />
                   {{ operationInProgress.playlistUpdate ? 'Читается...' : 'Прочитать' }}
                 </button>
-
-                <label class="playlist-label" for="playlist-destination">Локальный диск</label>
-                <input
-                  id="playlist-destination"
-                  v-model="playlistSettings.destination"
-                  type="text"
-                  class="playlist-input"
-                  :disabled="isDisabled || hasAnyOperationInProgress"
-                />
                 <button
                   class="button-o-c"
                   type="button"
@@ -484,7 +720,7 @@ onBeforeUnmount(() => {
             Закрыть
         </button>
       </v-card-actions>
-      <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <div v-if="alert" class="alert alert-dismissable" :class="alert.type">
         <button @click="clearAlert()" class="btn btn-link close">×</button>
         {{ alert.message }}
       </div>
@@ -522,6 +758,56 @@ onBeforeUnmount(() => {
   min-height: 40px;
 }
 
+.timers-settings {
+  display: flex;
+  justify-content: center;
+}
+
+.timers-form {
+  width: 100%;
+}
+
+.timers-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.67fr;
+  gap: 0 0.2rem;
+}
+
+.timers-column {
+  border: 1px dashed var(--primary-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.timer-column-title {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.timer-buttons {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.rest-field-pair {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.timer-input {
+  min-width: 90px;
+}
+
+.rest-separator {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
 .system-actions {
   display: flex;
   flex-wrap: wrap;
@@ -540,17 +826,25 @@ onBeforeUnmount(() => {
 
 .playlist-settings {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
 }
 
 .playlist-grid {
   display: grid;
-  /* three columns: labels, inputs, buttons; two rows are provided by the markup order */
-  grid-template-columns: 140px 1fr auto;
+  grid-template-columns: 140px 1fr;
   grid-auto-rows: auto;
   gap: 0.5rem 0.75rem;
   align-items: center;
   width: 100%;
+  margin-bottom: 1rem;
+}
+
+.playlist-buttons {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .playlist-label {
@@ -646,5 +940,11 @@ onBeforeUnmount(() => {
   100% {
     transform: rotate(360deg);
   }
+}
+
+.alert {
+  margin: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
 }
 </style>
