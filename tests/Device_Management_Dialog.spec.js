@@ -420,7 +420,7 @@ describe('Device_Management_Dialog.vue', () => {
       await wrapper.vm.$nextTick()
 
       expect(updatePlaylist).toHaveBeenCalledWith(1, { source: 'new/source', destination: 'new/destination' })
-      expect(alertSuccess).toHaveBeenCalledWith('Настройки плей-листа успешно сохранены')
+      expect(alertSuccess).toHaveBeenCalledWith('Настройки плей-листа сохранены')
     })
 
     it('disables playlist controls when device is offline', async () => {
@@ -534,7 +534,7 @@ describe('Device_Management_Dialog.vue', () => {
     await wrapper.vm.$nextTick()
 
     expect(updateAudio).toHaveBeenCalledWith(1, { output: 'jack' })
-    expect(alertSuccess).toHaveBeenCalledWith('Настройки аудио успешно сохранены')
+    expect(alertSuccess).toHaveBeenCalledWith('Настройки аудио сохранены')
   })
 
   it('disables audio controls when device is offline', async () => {
