@@ -273,8 +273,6 @@ async function initializeDevice() {
 
 const onlineClass = computed(() => currentStatus.value?.isOnline ? 'text-success' : 'text-danger')
 
-// Note: playlist status column removed — UI simplified to source/destination only
-
 const isDisabled = computed(() => !currentStatus.value?.isOnline)
 const hasAnyOperationInProgress = computed(() =>
   Object.values(operationInProgress.value).some(Boolean)
@@ -925,13 +923,6 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
-.service-label {
-  font-weight: 600;
-}
-
-.service-status {
-  font-weight: 600;
-}
 
 .service-action {
   display: flex;
@@ -989,7 +980,6 @@ onBeforeUnmount(() => {
 }
 
 .rest-separator {
-  font-weight: 600;
   color: var(--text-color);
 }
 
