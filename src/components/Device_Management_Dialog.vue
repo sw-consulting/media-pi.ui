@@ -34,6 +34,13 @@ const { statuses } = storeToRefs(deviceStatusesStore)
 // Manual refresh override: prioritizes explicit refresh over SSE
 const manualStatus = ref(null)
 
+const defaultServiceStatus = Object.freeze({
+  playbackServiceStatus: false,
+  playlistUploadServiceStatus: false,
+  yaDiskMountStatus: false
+})
+const serviceStatus = ref({ ...defaultServiceStatus })
+
 // Track ongoing operations to disable controls
 const operationInProgress = ref({
   apply: false,
@@ -44,7 +51,10 @@ const operationInProgress = ref({
   playlistUpdate: false,
   playlistSave: false,
   scheduleUpdate: false,
-  scheduleSave: false
+  scheduleSave: false,
+  serviceStatus: false,
+  playbackToggle: false,
+  uploadToggle: false
 })
 
 const systemOperationTimers = ref({
@@ -211,6 +221,7 @@ watch(internalOpen, (v) => {
   if (!v) {
     manualStatus.value = null
     resetSystemOperations()
+    resetServiceStatus()
     // Clear global alerts when the dialog is closed to avoid overlapping UI
     try {
       clearAlert()
@@ -222,15 +233,19 @@ watch(internalOpen, (v) => {
 watch(() => props.deviceId, () => {
   manualStatus.value = null
   resetSystemOperations()
+  resetServiceStatus()
 })
 
 // Watch for device coming online to load audio settings
 watch(() => currentStatus.value?.isOnline, async (isOnline, wasOnline) => {
   // Only load audio settings when device comes online (was offline, now online)
   if (isOnline && wasOnline === false && internalOpen.value && props.deviceId) {
+    await updateServiceStatus()
     await updateAudioSettings()
     await updatePlaylistSettings()
     await updateScheduleSettings()
+  } else if (isOnline === false && internalOpen.value) {
+    resetServiceStatus()
   }
 })
 
@@ -242,10 +257,12 @@ async function initializeDevice() {
   // Only load audio settings if device is online, otherwise set default
   const status = currentStatus.value
   if (status?.isOnline) {
+    await updateServiceStatus()
     await updateAudioSettings()
     await updatePlaylistSettings()
     await updateScheduleSettings()
   } else {
+    resetServiceStatus()
     // Set default audio value silently when device is offline
     audioSettings.value.output = 'hdmi'
     playlistSettings.value.source = ''
@@ -262,6 +279,38 @@ const isDisabled = computed(() => !currentStatus.value?.isOnline)
 const hasAnyOperationInProgress = computed(() =>
   Object.values(operationInProgress.value).some(Boolean)
 )
+
+const serviceRows = computed(() => {
+  const status = serviceStatus.value || defaultServiceStatus
+  return [
+    {
+      key: 'playback',
+      label: 'Воспроизведение',
+      isActive: Boolean(status.playbackServiceStatus),
+      statusLabel: status.playbackServiceStatus ? 'Запущено' : 'Остановлено',
+      actionLabel: status.playbackServiceStatus ? 'Остановить' : 'Запустить',
+      action: status.playbackServiceStatus ? stopPlaybackService : startPlaybackService,
+      operationKey: 'playbackToggle'
+    },
+    {
+      key: 'upload',
+      label: 'Загрузка',
+      isActive: Boolean(status.playlistUploadServiceStatus),
+      statusLabel: status.playlistUploadServiceStatus ? 'Запущено' : 'Остановлено',
+      actionLabel: status.playlistUploadServiceStatus ? 'Остановить' : 'Запустить',
+      action: status.playlistUploadServiceStatus ? stopUploadService : startUploadService,
+      operationKey: 'uploadToggle'
+    },
+    {
+      key: 'yadisk',
+      label: 'Яндекс диск',
+      isActive: Boolean(status.yaDiskMountStatus),
+      statusLabel: status.yaDiskMountStatus ? 'Смонтирован' : 'Не смонтирован',
+      actionLabel: null,
+      action: null
+    }
+  ]
+})
 
 const resetSystemOperations = () => {
   Object.keys(systemOperationTimers.value).forEach((key) => {
@@ -376,6 +425,42 @@ async function saveScheduleSettings() {
   }
 }
 
+const applyServiceStatus = (payload = {}) => {
+  serviceStatus.value = { ...defaultServiceStatus, ...payload }
+}
+
+const resetServiceStatus = () => {
+  applyServiceStatus(defaultServiceStatus)
+}
+
+async function updateServiceStatus() {
+  if (!props.deviceId) return
+  operationInProgress.value.serviceStatus = true
+  try {
+    const result = await devicesStore.getServiceStatus(props.deviceId)
+    applyServiceStatus(result)
+  } catch (err) {
+    alertStore.error('Не удалось получить статус сервисов: ' + (err?.message || 'Неизвестная ошибка'))
+  } finally {
+    operationInProgress.value.serviceStatus = false
+  }
+}
+
+const toggleService = async (operationKey, handler) => {
+  if (!handler) return
+  operationInProgress.value[operationKey] = true
+  const success = await runWithDevice(handler)
+  if (success) {
+    await updateServiceStatus()
+  }
+  operationInProgress.value[operationKey] = false
+}
+
+const startPlaybackService = () => toggleService('playbackToggle', devicesStore.startPlayback)
+const stopPlaybackService = () => toggleService('playbackToggle', devicesStore.stopPlayback)
+const startUploadService = () => toggleService('uploadToggle', devicesStore.startUpload)
+const stopUploadService = () => toggleService('uploadToggle', devicesStore.stopUpload)
+
 const runWithDevice = async (handler) => {
   if (!props.deviceId || typeof handler !== 'function') return false
   try {
@@ -453,6 +538,68 @@ onBeforeUnmount(() => {
       </v-card-title>
       <v-card-text>
         <div class="panel-grid">
+          <fieldset class="panel">
+            <legend class="primary-heading">Управление сервисами</legend>
+            <div class="panel-content service-settings">
+              <div class="service-grid">
+                <template v-for="row in serviceRows" :key="row.key">
+                  <div class="service-cell service-label">{{ row.label }}</div>
+                  <div
+                    class="service-cell service-status"
+                    :class="row.isActive ? 'text-success' : 'text-danger'"
+                  >
+                    {{ row.statusLabel }}
+                  </div>
+                  <div class="service-cell service-action">
+                    <button
+                      v-if="row.action"
+                      class="button-o-c"
+                      type="button"
+                      :data-test="`service-action-${row.key}`"
+                      :disabled="
+                        isDisabled ||
+                        hasAnyOperationInProgress ||
+                        operationInProgress[row.operationKey] ||
+                        operationInProgress.serviceStatus
+                      "
+                      @click="row.action"
+                    >
+                      <font-awesome-icon
+                        size="1x"
+                        :icon="
+                          operationInProgress[row.operationKey]
+                            ? 'fa-solid fa-spinner'
+                            : row.isActive
+                              ? 'fa-solid fa-stop'
+                              : 'fa-solid fa-play'
+                        "
+                        :class="{ 'fa-spin': operationInProgress[row.operationKey] }"
+                        class="mr-1"
+                      />
+                      {{ row.actionLabel }}
+                    </button>
+                  </div>
+                </template>
+              </div>
+              <div class="service-buttons">
+                <button
+                  class="button-o-c"
+                  type="button"
+                  :disabled="isDisabled || hasAnyOperationInProgress"
+                  @click="updateServiceStatus"
+                >
+                  <font-awesome-icon
+                    size="1x"
+                    :icon="operationInProgress.serviceStatus ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
+                    :class="{ 'fa-spin': operationInProgress.serviceStatus }"
+                    class="mr-1"
+                  />
+                  {{ operationInProgress.serviceStatus ? 'Читается...' : 'Прочитать' }}
+                </button>
+              </div>
+            </div>
+          </fieldset>
+
           <fieldset class="panel">
             <legend class="primary-heading">Настройки таймеров</legend>
             <div class="panel-content timers-settings">
@@ -756,6 +903,44 @@ onBeforeUnmount(() => {
 
 .panel-content {
   min-height: 40px;
+}
+
+.service-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: 180px 1fr 170px;
+  row-gap: 0.5rem;
+  column-gap: 0.75rem;
+  align-items: center;
+}
+
+.service-cell {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.service-label {
+  font-weight: 600;
+}
+
+.service-status {
+  font-weight: 600;
+}
+
+.service-action {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.service-buttons {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .timers-settings {
