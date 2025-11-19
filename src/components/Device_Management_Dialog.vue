@@ -297,7 +297,7 @@ async function saveAudioSettings() {
   operationInProgress.value.audioSave = true
   try {
     await devicesStore.updateAudio(props.deviceId, { output: audioSettings.value.output })
-    alertStore.success('Настройки аудио успешно сохранены')
+    alertStore.success('Настройки аудио сохранены')
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки аудио: ' + (err?.message || 'Неизвестная ошибка'))
   } finally {
@@ -326,7 +326,7 @@ async function savePlaylistSettings() {
       source: playlistSettings.value.source,
       destination: playlistSettings.value.destination
     })
-    alertStore.success('Настройки плей-листа успешно сохранены')
+    alertStore.success('Настройки плей-листа сохранены')
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки плей-листа: ' + (err?.message || 'Неизвестная ошибка'))
   } finally {
@@ -368,7 +368,7 @@ async function saveScheduleSettings() {
     await devicesStore.updateSchedule(props.deviceId, payload)
     // Sync internal copy so reopening dialog shows what was just saved
     scheduleFormValues.value = payload
-    alertStore.success('Настройки таймеров успешно сохранены')
+    alertStore.success('Настройки таймеров сохранены')
   } catch (err) {
     alertStore.error('Не удалось сохранить настройки таймеров: ' + (err?.message || 'Неизвестная ошибка'))
   } finally {
@@ -407,6 +407,14 @@ const runSystemOperation = async (key, handler, timeout) => {
     await fetchDeviceStatus()
     operationInProgress.value[key] = false
     systemOperationTimers.value[key] = null
+    
+    // Show completion message based on operation type
+    const completionMessages = {
+      apply: 'Изменения применены, выполнен перезапуск сервисов',
+      reboot: 'Устройство перезагружено',
+      shutdown: 'Устройство выключено'
+    }
+    alertStore.success(completionMessages[key])
   }, timeout)
 }
 
@@ -712,7 +720,7 @@ onBeforeUnmount(() => {
             Закрыть
         </button>
       </v-card-actions>
-      <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <div v-if="alert" class="alert alert-dismissable" :class="alert.type">
         <button @click="clearAlert()" class="btn btn-link close">×</button>
         {{ alert.message }}
       </div>
@@ -933,5 +941,11 @@ onBeforeUnmount(() => {
   100% {
     transform: rotate(360deg);
   }
+}
+
+.alert {
+  margin: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
 }
 </style>
