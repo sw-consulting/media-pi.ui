@@ -484,6 +484,8 @@ async function saveAllSettings() {
     ])
     if (results.every(Boolean)) {
       alertStore.success('Все настройки сохранены')
+    } else if (results.some(Boolean)) {
+      alertStore.error('Некоторые настройки не удалось сохранить')
     }
   } finally {
     operationInProgress.value.saveAll = false
