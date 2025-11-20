@@ -1071,7 +1071,6 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
-/* playlist-status column removed */
 
 .audio-label {
   font-size: 1rem;
