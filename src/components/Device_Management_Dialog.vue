@@ -950,16 +950,6 @@ onBeforeUnmount(() => {
   max-width: 100%;
 }
 
-.service-buttons {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    width: 100%;
-  }
-
 .timers-settings {
   display: flex;
   justify-content: center;
