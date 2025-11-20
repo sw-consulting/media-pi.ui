@@ -977,14 +977,6 @@ onBeforeUnmount(() => {
   margin-bottom: 0.5rem;
 }
 
-.timer-buttons {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
 .rest-field-pair {
   display: flex;
   align-items: center;
