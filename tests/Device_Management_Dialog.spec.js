@@ -180,6 +180,9 @@ describe('Device_Management_Dialog.vue', () => {
       await settleWrapper(wrapper)
       attempts += 1
     }
+    if (attempts >= 10 && wrapper.vm.hasAnyOperationInProgress) {
+      throw new Error('waitForOperationsToFinish: Operations did not finish within expected time')
+    }
   }
 
   it('disables system buttons when device is offline and enables when online status arrives', async () => {
