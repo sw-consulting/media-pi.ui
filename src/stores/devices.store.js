@@ -257,7 +257,7 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
-  const checkStorage = (id) => executeDeviceRequest('get', id, ['storage', 'check'])
+  // storage check removed: endpoint deprecated
   const getPlaylist = (id) => executeDeviceRequest('get', id, ['playlist', 'get'])
   const updatePlaylist = (id, params) => executeDeviceRequest('put', id, ['playlist', 'update'], params)
   const getSchedule = (id) => executeDeviceRequest('get', id, ['schedule', 'get'])
@@ -267,6 +267,12 @@ export const useDevicesStore = defineStore('devices', () => {
   const reloadSystem = (id) => executeDeviceRequest('post', id, ['system', 'reload'])
   const rebootSystem = (id) => executeDeviceRequest('post', id, ['system', 'reboot'])
   const shutdownSystem = (id) => executeDeviceRequest('post', id, ['system', 'shutdown'])
+  const startPlayback = (id) => executeDeviceRequest('post', id, ['playback', 'start'])
+  const stopPlayback = (id) => executeDeviceRequest('post', id, ['playback', 'stop'])
+  const startUpload = (id) => executeDeviceRequest('post', id, ['playlist', 'start-upload'])
+  const stopUpload = (id) => executeDeviceRequest('post', id, ['playlist', 'stop-upload'])
+  const getServiceStatus = (id) => executeDeviceRequest('get', id, ['service', 'status'])
+
 
   return {
     devices,
@@ -290,7 +296,6 @@ export const useDevicesStore = defineStore('devices', () => {
     restartService,
     enableService,
     disableService,
-    checkStorage,
     getPlaylist,
     updatePlaylist,
     getSchedule,
@@ -299,7 +304,12 @@ export const useDevicesStore = defineStore('devices', () => {
     updateAudio,
     reloadSystem,
     rebootSystem,
-    shutdownSystem
+    shutdownSystem,
+    startPlayback,
+    stopPlayback,
+    startUpload,
+    stopUpload,
+    getServiceStatus
   }
 })
 

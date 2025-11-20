@@ -292,18 +292,40 @@ describe('devices.store', () => {
     expect(store.serviceResponse).toBe(null)
   })
 
-  it('checkStorage calls fetchWrapper.get with expected url and returns response', async () => {
+  it.each([
+    ['startPlayback', 'post', '/devices/9/playback/start', {}],
+    ['stopPlayback', 'post', '/devices/9/playback/stop', {}],
+    ['startUpload', 'post', '/devices/9/playlist/start-upload', {}],
+    ['stopUpload', 'post', '/devices/9/playlist/stop-upload', {}],
+    ['getServiceStatus', 'get', '/devices/9/service/status']
+  ])('%s calls %s on expected endpoint', async (method, httpMethod, urlPart, body) => {
     const store = useDevicesStore()
-    const mockResponse = { status: 'ok' }
-    fetchWrapper.get.mockResolvedValueOnce(mockResponse)
-    const response = await store.checkStorage(42)
+    const mockResult = { ok: true, action: method }
+    fetchWrapper[httpMethod].mockResolvedValueOnce(mockResult)
 
-    expect(fetchWrapper.get).toHaveBeenCalledWith(
-      expect.stringContaining('/devices/42/storage/check')
-    )
-    expect(response).toBe(mockResponse)
+    const result = await store[method](9)
+
+    const expectedArgs = [expect.stringContaining(urlPart)]
+    if (body !== undefined) {
+      expectedArgs.push(body)
+    }
+
+    expect(fetchWrapper[httpMethod]).toHaveBeenCalledWith(...expectedArgs)
+    expect(result).toEqual(mockResult)
     expect(store.loading).toBe(false)
   })
+
+  it('getServiceStatus propagates errors', async () => {
+    const store = useDevicesStore()
+    const mockError = new Error('Status failed')
+    fetchWrapper.get.mockRejectedValueOnce(mockError)
+
+    await expect(store.getServiceStatus(2)).rejects.toThrow('Status failed')
+    expect(store.error).toBe(mockError)
+    expect(store.loading).toBe(false)
+  })
+
+
 
   it('updatePlaylist calls fetchWrapper.put with payload', async () => {
     const store = useDevicesStore()

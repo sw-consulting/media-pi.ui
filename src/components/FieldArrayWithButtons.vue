@@ -14,6 +14,11 @@ defineProps({
     type: String,
     required: true
   },
+  // When true, hides the label visually while keeping the plus button aligned.
+  hideLabel: {
+    type: Boolean,
+    default: false
+  },
   fieldType: {
     type: String,
     default: 'select',
@@ -36,7 +41,7 @@ defineProps({
     default: 'Удалить элемент'
   },
   defaultValue: {
-    type: [String, Number],
+    type: [String, Number, Object],
     default: ''
   },
   fieldProps: {
@@ -46,45 +51,84 @@ defineProps({
   hasError: {
     type: Boolean,
     default: false
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
+
+const cloneDefaultValue = (value) => {
+  if (value && typeof value === 'object') {
+    try {
+      return JSON.parse(JSON.stringify(value))
+    } catch {
+      return { ...value }
+    }
+  }
+
+  return value
+}
 </script>
 
 <template>
   <FieldArray :name="name" v-slot="{ fields, push, remove }">
-    <div v-for="(field, idx) in fields" :key="field.key" class="form-group mb-2">
+    <div
+      v-for="(field, idx) in fields"
+      :key="field.key"
+      :class="['form-group', 'mb-2', { 'no-label': hideLabel }]"
+    >
+      <!-- Keep label node for first index; CSS will hide it when hideLabel is true -->
       <label v-if="idx === 0" class="label">{{ label }}:</label>
       <div v-else class="label"></div>
       
       <div class="field-container">
         <!-- Plus button positioned to the left for first option -->
-        <ActionButton 
+        <ActionButton
           v-if="idx === 0"
           icon="fa-solid fa-plus"
           :item="defaultValue"
-          @click="push(defaultValue)"
+          @click="push(cloneDefaultValue(defaultValue))"
           class="button-o-c field-container-plus"
           :tooltip-text="addTooltip"
+          :disabled="disabled"
         />
-        
-        <Field :name="`${name}[${idx}]`" :as="fieldType" :id="`${name}_${idx}`"
-          class="form-control input field-container-select" :class="{ 'is-invalid': hasError }"
-          v-bind="fieldProps"
+        <!-- Spacer to keep alignment when label hidden and no plus button on subsequent rows -->
+        <div
+          v-else-if="hideLabel"
+          class="field-container-plus-spacer"
+        ></div>
+
+        <slot
+          name="field"
+          :field-name="`${name}[${idx}]`"
+          :index="idx"
+          :field="field"
         >
-          <option v-if="fieldType === 'select'" value="">{{ placeholder }}</option>
-          <template v-if="fieldType === 'select'">
-            <option v-for="option in options" :key="option.value" :value="option.value">
-              {{ option.text }}
-            </option>
-          </template>
-        </Field>
-        
+          <Field
+            :name="`${name}[${idx}]`"
+            :as="fieldType"
+            :id="`${name}_${idx}`"
+            class="form-control input field-container-select"
+            :class="{ 'is-invalid': hasError }"
+            :disabled="disabled"
+            v-bind="fieldProps"
+          >
+            <option v-if="fieldType === 'select'" value="">{{ placeholder }}</option>
+            <template v-if="fieldType === 'select'">
+              <option v-for="option in options" :key="option.value" :value="option.value">
+                {{ option.text }}
+              </option>
+            </template>
+          </Field>
+        </slot>
+
         <!-- Minus button always after select -->
         <ActionButton
           icon="fa-solid fa-minus"
           :item="idx"
           @click="remove(idx)"
-          :disabled="fields.length === 1"
+          :disabled="disabled || fields.length === 1"
           class="button-o-c ml-2"
           :tooltip-text="removeTooltip"
         />
@@ -93,75 +137,3 @@ defineProps({
   </FieldArray>
 </template>
 
-<style scoped>
-/* Moved styles from main.css - keeping exactly as they were */
-.field-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.button-o-c {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  background-color: #f8f9fa;
-  color: #495057;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  flex-shrink: 0;
-}
-
-.button-o-c:hover {
-  background-color: #e9ecef;
-  border-color: #adb5bd;
-}
-
-.button-o-c:active {
-  background-color: #dee2e6;
-  border-color: #6c757d;
-}
-
-.button-o-c:disabled {
-  background-color: #e9ecef;
-  border-color: #dee2e6;
-  color: #adb5bd;
-  cursor: not-allowed;
-}
-
-.button-o-c.field-container-plus {
-  background-color: #d4edda;
-  border-color: #c3e6cb;
-  color: #155724;
-}
-
-.button-o-c.field-container-plus:hover {
-  background-color: #c3e6cb;
-  border-color: #b1dfbb;
-}
-
-.field-container-plus:focus {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-
-.button-o-c.field-container-plus:focus {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-
-.button-o-c.field-container-plus:active {
-  background-color: #b1dfbb;
-  border-color: #a1d2aa;
-}
-
-.ml-2 {
-  margin-left: 8px;
-}
-</style>

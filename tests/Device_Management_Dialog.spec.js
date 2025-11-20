@@ -2,7 +2,7 @@
 // Copyright (c) 2025 sw.consulting
 // This file is a part of Media Pi  frontend application
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
 
@@ -17,6 +17,23 @@ const rebootSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const shutdownSystem = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const getAudio = vi.hoisted(() => vi.fn(() => Promise.resolve({ output: 'hdmi' })))
 const updateAudio = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const getPlaylist = vi.hoisted(() => vi.fn(() => Promise.resolve({ source: '', destination: '' })))
+const updatePlaylist = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const getSchedule = vi.hoisted(() => vi.fn(() => Promise.resolve({
+  playlist: ['00:00'],
+  video: ['00:00'],
+  rest: [{ start: '00:00', stop: '00:00' }]
+})))
+const updateSchedule = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const getServiceStatus = vi.hoisted(() => vi.fn(() => Promise.resolve({
+  playbackServiceStatus: false,
+  playlistUploadServiceStatus: false,
+  yaDiskMountStatus: false
+})))
+const startPlayback = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const stopPlayback = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const startUpload = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const stopUpload = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const alertError = vi.hoisted(() => vi.fn())
 const alertSuccess = vi.hoisted(() => vi.fn())
 
@@ -35,7 +52,16 @@ vi.mock('@/stores/devices.store.js', () => ({
     rebootSystem,
     shutdownSystem,
     getAudio,
-    updateAudio
+    updateAudio,
+    getPlaylist,
+    updatePlaylist,
+    getSchedule,
+    updateSchedule,
+    getServiceStatus,
+    startPlayback,
+    stopPlayback,
+    startUpload,
+    stopUpload
   })
 }))
 
@@ -76,7 +102,8 @@ const globalStubs = {
   'v-card-title': { template: '<div class="v-card-title"><slot /></div>' },
   'v-card-text': { template: '<div class="v-card-text"><slot /></div>' },
   'v-card-actions': { template: '<div class="v-card-actions"><slot /></div>' },
-  'v-spacer': { template: '<div class="v-spacer"></div>' }
+  'v-spacer': { template: '<div class="v-spacer"></div>' },
+  'v-tooltip': { template: '<div class="v-tooltip"><slot /></div>' }
 }
 
 describe('Device_Management_Dialog.vue', () => {
@@ -90,9 +117,35 @@ describe('Device_Management_Dialog.vue', () => {
     shutdownSystem.mockReset()
     getAudio.mockReset()
     updateAudio.mockReset()
+    getPlaylist.mockReset()
+    updatePlaylist.mockReset()
+    getSchedule.mockReset()
+    updateSchedule.mockReset()
+    getServiceStatus.mockReset()
+    startPlayback.mockReset()
+    stopPlayback.mockReset()
+    startUpload.mockReset()
+    stopUpload.mockReset()
     statusesRef.value = []
     getAudio.mockResolvedValue({ output: 'hdmi' })
     updateAudio.mockResolvedValue()
+    getPlaylist.mockResolvedValue({ source: '', destination: '' })
+    updatePlaylist.mockResolvedValue()
+    getSchedule.mockResolvedValue({
+      playlist: ['00:00'],
+      video: ['00:00'],
+      rest: [{ start: '00:00', stop: '00:00' }]
+    })
+    updateSchedule.mockResolvedValue()
+    getServiceStatus.mockResolvedValue({
+      playbackServiceStatus: false,
+      playlistUploadServiceStatus: false,
+      yaDiskMountStatus: false
+    })
+    startPlayback.mockResolvedValue()
+    stopPlayback.mockResolvedValue()
+    startUpload.mockResolvedValue()
+    stopUpload.mockResolvedValue()
     getDeviceById.mockImplementation((id) => (
       id === 1
         ? {
@@ -106,16 +159,36 @@ describe('Device_Management_Dialog.vue', () => {
     ))
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   const mountDialog = () => mount(DeviceManagementDialog, {
     props: { modelValue: true, deviceId: 1 },
     global: { stubs: globalStubs }
   })
 
+  const settleWrapper = async (wrapper, delay = 20) => {
+    await new Promise((resolve) => setTimeout(resolve, delay))
+    await wrapper.vm.$nextTick()
+  }
+
+  const waitForOperationsToFinish = async (wrapper) => {
+    let attempts = 0
+    while (wrapper.vm.hasAnyOperationInProgress && attempts < 10) {
+      await settleWrapper(wrapper)
+      attempts += 1
+    }
+    if (attempts >= 10 && wrapper.vm.hasAnyOperationInProgress) {
+      throw new Error('waitForOperationsToFinish: Operations did not finish within expected time')
+    }
+  }
+
   it('disables system buttons when device is offline and enables when online status arrives', async () => {
     const wrapper = mountDialog()
 
     const buttons = wrapper.findAll('.system-actions button')
-    expect(buttons).toHaveLength(3)
+    expect(buttons).toHaveLength(5)
     buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeDefined())
 
     statusesRef.value = [
@@ -135,7 +208,7 @@ describe('Device_Management_Dialog.vue', () => {
     ]
     const wrapper = mountDialog()
 
-    const [applyBtn] = wrapper.findAll('.system-actions button')
+    const applyBtn = wrapper.find('[data-test="system-apply"]')
     await applyBtn.trigger('click')
     await wrapper.vm.$nextTick()
     expect(reloadSystem).toHaveBeenCalledWith(1)
@@ -147,7 +220,7 @@ describe('Device_Management_Dialog.vue', () => {
     ]
     const wrapper = mountDialog()
 
-    const [, rebootBtn] = wrapper.findAll('.system-actions button')
+    const rebootBtn = wrapper.find('[data-test="system-reboot"]')
     await rebootBtn.trigger('click')
     await wrapper.vm.$nextTick()
     expect(rebootSystem).toHaveBeenCalledWith(1)
@@ -159,10 +232,63 @@ describe('Device_Management_Dialog.vue', () => {
     ]
     const wrapper = mountDialog()
 
-    const [, , shutdownBtn] = wrapper.findAll('.system-actions button')
+    const shutdownBtn = wrapper.find('[data-test="system-shutdown"]')
     await shutdownBtn.trigger('click')
     await wrapper.vm.$nextTick()
     expect(shutdownSystem).toHaveBeenCalledWith(1)
+  })
+
+  it('reads all panels when global read button is clicked', async () => {
+    statusesRef.value = [
+      { deviceId: 1, isOnline: true }
+    ]
+    const wrapper = mountDialog()
+
+    await settleWrapper(wrapper)
+    getServiceStatus.mockClear()
+    getAudio.mockClear()
+    getPlaylist.mockClear()
+    getSchedule.mockClear()
+
+    const readBtn = wrapper.find('[data-test="system-read"]')
+    await readBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(getServiceStatus).toHaveBeenCalledWith(1)
+    expect(getAudio).toHaveBeenCalledWith(1)
+    expect(getPlaylist).toHaveBeenCalledWith(1)
+    expect(getSchedule).toHaveBeenCalledWith(1)
+  })
+
+  it('saves all panels when global save button is clicked', async () => {
+    statusesRef.value = [
+      { deviceId: 1, isOnline: true }
+    ]
+    const wrapper = mountDialog()
+    await settleWrapper(wrapper)
+    await waitForOperationsToFinish(wrapper)
+
+    await wrapper.find('#playlist-source').setValue('new/source')
+    await wrapper.find('#playlist-destination').setValue('new/destination')
+    await wrapper.find('.audio-selector').setValue('jack')
+
+    updateAudio.mockClear()
+    updatePlaylist.mockClear()
+    updateSchedule.mockClear()
+
+    const saveBtn = wrapper.find('[data-test="system-save"]')
+    await saveBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+    await waitForOperationsToFinish(wrapper)
+
+    expect(updateAudio).toHaveBeenCalledWith(1, { output: 'jack' })
+    expect(updatePlaylist).toHaveBeenCalledWith(1, { source: 'new/source', destination: 'new/destination' })
+    expect(updateSchedule).toHaveBeenCalledWith(1, {
+      playlist: ['00:00'],
+      video: ['00:00'],
+      rest: [{ start: '00:00', stop: '00:00' }]
+    })
   })
 
   it('displays error message when system action fails', async () => {
@@ -172,7 +298,8 @@ describe('Device_Management_Dialog.vue', () => {
     reloadSystem.mockRejectedValueOnce(new Error('Network error'))
 
     const wrapper = mountDialog()
-    const [applyBtn] = wrapper.findAll('.system-actions button')
+    await settleWrapper(wrapper)
+    const applyBtn = wrapper.find('[data-test="system-apply"]')
 
     await applyBtn.trigger('click')
     await wrapper.vm.$nextTick()
@@ -217,6 +344,91 @@ describe('Device_Management_Dialog.vue', () => {
     expect(getDeviceStatusById).toHaveBeenCalledWith(2)
   })
 
+  describe('Service management', () => {
+    it('loads and displays service statuses when dialog opens with online device', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+      getServiceStatus.mockResolvedValue({
+        playbackServiceStatus: true,
+        playlistUploadServiceStatus: false,
+        yaDiskMountStatus: true
+      })
+
+      const wrapper = mountDialog()
+
+      await new Promise((resolve) => setTimeout(resolve, 15))
+      await wrapper.vm.$nextTick()
+
+      expect(getServiceStatus).toHaveBeenCalledWith(1)
+      const statuses = wrapper.findAll('.service-status')
+      expect(statuses).toHaveLength(3)
+      expect(statuses[0].text()).toBe('Запущено')
+      expect(statuses[1].text()).toBe('Остановлена')
+      expect(statuses[2].text()).toBe('Смонтирован')
+    })
+
+    it('invokes startPlayback and refreshes status when playback is stopped', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+
+      const wrapper = mountDialog()
+
+      await settleWrapper(wrapper)
+      await waitForOperationsToFinish(wrapper)
+      vi.useFakeTimers()
+      getServiceStatus.mockClear()
+
+      const button = wrapper.find('[data-test="service-action-playback"]')
+      expect(button.text()).toContain('Запустить')
+
+      await button.trigger('click')
+      await wrapper.vm.$nextTick()
+      await vi.advanceTimersByTimeAsync(3000)
+      await wrapper.vm.$nextTick()
+
+      expect(startPlayback).toHaveBeenCalledWith(1)
+      expect(getServiceStatus).toHaveBeenCalledWith(1)
+    })
+
+    it('invokes stopPlayback and refreshes status when playback is running', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+      getServiceStatus.mockResolvedValue({
+        playbackServiceStatus: true,
+        playlistUploadServiceStatus: false,
+        yaDiskMountStatus: false
+      })
+
+      const wrapper = mountDialog()
+
+      await settleWrapper(wrapper)
+      await waitForOperationsToFinish(wrapper)
+      vi.useFakeTimers()
+      getServiceStatus.mockClear()
+
+      const button = wrapper.find('[data-test="service-action-playback"]')
+      expect(button.text()).toContain('Остановить')
+
+      await button.trigger('click')
+      await wrapper.vm.$nextTick()
+      await vi.advanceTimersByTimeAsync(3000)
+      await wrapper.vm.$nextTick()
+
+      expect(stopPlayback).toHaveBeenCalledWith(1)
+      expect(getServiceStatus).toHaveBeenCalledWith(1)
+    })
+
+    it('disables service controls when device is offline', () => {
+      const wrapper = mountDialog()
+      const buttons = wrapper.findAll('.service-settings button')
+      expect(buttons.length).toBeGreaterThan(0)
+      buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeDefined())
+    })
+  })
+
   it('disables system buttons when no status data is available', async () => {
     // Mock getDeviceById to return null (no cached status)
     getDeviceById.mockImplementation(() => null)
@@ -229,7 +441,7 @@ describe('Device_Management_Dialog.vue', () => {
     })
 
     const buttons = wrapper.findAll('.system-actions button')
-    expect(buttons).toHaveLength(3)
+    expect(buttons).toHaveLength(5)
     buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeDefined())
   })
 
@@ -248,7 +460,8 @@ describe('Device_Management_Dialog.vue', () => {
     await vi.runOnlyPendingTimersAsync()
     getDeviceStatusById.mockClear()
 
-    const [, rebootBtn, shutdownBtn] = wrapper.findAll('.system-actions button')
+    const rebootBtn = wrapper.find('[data-test="system-reboot"]')
+    const shutdownBtn = wrapper.find('[data-test="system-shutdown"]')
 
     // Test reboot button (30 second timeout)
     await rebootBtn.trigger('click')
@@ -278,19 +491,36 @@ describe('Device_Management_Dialog.vue', () => {
     vi.useRealTimers()
   }, 10000)
 
+  describe('Schedule timer settings', () => {
+    it('loads schedule settings when dialog opens with online device', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+
+      const wrapper = mount(DeviceManagementDialog, {
+        props: { modelValue: true, deviceId: 1 },
+        global: { stubs: globalStubs }
+      })
+
+      await settleWrapper(wrapper)
+
+      expect(getSchedule).toHaveBeenCalledWith(1)
+    })
+  })
+
   describe('Audio settings', () => {
     it('loads audio settings when dialog opens with online device', async () => {
       statusesRef.value = [
         { deviceId: 1, isOnline: true }
       ]
 
-      mount(DeviceManagementDialog, {
+      const wrapper = mount(DeviceManagementDialog, {
         props: { modelValue: true, deviceId: 1 },
         global: { stubs: globalStubs }
       })
 
       // Wait for Vue reactivity and async operations
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await settleWrapper(wrapper)
 
       expect(getAudio).toHaveBeenCalledWith(1)
     })
@@ -306,10 +536,30 @@ describe('Device_Management_Dialog.vue', () => {
       })
 
       // Wait for Vue reactivity and async operations
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await settleWrapper(wrapper)
 
       expect(getAudio).not.toHaveBeenCalled()
       expect(wrapper.find('.audio-selector').element.value).toBe('hdmi')
+    })
+  })
+
+  describe('Playlist settings', () => {
+    it('loads playlist settings when dialog opens with online device', async () => {
+      statusesRef.value = [
+        { deviceId: 1, isOnline: true }
+      ]
+
+      const wrapper = mountDialog()
+      await settleWrapper(wrapper)
+
+      expect(getPlaylist).toHaveBeenCalledWith(1)
+    })
+
+    it('disables playlist controls when device is offline', async () => {
+      const wrapper = mountDialog()
+
+      expect(wrapper.find('#playlist-source').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('#playlist-destination').attributes('disabled')).toBeDefined()
     })
   })
 
@@ -339,8 +589,7 @@ describe('Device_Management_Dialog.vue', () => {
     getAudio.mockResolvedValueOnce({ output: 'unknown' })
 
     const wrapper = mountDialog()
-    await new Promise(resolve => setTimeout(resolve, 10))
-    await wrapper.vm.$nextTick()
+    await settleWrapper(wrapper)
 
     expect(alertError).toHaveBeenCalledWith('Неизвестный тип аудио выхода. Установлено значение по умолчанию: HDMI')
     expect(wrapper.find('.audio-selector').element.value).toBe('hdmi')
@@ -353,97 +602,34 @@ describe('Device_Management_Dialog.vue', () => {
     getAudio.mockResolvedValueOnce({ output: 'invalid-option' })
 
     const wrapper = mountDialog()
-    await new Promise(resolve => setTimeout(resolve, 10))
-    await wrapper.vm.$nextTick()
+    await settleWrapper(wrapper)
 
     expect(alertError).toHaveBeenCalledWith('Неизвестный тип аудио выхода. Установлено значение по умолчанию: HDMI')
     expect(wrapper.find('.audio-selector').element.value).toBe('hdmi')
-  })
-
-  it('updates audio setting when refresh is clicked with jack output', async () => {
-    statusesRef.value = [
-      { deviceId: 1, isOnline: true }
-    ]
-    const wrapper = mountDialog()
-    await new Promise(resolve => setTimeout(resolve, 10))
-
-    // Mock the next call to getAudio to return jack
-    getAudio.mockResolvedValueOnce({ output: 'jack' })
-
-    const refreshBtn = wrapper.find('.audio-settings button:nth-of-type(1)')
-    await refreshBtn.trigger('click')
-    await wrapper.vm.$nextTick()
-    await new Promise(resolve => setTimeout(resolve, 10))
-
-    expect(wrapper.find('.audio-selector').element.value).toBe('jack')
-    expect(alertError).not.toHaveBeenCalled()
-  })
-
-  it('calls updateAudio when refresh button is clicked', async () => {
-    statusesRef.value = [
-      { deviceId: 1, isOnline: true }
-    ]
-    const wrapper = mountDialog()
-
-    await new Promise(resolve => setTimeout(resolve, 0))
-    getAudio.mockClear()
-
-    const refreshBtn = wrapper.find('.audio-settings button:nth-of-type(1)')
-    await refreshBtn.trigger('click')
-    await wrapper.vm.$nextTick()
-
-    expect(getAudio).toHaveBeenCalledWith(1)
-  })
-
-  it('calls updateAudio with correct data when save button is clicked', async () => {
-    statusesRef.value = [
-      { deviceId: 1, isOnline: true }
-    ]
-    const wrapper = mountDialog()
-
-    await new Promise(resolve => setTimeout(resolve, 10))
-    await wrapper.vm.$nextTick()
-
-    // Change selection to jack
-    const selector = wrapper.find('.audio-selector')
-    await selector.setValue('jack')
-
-    const saveBtn = wrapper.find('.audio-settings button:nth-of-type(2)')
-    await saveBtn.trigger('click')
-    await wrapper.vm.$nextTick()
-
-    expect(updateAudio).toHaveBeenCalledWith(1, { output: 'jack' })
-    expect(alertSuccess).toHaveBeenCalledWith('Настройки аудио успешно сохранены')
   })
 
   it('disables audio controls when device is offline', async () => {
     const wrapper = mountDialog()
 
     const selector = wrapper.find('.audio-selector')
-    const buttons = wrapper.findAll('.audio-settings button')
 
     expect(selector.attributes('disabled')).toBeDefined()
-    buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeDefined())
   })
 
-  it('verifies audio controls exist and are functional', async () => {
+  it('verifies audio selector exists and is functional when device is online', async () => {
     statusesRef.value = [
       { deviceId: 1, isOnline: true }
     ]
 
     const wrapper = mountDialog()
-    await new Promise(resolve => setTimeout(resolve, 20))
-    await wrapper.vm.$nextTick()
+    await settleWrapper(wrapper, 20)
 
     const selector = wrapper.find('.audio-selector')
-    const buttons = wrapper.findAll('.audio-settings button')
 
     expect(selector.exists()).toBe(true)
-    expect(buttons).toHaveLength(2)
 
     // Verify the buttons are clickable when online
     expect(selector.attributes('disabled')).toBeUndefined()
-    buttons.forEach((btn) => expect(btn.attributes('disabled')).toBeUndefined())
   })
 
   it('displays error when getAudio fails with online device', async () => {
@@ -453,27 +639,9 @@ describe('Device_Management_Dialog.vue', () => {
     getAudio.mockRejectedValueOnce(new Error('Network error'))
 
     const wrapper = mountDialog()
-    await new Promise(resolve => setTimeout(resolve, 10))
-    await wrapper.vm.$nextTick()
+    await settleWrapper(wrapper)
 
     expect(alertError).toHaveBeenCalledWith('Не удалось загрузить настройки аудио: Network error')
-  })
-
-  it('displays error when updateAudio fails', async () => {
-    statusesRef.value = [
-      { deviceId: 1, isOnline: true }
-    ]
-    updateAudio.mockRejectedValueOnce(new Error('Save error'))
-
-    const wrapper = mountDialog()
-    await new Promise(resolve => setTimeout(resolve, 0))
-    await wrapper.vm.$nextTick()
-
-    const saveBtn = wrapper.find('.audio-settings button:nth-of-type(2)')
-    await saveBtn.trigger('click')
-    await wrapper.vm.$nextTick()
-
-    expect(alertError).toHaveBeenCalledWith('Не удалось сохранить настройки аудио: Save error')
   })
 
   it('refreshes audio settings when deviceId changes with online device', async () => {
@@ -486,7 +654,7 @@ describe('Device_Management_Dialog.vue', () => {
     })
 
     // Wait for initial load and clear the mock
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await settleWrapper(wrapper)
     expect(getAudio).toHaveBeenCalledWith(1)
     getAudio.mockClear()
 
@@ -495,7 +663,7 @@ describe('Device_Management_Dialog.vue', () => {
       { deviceId: 2, isOnline: true }
     ]
     await wrapper.setProps({ deviceId: 2 })
-    await wrapper.vm.$nextTick()
+    await settleWrapper(wrapper)
 
     expect(getAudio).toHaveBeenCalledWith(2)
   })
@@ -510,7 +678,7 @@ describe('Device_Management_Dialog.vue', () => {
       global: { stubs: globalStubs }
     })
 
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await settleWrapper(wrapper)
     expect(getAudio).not.toHaveBeenCalled()
 
     // Device comes online
@@ -518,28 +686,8 @@ describe('Device_Management_Dialog.vue', () => {
       { deviceId: 1, isOnline: true }
     ]
     await wrapper.vm.$nextTick()
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await settleWrapper(wrapper)
 
     expect(getAudio).toHaveBeenCalledWith(1)
-  })
-
-  it('displays loading states for audio buttons correctly', async () => {
-    statusesRef.value = [
-      { deviceId: 1, isOnline: true }
-    ]
-
-    const wrapper = mountDialog()
-    await new Promise(resolve => setTimeout(resolve, 10))
-    await wrapper.vm.$nextTick()
-
-    const [refreshBtn, saveBtn] = wrapper.findAll('.audio-settings button')
-
-    // Test refresh button loading state
-    expect(refreshBtn.text()).toContain('Прочитать')
-    expect(refreshBtn.find('font-awesome-icon').exists()).toBe(true)
-
-    // Test save button loading state
-    expect(saveBtn.text()).toContain('Сохранить')
-    expect(saveBtn.find('font-awesome-icon').exists()).toBe(true)
   })
 })
