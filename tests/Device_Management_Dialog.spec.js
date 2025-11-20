@@ -161,7 +161,6 @@ describe('Device_Management_Dialog.vue', () => {
 
   afterEach(() => {
     vi.useRealTimers()
-    vi.clearAllTimers()
   })
 
   const mountDialog = () => mount(DeviceManagementDialog, {
