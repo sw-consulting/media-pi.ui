@@ -34,8 +34,8 @@ vi.mock('@/helpers/user.helpers.js', () => ({
   isManager: (u) => Array.isArray(u?.roles) && u.roles.includes(11),
   canManageAccountById: (u, id) => u?.roles?.includes(1) || (Array.isArray(u?.accountIds) && u.accountIds.includes(id))
 }))
-vi.mock('@/components/ActionButton.vue', () => ({
-  default: { name: 'ActionButton', props: ['item','icon','tooltipText'], emits: ['click'], template: '<button class="action-btn" @click="$emit(\'click\')"></button>' }
+vi.mock('@sw-consulting/tooling.ui.kit', () => ({
+  ActionButton: { name: 'ActionButton', props: ['item','icon','tooltipText'], emits: ['click'], template: '<button class="action-btn" @click="$emit(\'click\')"></button>' }
 }))
 vi.mock('@/components/ActionDialog.vue', () => ({
   default: { name: 'ActionDialog', props: ['actionDialog'], template: '<div class="action-dialog" v-if="actionDialog?.show">{{ actionDialog.title }}</div>' }

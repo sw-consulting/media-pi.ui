@@ -11,7 +11,7 @@ import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { timeouts } from '@/helpers/config.js'
-import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
+import { FieldArrayWithButtons } from '@sw-consulting/tooling.ui.kit'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -93,6 +93,13 @@ const createDefaultScheduleValues = () => ({
 const scheduleFormValues = ref(createDefaultScheduleValues())
 const scheduleFormRef = ref(null)
 const timeFieldProps = Object.freeze({
+  type: 'time',
+  step: 60
+})
+const buildRestFieldAttributes = (index, part, errors = {}) => ({
+  name: `rest[${index}].${part}`,
+  id: `${sanitizeFieldName(`rest_${index}`)}_${part}`,
+  class: ['form-control', 'input', 'timer-input', { 'is-invalid': hasErrorsForPrefix(errors, `rest[${index}].${part}`) }],
   type: 'time',
   step: 60
 })
@@ -680,7 +687,6 @@ onBeforeUnmount(() => {
                     <FieldArrayWithButtons
                       name="playlist"
                       label=""
-                      :hide-label="true"
                       field-type="input"
                       :field-props="timeFieldProps"
                       placeholder="HH:mm"
@@ -694,7 +700,6 @@ onBeforeUnmount(() => {
                     <FieldArrayWithButtons
                       name="video"
                       label=""
-                      :hide-label="true"
                       field-type="input"
                       :field-props="timeFieldProps"
                       placeholder="HH:mm"
@@ -708,33 +713,18 @@ onBeforeUnmount(() => {
                     <FieldArrayWithButtons
                       name="rest"
                       label="Время отдыха"
-                      :hide-label="true"
+                      field-type="input"
+                      :field-props="({ index }) => buildRestFieldAttributes(index, 'start', scheduleErrors)"
                       :default-value="restDefaultValue"
                       :has-error="hasErrorsForPrefix(scheduleErrors, 'rest')"
                       :disabled="isDisabled || hasAnyOperationInProgress"
                     >
-                      <template #field="{ fieldName: restFieldName }">
-                        <div class="rest-field-pair">
-                          <Field
-                            :name="`${restFieldName}.start`"
-                            :id="`${sanitizeFieldName(restFieldName)}_start`"
-                            class="form-control input timer-input"
-                            :class="{ 'is-invalid': hasErrorsForPrefix(scheduleErrors, `${restFieldName}.start`) }"
-                            type="time"
-                            step="60"
-                            :disabled="isDisabled || hasAnyOperationInProgress"
-                          />
-                          <span class="rest-separator">—</span>
-                          <Field
-                            :name="`${restFieldName}.stop`"
-                            :id="`${sanitizeFieldName(restFieldName)}_stop`"
-                            class="form-control input timer-input"
-                            :class="{ 'is-invalid': hasErrorsForPrefix(scheduleErrors, `${restFieldName}.stop`) }"
-                            type="time"
-                            step="60"
-                            :disabled="isDisabled || hasAnyOperationInProgress"
-                          />
-                        </div>
+                      <template #extra="{ index }">
+                        <span class="rest-separator">—</span>
+                        <Field
+                          v-bind="buildRestFieldAttributes(index, 'stop', scheduleErrors)"
+                          :disabled="isDisabled || hasAnyOperationInProgress"
+                        />
                       </template>
                     </FieldArrayWithButtons>
                   </div>
@@ -975,12 +965,6 @@ onBeforeUnmount(() => {
 .timer-column-title {
   text-align: center;
   margin-bottom: 0.5rem;
-}
-
-.rest-field-pair {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 .timer-input {

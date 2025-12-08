@@ -46,8 +46,8 @@ vi.mock('@/helpers/user.helpers.js', () => ({
 }))
 
 // Stub ActionButton separately to emit click --------------------------
-vi.mock('@/components/ActionButton.vue', () => ({
-  default: {
+vi.mock('@sw-consulting/tooling.ui.kit', () => ({
+  ActionButton: {
     name: 'ActionButton',
     props: ['item', 'icon', 'tooltipText'],
     emits: ['click'],

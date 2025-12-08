@@ -16,7 +16,7 @@ import { getRoleName, isManager } from '@/helpers/user.helpers.js'
 import { useRolesStore } from '@/stores/roles.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route'
-import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
+import { FieldArrayWithButtons } from '@sw-consulting/tooling.ui.kit'
 
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)

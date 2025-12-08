@@ -14,7 +14,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { UserRoleConstants } from '@/helpers/user.helpers.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
-import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
+import { FieldArrayWithButtons } from '@sw-consulting/tooling.ui.kit'
 
 
 const props = defineProps({
