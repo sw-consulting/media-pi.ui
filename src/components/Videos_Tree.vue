@@ -3,7 +3,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch, nextTick } from 'vue'
-import ActionButton from '@/components/ActionButton.vue'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 import ActionDialog from '@/components/ActionDialog.vue'
 import { storeToRefs } from 'pinia'
 import { useAccountsStore } from '@/stores/accounts.store.js'
