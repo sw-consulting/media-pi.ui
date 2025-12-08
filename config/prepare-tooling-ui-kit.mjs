@@ -14,7 +14,7 @@ if (!existsSync(srcPath)) {
   }
   try {
     execSync(
-      `git clone --depth 1 https://github.com/sw-consulting/tooling.ui.kit.git ${target}`,
+      `git clone --depth 1 --branch v1.0.0 https://github.com/sw-consulting/tooling.ui.kit.git ${target}`,
       { stdio: 'inherit' }
     )
   } catch (error) {
