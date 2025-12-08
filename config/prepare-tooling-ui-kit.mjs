@@ -9,9 +9,24 @@ const srcPath = join(target, 'src')
 
 // Read version from package.json
 const packageJsonPath = join(cwd(), 'package.json')
-const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
-const dependencySpec = packageJson.dependencies['@sw-consulting/tooling.ui.kit']
-const version = dependencySpec.split('#')[1]
+let packageJson
+try {
+  packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
+} catch (error) {
+  console.error('Failed to read or parse package.json. Please ensure the file exists and is valid JSON.')
+  throw error
+}
+
+const dependencySpec = packageJson.dependencies?.['@sw-consulting/tooling.ui.kit']
+if (!dependencySpec) {
+  throw new Error('Dependency @sw-consulting/tooling.ui.kit not found in package.json dependencies')
+}
+
+const parts = dependencySpec.split('#')
+if (parts.length !== 2) {
+  throw new Error(`Invalid dependency format for @sw-consulting/tooling.ui.kit: ${dependencySpec}. Expected format: github:owner/repo#version`)
+}
+const version = parts[1]
 
 if (!existsSync(srcPath)) {
   mkdirSync(baseDir, { recursive: true })
