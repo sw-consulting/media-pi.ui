@@ -10,8 +10,13 @@ const srcPath = join(target, 'src')
 if (!existsSync(srcPath)) {
   mkdirSync(baseDir, { recursive: true })
   rmSync(target, { recursive: true, force: true })
-  execSync(
-    `git clone --depth 1 https://github.com/sw-consulting/tooling.ui.kit.git ${target}`,
-    { stdio: 'inherit' }
-  )
+  try {
+    execSync(
+      `git clone --depth 1 https://github.com/sw-consulting/tooling.ui.kit.git ${target}`,
+      { stdio: 'inherit' }
+    )
+  } catch (error) {
+    console.error('Failed to clone @sw-consulting/tooling.ui.kit repository. Please check your network connection and git configuration.')
+    throw error
+  }
 }
