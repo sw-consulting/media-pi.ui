@@ -1,8 +1,9 @@
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { cwd } from 'node:process'
 
-const baseDir = join(process.cwd(), 'node_modules', '@sw-consulting')
+const baseDir = join(cwd(), 'node_modules', '@sw-consulting')
 const target = join(baseDir, 'tooling.ui.kit')
 const srcPath = join(target, 'src')
 
