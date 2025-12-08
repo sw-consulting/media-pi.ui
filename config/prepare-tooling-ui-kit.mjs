@@ -9,10 +9,12 @@ const srcPath = join(target, 'src')
 
 if (!existsSync(srcPath)) {
   mkdirSync(baseDir, { recursive: true })
-  rmSync(target, { recursive: true, force: true })
+  if (existsSync(target)) {
+    rmSync(target, { recursive: true, force: true })
+  }
   try {
     execSync(
-      `git clone --depth 1 https://github.com/sw-consulting/tooling.ui.kit.git ${target}`,
+      `git clone --depth 1 --branch v1.0.0 https://github.com/sw-consulting/tooling.ui.kit.git ${target}`,
       { stdio: 'inherit' }
     )
   } catch (error) {
