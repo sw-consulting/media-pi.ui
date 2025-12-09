@@ -41,7 +41,12 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          icons: ['@fortawesome/vue-fontawesome', '@fortawesome/fontawesome-svg-core', '@fortawesome/free-solid-svg-icons', '@fortawesome/free-regular-svg-icons']
+          icons: [
+            '@fortawesome/vue-fontawesome',
+            '@fortawesome/fontawesome-svg-core',
+            '@fortawesome/free-solid-svg-icons',
+            '@fortawesome/free-regular-svg-icons'
+          ]
         }
       }
     }
