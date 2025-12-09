@@ -232,3 +232,11 @@ async function onSubmit (values) {
   </div>
 </template>
 
+<style scoped>
+/* Override Vuetify tab font to match application font family */
+:deep(.v-tab) {
+  font-family: Roboto, Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu,
+    Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+</style>
+
