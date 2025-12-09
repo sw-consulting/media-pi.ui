@@ -18,7 +18,7 @@
     "@fortawesome/free-regular-svg-icons": "^7.1.0",
     "@fortawesome/free-solid-svg-icons": "^7.1.0",
     "@fortawesome/vue-fontawesome": "^3.1.2",
-    "@sw-consulting/tooling.ui.kit": "1.0.0",
+    "@sw-consulting/tooling.ui.kit": "github:sw-consulting/tooling.ui.kit#v1.1.0",
     "moment": "^2.30.1",
     "pinia": "^3.0.3",
     "vee-validate": "^4.15.1",
