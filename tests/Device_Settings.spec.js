@@ -86,6 +86,22 @@ const mountSettings = (props = {}) => mount({
       Field: {
         template: '<input />',
         props: ['name', 'type', 'disabled', 'class', 'placeholder']
+      },
+      VTabs: {
+        template: '<div class="v-tabs"><slot /></div>',
+        props: ['modelValue', 'color']
+      },
+      VTab: {
+        template: '<div class="v-tab"><slot /></div>',
+        props: ['value']
+      },
+      VTabsWindow: {
+        template: '<div class="v-tabs-window"><slot /></div>',
+        props: ['modelValue']
+      },
+      VTabsWindowItem: {
+        template: '<div class="v-tabs-window-item"><slot /></div>',
+        props: ['value']
       }
     },
     components: {
