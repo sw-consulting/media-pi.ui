@@ -28,5 +28,5 @@ vi.mock('@fortawesome/vue-fontawesome', () => ({
 // Provide a global stub for v-tooltip to avoid repeated unresolved component warnings
 config.global.stubs = {
   ...(config.global.stubs || {}),
-  'v-tooltip': { template: '<div><slot name="activator" :props="{}"></slot><slot /></div>' }
+  'v-tooltip': { template: '<div><slot name="activator" v-bind="props"></slot><slot /></div>' }
 }
