@@ -11,7 +11,7 @@ import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { getRoleName, isManager } from '@/helpers/user.helpers.js'
 import { mdiMagnify } from '@mdi/js'
 import { onMounted, computed } from 'vue'
-import ActionButton from '@/components/ActionButton.vue'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
 import { useAuthStore } from '@/stores/auth.store.js'
 const authStore = useAuthStore()

@@ -3,7 +3,7 @@
 
 <script setup>
 import { Field, FieldArray } from 'vee-validate'
-import ActionButton from '@/components/ActionButton.vue'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
 defineProps({
   name: {
