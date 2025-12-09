@@ -192,6 +192,7 @@ async function onSubmit (values) {
 
           <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
           <div v-if="errors.ipAddress" class="alert alert-danger mt-3 mb-0">{{ errors.ipAddress }}</div>
+          <div v-if="errors.port" class="alert alert-danger mt-3 mb-0">{{ errors.port }}</div>
         </Form>
       </v-tabs-window-item>
 
