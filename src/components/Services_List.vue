@@ -5,7 +5,7 @@
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
-import ActionButton from '@/components/ActionButton.vue'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 import { useDevicesStore } from '@/stores/devices.store.js'
 
 const props = defineProps({

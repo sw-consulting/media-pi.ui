@@ -94,6 +94,7 @@ library.add(
 )
 
 import 'vuetify/styles'
+import '@sw-consulting/tooling.ui.kit/dist/tooling.ui.kit.css'
 import { createVuetify } from 'vuetify'
 import VuetifyUseDialog from 'vuetify-use-dialog'
 //import { aliases, fa } from 'vuetify/iconsets/fa'
