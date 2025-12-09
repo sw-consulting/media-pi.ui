@@ -2,23 +2,22 @@
 // This file is loaded by vitest via setupFiles.
 
 import { vi } from 'vitest'
-
-// Suppress specific component resolution warnings
-const originalWarn = console.warn
-console.warn = (...args) => {
-  const msg = args[0]
-  if (typeof msg === 'string' && (
-    msg.includes('Failed to resolve component: font-awesome-icon') ||
-    msg.includes('<Suspense> is an experimental feature')
-  )) {
-    return // ignore noisy warnings
-  }
-  originalWarn(...args)
-}
+import { config } from '@vue/test-utils'
 
 // Provide a global stub for font-awesome-icon to avoid resolution warnings
+const fontAwesomeIconStub = { name: 'font-awesome-icon', render: () => null }
 vi.mock('@fortawesome/vue-fontawesome', () => ({
-  FontAwesomeIcon: { name: 'font-awesome-icon', render: () => null }
+  FontAwesomeIcon: fontAwesomeIconStub
 }))
 
-// Vue warnHandler is not reliably available in test env; relying on console.warn override only.
+const tooltipStub = {
+  name: 'v-tooltip',
+  template: '<div><slot name="activator" :props="{}"></slot><slot /></div>'
+}
+
+config.global.components = {
+  ...(config.global.components || {}),
+  'font-awesome-icon': fontAwesomeIconStub,
+  'v-tooltip': tooltipStub
+}
+

@@ -6,7 +6,7 @@ import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import { createPinia } from 'pinia'
 import InlineAssignment from '@/components/InlineAssignment.vue'
-import ActionButton from '@/components/ActionButton.vue'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
 // Mock FontAwesome
 vi.mock('@fortawesome/vue-fontawesome', () => ({

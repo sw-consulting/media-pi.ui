@@ -94,7 +94,10 @@ library.add(
 )
 
 import 'vuetify/styles'
+import '@sw-consulting/tooling.ui.kit/dist/tooling.ui.kit.css'
 import { createVuetify } from 'vuetify'
+import * as components from 'vuetify/components'
+import * as directives from 'vuetify/directives'
 import VuetifyUseDialog from 'vuetify-use-dialog'
 //import { aliases, fa } from 'vuetify/iconsets/fa'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
@@ -106,6 +109,8 @@ import { useAuthStore } from '@/stores/auth.store.js'
 
 export function initializeApp() {
   const vuetify = createVuetify({
+    components,
+    directives,
     breakpoint: {
       mobileBreakpoint: 'xl' // This is the breakpoint for mobile devices
     },
