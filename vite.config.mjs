@@ -37,5 +37,14 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          icons: ['@fortawesome/vue-fontawesome', '@fortawesome/fontawesome-svg-core', '@fortawesome/free-solid-svg-icons', '@fortawesome/free-regular-svg-icons']
+        }
+      }
+    }
+  },
   base: './'
 })
