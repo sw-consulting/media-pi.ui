@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 // Copyright (c) 2025 sw.consulting
-// This file is a part of Media Pi  frontend application
+// This file is a part of Media Pi frontend application
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
