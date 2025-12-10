@@ -399,7 +399,6 @@ async function saveScheduleSettings() {
     video: [...(liveValues.video || [])],
     rest: (liveValues.rest || []).map((item) => ({ start: item.start, stop: item.stop }))
   }
-  
   operationInProgress.value.scheduleSave = true
   try {
     await devicesStore.updateSchedule(props.deviceId, payload)
