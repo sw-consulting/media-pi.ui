@@ -26,6 +26,7 @@ vi.mock('@/views/DeviceGroup_CreateView.vue', () => ({ default: { template: '<di
 vi.mock('@/views/DeviceGroup_EditView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/Device_CreateView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/Device_EditView.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/Device_ManagementView.vue', () => ({ default: { template: '<div />' } }))
 
 import router from '@/router'
 
