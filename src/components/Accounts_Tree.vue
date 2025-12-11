@@ -94,13 +94,6 @@ const openDeviceStatus = (item) => {
   statusDialogOpen.value = true
 }
 
-const openDeviceManagement = (item) => {
-  const id = getDeviceIdFromNodeId(item.id)
-  if (!id) return
-  managementDialogDeviceId.value = id
-  managementDialogOpen.value = true
-}
-
 
 // Initialize tree helper
 const {
@@ -203,7 +196,7 @@ const createDeviceGroup = (item) => {
  * The self-registration logic is handled by the backend/device onboarding workflow.
  * For more details, see the device provisioning documentation or backend implementation.
  */
-const { editDevice, deleteDevice, unassignFromGroup: _unassignFromGroup, unassignFromAccount: _unassignFromAccount } = createDeviceActions(
+const { editDevice, manageDevice, deleteDevice, unassignFromGroup: _unassignFromGroup, unassignFromAccount: _unassignFromAccount } = createDeviceActions(
   router,
   alertStore,
   devicesStore,
@@ -537,7 +530,11 @@ onBeforeUnmount(() => {
               />
               <ActionButton :item="item" icon="fa-solid fa-list" tooltip-text="Управление устройством" 
                 :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                @click="openDeviceManagement" 
+                @click="manageDevice" 
+              />
+              <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
+                :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
+                @click="editDevice" 
               />
               <!-- Determine context: top-level unassigned vs account-assigned -->
               <template v-if="isTopLevelUnassignedDevice(item)">
@@ -559,10 +556,6 @@ onBeforeUnmount(() => {
                     @cancel-assignment="cancelAccountAssignment"
                     @confirm-assignment="confirmAccountAssignment"
                     @update-selection="(value) => updateSelectedAccount(getDeviceIdFromNodeId(item.id), value)"
-                  />
-                  <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
-                    :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                    @click="editDevice" 
                   />
                   <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить устройство" 
                     :disabled="loading || accountAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
@@ -598,10 +591,6 @@ onBeforeUnmount(() => {
                   <ActionButton v-if="isDeviceInUnassignedSection(item) && canCreateDeleteAccounts" :item="item" icon="fa-solid fa-plug-circle-xmark" tooltip-text="Исключить из лицевого счёта" 
                     :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                     @click="unassignFromAccount" 
-                  />
-                  <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать устройство" 
-                    :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                    @click="editDevice" 
                   />
                 </template>
               </template>
