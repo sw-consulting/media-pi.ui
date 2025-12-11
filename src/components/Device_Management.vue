@@ -184,7 +184,7 @@ const currentStatus = computed(() => {
   const live = (statuses.value || []).find((s) => s?.deviceId === id)
   if (live) return live
 
-  return device?.deviceStatus || null
+  return device.value?.deviceStatus || null
 })
 
 async function fetchDeviceStatus() {
@@ -590,7 +590,7 @@ onBeforeUnmount(() => {
           <template v-else>Устройство {{ props.deviceId }}</template>
         </span>
       </h1>
-       <div style="display:flex; align-items:center;">
+       <div class="flex-center">
         <div v-if="loading" class="header-actions header-actions-group">
           <span class="spinner-border"></span>
         </div>
@@ -767,7 +767,7 @@ onBeforeUnmount(() => {
           :disabled="isDisabled || hasAnyOperationInProgress"
         >
           <option value="hdmi">HDMI audio</option>
-          <option value="jack">3.5'' jack audio</option>
+          <option value="jack">3.5" jack audio</option>
         </select>
       </div>
     </div>
