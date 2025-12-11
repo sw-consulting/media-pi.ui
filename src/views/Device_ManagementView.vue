@@ -11,12 +11,19 @@ const props = defineProps({
   }
 })
 
-const deviceId = parseInt(props.id, 10)
+const deviceId = (typeof props.id === 'string' && /^\d+$/.test(props.id)) ? parseInt(props.id, 10) : null
 </script>
 
 <template>
   <Suspense>
-    <DeviceManagement :device-id="deviceId" />
+    <template v-if="deviceId !== null">
+      <DeviceManagement :device-id="deviceId" />
+    </template>
+    <template v-else>
+      <div class="text-center m-5 text-danger">
+        <div class="mt-2">Некорректный идентификатор устройства.</div>
+      </div>
+    </template>
     <template #fallback>
       <div class="text-center m-5">
         <span class="spinner-border spinner-border-lg align-center"></span>
