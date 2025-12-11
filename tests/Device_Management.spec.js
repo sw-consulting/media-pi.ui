@@ -174,4 +174,381 @@ describe('Device_Management.vue', () => {
     await wrapper.find('button.button.secondary').trigger('click')
     expect(routerGo).toHaveBeenCalledWith(-1)
   })
+
+  it('loads audio settings successfully', async () => {
+    mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Verify audio settings loaded
+    expect(getAudio).toHaveBeenCalledTimes(1)
+    expect(getAudio).toHaveBeenCalledWith(1)
+  })
+
+  it('saves all settings including audio successfully', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Trigger save all settings
+    await wrapper.find('[data-test="system-save"]').trigger('click')
+    await flushPromises()
+
+    expect(updateAudio).toHaveBeenCalledTimes(1)
+    expect(updateAudio).toHaveBeenCalledWith(1, { output: 'hdmi' })
+    expect(updatePlaylist).toHaveBeenCalledTimes(1)
+    // Each individual save shows its own success message
+    expect(alertSuccess).toHaveBeenCalledWith('Настройки аудио сохранены')
+    expect(alertSuccess).toHaveBeenCalledWith('Настройки плей-листа сохранены')
+  })
+
+  it('handles audio settings update error', async () => {
+    getAudio.mockRejectedValueOnce(new Error('Network error'))
+
+    mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(alertError).toHaveBeenCalledWith('Не удалось загрузить настройки аудио: Network error')
+  })
+
+  it('handles audio settings save error', async () => {
+    updateAudio.mockRejectedValueOnce(new Error('Save failed'))
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Trigger save all settings
+    await wrapper.find('[data-test="system-save"]').trigger('click')
+    await flushPromises()
+
+    expect(alertError).toHaveBeenCalledWith('Не удалось сохранить настройки аудио: Save failed')
+  })
+
+  it('loads playlist settings successfully', async () => {
+    mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Verify playlist settings loaded
+    expect(getPlaylist).toHaveBeenCalledTimes(1)
+    expect(getPlaylist).toHaveBeenCalledWith(1)
+  })
+
+  it('handles playlist settings update error', async () => {
+    getPlaylist.mockRejectedValueOnce(new Error('Network error'))
+
+    mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(alertError).toHaveBeenCalledWith('Не удалось загрузить настройки плей-листа: Network error')
+  })
+
+  it('handles playlist settings save error', async () => {
+    updatePlaylist.mockRejectedValueOnce(new Error('Save failed'))
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Trigger save all settings
+    await wrapper.find('[data-test="system-save"]').trigger('click')
+    await flushPromises()
+
+    expect(alertError).toHaveBeenCalledWith('Не удалось сохранить настройки плей-листа: Save failed')
+  })
+
+  it('loads schedule settings successfully', async () => {
+    mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Verify schedule settings loaded
+    expect(getSchedule).toHaveBeenCalledTimes(1)
+    expect(getSchedule).toHaveBeenCalledWith(1)
+  })
+
+  it('handles schedule settings update error', async () => {
+    getSchedule.mockRejectedValueOnce(new Error('Network error'))
+
+    mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(alertError).toHaveBeenCalledWith('Не удалось загрузить настройки таймеров: Network error')
+  })
+
+  it('handles schedule settings save error through saveAll', async () => {
+    updateSchedule.mockRejectedValueOnce(new Error('Save failed'))
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+    vi.clearAllMocks()
+
+    // Trigger save all settings
+    await wrapper.find('[data-test="system-save"]').trigger('click')
+    await flushPromises()
+
+    // The audio and playlist should still succeed even if schedule fails
+    expect(alertSuccess).toHaveBeenCalledWith('Настройки аудио сохранены')
+    expect(alertSuccess).toHaveBeenCalledWith('Настройки плей-листа сохранены')
+  })
+
+  it('reads all settings on demand', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+    vi.clearAllMocks()
+
+    // Trigger read all settings
+    await wrapper.find('[data-test="system-read"]').trigger('click')
+    await flushPromises()
+
+    expect(getAudio).toHaveBeenCalledTimes(1)
+    expect(getPlaylist).toHaveBeenCalledTimes(1)
+    expect(getSchedule).toHaveBeenCalledTimes(1)
+    expect(getServiceStatus).toHaveBeenCalledTimes(1)
+  })
+
+  it('starts playback service successfully', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Trigger start playback
+    await wrapper.find('[data-test="service-action-playback"]').trigger('click')
+    await flushPromises()
+
+    expect(startPlayback).toHaveBeenCalledTimes(1)
+    expect(startPlayback).toHaveBeenCalledWith(1)
+
+    await vi.runAllTimersAsync()
+    await flushPromises()
+
+    // Verify service status is refreshed after operation
+    expect(getServiceStatus).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops playback service successfully', async () => {
+    getServiceStatus.mockResolvedValue({
+      playbackServiceStatus: true,
+      playlistUploadServiceStatus: false,
+      yaDiskMountStatus: false
+    })
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Trigger stop playback
+    await wrapper.find('[data-test="service-action-playback"]').trigger('click')
+    await flushPromises()
+
+    expect(stopPlayback).toHaveBeenCalledTimes(1)
+    expect(stopPlayback).toHaveBeenCalledWith(1)
+
+    await vi.runAllTimersAsync()
+    await flushPromises()
+
+    // Verify service status is refreshed after operation
+    expect(getServiceStatus).toHaveBeenCalledTimes(2)
+  })
+
+  it('starts upload service successfully', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Trigger start upload
+    await wrapper.find('[data-test="service-action-upload"]').trigger('click')
+    await flushPromises()
+
+    expect(startUpload).toHaveBeenCalledTimes(1)
+    expect(startUpload).toHaveBeenCalledWith(1)
+
+    await vi.runAllTimersAsync()
+    await flushPromises()
+
+    // Verify service status is refreshed after operation
+    expect(getServiceStatus).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops upload service successfully', async () => {
+    getServiceStatus.mockResolvedValue({
+      playbackServiceStatus: false,
+      playlistUploadServiceStatus: true,
+      yaDiskMountStatus: false
+    })
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Trigger stop upload
+    await wrapper.find('[data-test="service-action-upload"]').trigger('click')
+    await flushPromises()
+
+    expect(stopUpload).toHaveBeenCalledTimes(1)
+    expect(stopUpload).toHaveBeenCalledWith(1)
+
+    await vi.runAllTimersAsync()
+    await flushPromises()
+
+    // Verify service status is refreshed after operation
+    expect(getServiceStatus).toHaveBeenCalledTimes(2)
+  })
+
+  it('handles service operation errors', async () => {
+    startPlayback.mockRejectedValueOnce(new Error('Service error'))
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    // Trigger start playback
+    await wrapper.find('[data-test="service-action-playback"]').trigger('click')
+    await flushPromises()
+
+    expect(alertError).toHaveBeenCalledWith('Service error')
+  })
+
+  it('handles partial save failures through saveAll', async () => {
+    updatePlaylist.mockRejectedValueOnce(new Error('Playlist save failed'))
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+    vi.clearAllMocks()
+
+    // Trigger save all settings
+    await wrapper.find('[data-test="system-save"]').trigger('click')
+    await flushPromises()
+
+    // Individual save function shows its own error
+    expect(alertError).toHaveBeenCalledWith('Не удалось сохранить настройки плей-листа: Playlist save failed')
+    // Audio should succeed
+    expect(alertSuccess).toHaveBeenCalledWith('Настройки аудио сохранены')
+  })
 })

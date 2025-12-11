@@ -7,8 +7,9 @@ import { mount } from '@vue/test-utils'
 
 vi.mock('@/components/Device_Management.vue', () => ({
   default: {
+    name: 'Device_Management',
     props: { deviceId: Number },
-    template: '<div class="management-stub" :data-device-id="deviceId"></div>'
+    template: '<div class="management-stub"></div>'
   }
 }))
 
@@ -25,6 +26,8 @@ describe('Device_ManagementView.vue', () => {
       }
     })
 
-    expect(wrapper.find('.management-stub').attributes('data-device-id')).toBe('7')
+    const stub = wrapper.findComponent({ name: 'Device_Management' })
+    expect(typeof stub.props('deviceId')).toBe('number')
+    expect(stub.props('deviceId')).toBe(7)
   })
 })
