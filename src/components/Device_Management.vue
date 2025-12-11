@@ -587,7 +587,7 @@ onBeforeUnmount(() => {
         <span>
           <template v-if="!device">Загрузка...</template>
           <template v-else-if="device?.name">{{ device.name }}</template>
-          <template v-else>Устройство {{ props.id }}</template>
+          <template v-else>Устройство {{ props.deviceId }}</template>
         </span>
       </h1>
        <div style="display:flex; align-items:center;">
