@@ -160,7 +160,8 @@ describe('Device_Management.vue', () => {
     expect(getPlaylist).toHaveBeenCalledTimes(1)
     expect(getSchedule).toHaveBeenCalledTimes(1)
     expect(getServiceStatus).toHaveBeenCalledTimes(1)
-    expect(wrapper.find('.management-title').text()).toContain('Управление устройством')
+    const headerText = wrapper.get('h1.primary-heading span').text()
+    expect(headerText).toContain('Device 1')
   })
 
   it('triggers apply operation and refreshes status', async () => {
