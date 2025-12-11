@@ -176,7 +176,7 @@ describe('Device_Management.vue', () => {
   })
 
   it('loads audio settings successfully', async () => {
-    const wrapper = mount(DeviceManagement, {
+    mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
         stubs: {
@@ -219,7 +219,7 @@ describe('Device_Management.vue', () => {
   it('handles audio settings update error', async () => {
     getAudio.mockRejectedValueOnce(new Error('Network error'))
 
-    const wrapper = mount(DeviceManagement, {
+    mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
         stubs: {
@@ -255,7 +255,7 @@ describe('Device_Management.vue', () => {
   })
 
   it('loads playlist settings successfully', async () => {
-    const wrapper = mount(DeviceManagement, {
+    mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
         stubs: {
@@ -274,7 +274,7 @@ describe('Device_Management.vue', () => {
   it('handles playlist settings update error', async () => {
     getPlaylist.mockRejectedValueOnce(new Error('Network error'))
 
-    const wrapper = mount(DeviceManagement, {
+    mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
         stubs: {
@@ -310,7 +310,7 @@ describe('Device_Management.vue', () => {
   })
 
   it('loads schedule settings successfully', async () => {
-    const wrapper = mount(DeviceManagement, {
+    mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
         stubs: {
@@ -329,7 +329,7 @@ describe('Device_Management.vue', () => {
   it('handles schedule settings update error', async () => {
     getSchedule.mockRejectedValueOnce(new Error('Network error'))
 
-    const wrapper = mount(DeviceManagement, {
+    mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
         stubs: {
