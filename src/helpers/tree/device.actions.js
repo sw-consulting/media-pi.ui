@@ -150,6 +150,39 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
   }
 
   /**
+   * Navigates to the device management page
+   * 
+   * Redirects the user to the device management page for the specified device.
+   * Handles complex device ID extraction from tree node structures and
+   * provides comprehensive error handling.
+   * 
+   * @param {Object|number} item - Device object, tree node, or device ID
+   * 
+   * @example
+   * // With tree node
+   * manageDevice({ id: 'device-123-account-456-unassigned' })
+   * 
+   * // With device object
+   * manageDevice({ id: 123, name: 'Camera 1' })
+   * 
+   * // With device ID
+   * manageDevice(123)
+   */
+  const manageDevice = (item) => {
+    try {
+      // Try to get device ID from tree node ID first, then fallback to item.id or item itself
+      const deviceId = getDeviceIdFromNodeId(item?.id) || (typeof item === 'object' ? item.id : item)
+      if (!deviceId) {
+        alertStore.error('Не удалось определить ID устройства для управления')
+        return
+      }
+      router.push(`/device/manage/${deviceId}`)
+    } catch (error) {
+      alertStore.error(`Не удалось перейти к управлению устройством: ${error.message || error}`)
+    }
+  }
+
+  /**
    * Deletes a device with user confirmation
    * 
    * Performs a safe device deletion process that includes:
@@ -327,6 +360,7 @@ export const createDeviceActions = (router, alertStore, devicesStore, confirmDel
   return {
     createDevice,
     editDevice,
+    manageDevice,
     deleteDevice,
     unassignFromGroup,
     unassignFromAccount

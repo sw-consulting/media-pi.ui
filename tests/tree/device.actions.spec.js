@@ -109,6 +109,39 @@ describe('Device Actions Functions', () => {
       })
     })
 
+    describe('manageDevice', () => {
+      it('should navigate to manage device page with device node ID', () => {
+        actions.manageDevice({ id: 'device-123' })
+        expect(router.push).toHaveBeenCalledWith('/device/manage/123')
+      })
+
+      it('should navigate to manage device page with object parameter', () => {
+        actions.manageDevice({ id: 1 })
+        expect(router.push).toHaveBeenCalledWith('/device/manage/1')
+      })
+
+      it('should navigate to manage device page with primitive parameter', () => {
+        actions.manageDevice(2)
+        expect(router.push).toHaveBeenCalledWith('/device/manage/2')
+      })
+
+      it('should handle invalid device ID', () => {
+        actions.manageDevice({ id: null })
+        expect(alertStore.error).toHaveBeenCalledWith('Не удалось определить ID устройства для управления')
+      })
+
+      it('should handle navigation errors', () => {
+        const error = new Error('Navigation failed')
+        router.push.mockImplementation(() => { throw error })
+
+        actions.manageDevice({ id: 'device-123' })
+
+        expect(alertStore.error).toHaveBeenCalledWith(
+          'Не удалось перейти к управлению устройством: Navigation failed'
+        )
+      })
+    })
+
     describe('deleteDevice', () => {
       it('should delete device after confirmation with device node ID', async () => {
         await actions.deleteDevice({ id: 'device-1' })

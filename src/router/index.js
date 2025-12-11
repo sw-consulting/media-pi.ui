@@ -104,6 +104,12 @@ const router = createRouter({
       props: true
     },
     {
+      path: '/device/manage/:id',
+      name: 'Управление устройством',
+      component: () => import('@/views/Device_ManagementView.vue'),
+      props: true
+    },
+    {
       path: '/videos',
       name: 'Видеофайлы',
       component: () => import('@/views/Videos_View.vue')
