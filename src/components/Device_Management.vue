@@ -417,42 +417,6 @@ const saveConfigurationWithContext = async (operationKeys, options) => {
   }
 }
 
-// Audio methods
-async function updateAudioSettings() {
-  return loadConfigurationFor(['audioUpdate'], 'Не удалось загрузить настройки аудио')
-}
-
-async function saveAudioSettings() {
-  return saveConfigurationWithContext(['audioSave'], {
-    errorPrefix: 'Не удалось сохранить настройки аудио',
-    successMessage: 'Настройки аудио сохранены'
-  })
-}
-
-// Playlist methods
-async function updatePlaylistSettings() {
-  return loadConfigurationFor(['playlistUpdate'], 'Не удалось загрузить настройки плей-листа')
-}
-
-async function savePlaylistSettings() {
-  return saveConfigurationWithContext(['playlistSave'], {
-    errorPrefix: 'Не удалось сохранить настройки плей-листа',
-    successMessage: 'Настройки плей-листа сохранены'
-  })
-}
-
-async function updateScheduleSettings() {
-  return loadConfigurationFor(['scheduleUpdate'], 'Не удалось загрузить настойки таймеров')
-}
-
-async function saveScheduleSettings() {
-  return saveConfigurationWithContext(['scheduleSave'], {
-    validateSchedule: true,
-    errorPrefix: 'Не удалось сохранить настройки таймеров',
-    successMessage: 'Настройки таймеров сохранены'
-  })
-}
-
 const applyServiceStatus = (payload = {}) => {
   serviceStatus.value = { ...defaultServiceStatus, ...payload }
 }
