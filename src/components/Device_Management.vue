@@ -376,7 +376,7 @@ const loadConfigurationFor = async (operationKeys = [], errorPrefix = 'Не уд
 const persistConfiguration = async ({
   validateSchedule = false,
   successMessage,
-  errorPrefix
+  errorPrefix = 'Не удалось сохранить настройки'
 } = {}) => {
   const formRef = scheduleFormRef.value
   if (validateSchedule) {
