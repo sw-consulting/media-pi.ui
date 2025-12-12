@@ -36,12 +36,76 @@ const { statuses } = storeToRefs(deviceStatusesStore)
 const defaultServiceStatus = Object.freeze({
   playbackServiceStatus: false,
   playlistUploadServiceStatus: false,
+  videoUploadServiceStatus: false,
   yaDiskMountStatus: false
 })
 const serviceStatus = ref({ ...defaultServiceStatus })
 
+const defaultServiceOperationTimeout = 3000
+
+const serviceDescriptors = Object.freeze([
+  {
+    key: 'playback',
+    label: 'Воспроизведение',
+    statusKey: 'playbackServiceStatus',
+    activeLabel: 'Запущено',
+    inactiveLabel: 'Остановлено',
+    startLabel: 'Запустить',
+    stopLabel: 'Остановить',
+    startOperationKey: 'startPlaybackService',
+    stopOperationKey: 'stopPlaybackService',
+    startHandler: devicesStore.startPlayback,
+    stopHandler: devicesStore.stopPlayback,
+    successMessages: {
+      start: 'Служба воспроизведения запущена',
+      stop: 'Служба воспроизведения остановлена'
+    }
+  },
+  {
+    key: 'playlistUpload',
+    label: 'Загрузка плейлистов',
+    statusKey: 'playlistUploadServiceStatus',
+    activeLabel: 'Запущена',
+    inactiveLabel: 'Остановлена',
+    startLabel: 'Запустить',
+    stopLabel: 'Остановить',
+    startOperationKey: 'startPlaylistUploadService',
+    stopOperationKey: 'stopPlaylistUploadService',
+    startHandler: devicesStore.startPlaylistUpload,
+    stopHandler: devicesStore.stopPlaylistUpload,
+    successMessages: {
+      start: 'Служба загрузки плейлистов запущена',
+      stop: 'Служба загрузки плейлистов остановлена'
+    }
+  },
+  {
+    key: 'videoUpload',
+    label: 'Загрузка видео',
+    statusKey: 'videoUploadServiceStatus',
+    activeLabel: 'Запущена',
+    inactiveLabel: 'Остановлена',
+    startLabel: 'Запустить',
+    stopLabel: 'Остановить',
+    startOperationKey: 'startVideoUploadService',
+    stopOperationKey: 'stopVideoUploadService',
+    startHandler: devicesStore.startVideoUpload,
+    stopHandler: devicesStore.stopVideoUpload,
+    successMessages: {
+      start: 'Служба загрузки видео запущена',
+      stop: 'Служба загрузки видео остановлена'
+    }
+  },
+  {
+    key: 'yadisk',
+    label: 'Яндекс диск',
+    statusKey: 'yaDiskMountStatus',
+    activeLabel: 'Смонтирован',
+    inactiveLabel: 'Не смонтирован'
+  }
+])
+
 // Track ongoing operations to disable controls
-const operationInProgress = ref({
+const baseOperationFlags = {
   apply: false,
   readAll: false,
   saveAll: false,
@@ -53,21 +117,23 @@ const operationInProgress = ref({
   playlistSave: false,
   scheduleUpdate: false,
   scheduleSave: false,
-  serviceStatus: false,
-  stopPlaybackService: false,
-  startPlaybackService: false,
-  stopUploadService: false,
-  startUploadService: false
-})
+  serviceStatus: false
+}
+
+const createServiceOperationState = (initialValue) => Object.fromEntries(
+  serviceDescriptors
+    .flatMap(({ startOperationKey, stopOperationKey }) => [startOperationKey, stopOperationKey])
+    .filter(Boolean)
+    .map((key) => [key, initialValue])
+)
+
+const operationInProgress = ref({ ...baseOperationFlags, ...createServiceOperationState(false) })
 
 const systemOperationTimers = ref({
   apply: null,
   reboot: null,
   shutdown: null,
-  stopPlaybackService: null,
-  startPlaybackService: null,
-  stopUploadService: null,
-  startUploadService: null
+  ...createServiceOperationState(null)
 })
 
 // Audio settings state
@@ -314,36 +380,50 @@ const hasAnyOperationInProgress = computed(() =>
   Object.values(operationInProgress.value).some(Boolean)
 )
 
+const serviceOperationConfigs = serviceDescriptors.reduce((acc, descriptor) => {
+  if (descriptor.startOperationKey) {
+    acc[descriptor.startOperationKey] = {
+      handler: descriptor.startHandler,
+      timeout: descriptor.timeout ?? defaultServiceOperationTimeout,
+      successMessage: descriptor.successMessages?.start
+    }
+  }
+  if (descriptor.stopOperationKey) {
+    acc[descriptor.stopOperationKey] = {
+      handler: descriptor.stopHandler,
+      timeout: descriptor.timeout ?? defaultServiceOperationTimeout,
+      successMessage: descriptor.successMessages?.stop
+    }
+  }
+  return acc
+}, {})
+
+const createServiceActionRunner = (operationKey) => async () => {
+  const config = serviceOperationConfigs[operationKey]
+  if (!config) return
+  await runServiceOperation(operationKey, config.handler, config.timeout, config.successMessage)
+}
+
+const serviceActionRunners = Object.fromEntries(
+  Object.keys(serviceOperationConfigs).map((key) => [key, createServiceActionRunner(key)])
+)
+
 const serviceRows = computed(() => {
   const status = serviceStatus.value || defaultServiceStatus
-  return [
-    {
-      key: 'playback',
-      label: 'Воспроизведение',
-      isActive: Boolean(status.playbackServiceStatus),
-      statusLabel: status.playbackServiceStatus ? 'Запущено' : 'Остановлено',
-      actionLabel: status.playbackServiceStatus ? 'Остановить' : 'Запустить',
-      action: status.playbackServiceStatus ? stopPlaybackService : startPlaybackService,
-      operationKey: status.playbackServiceStatus ? 'stopPlaybackService' : 'startPlaybackService'
-    },
-    {
-      key: 'upload',
-      label: 'Загрузка',
-      isActive: Boolean(status.playlistUploadServiceStatus),
-      statusLabel: status.playlistUploadServiceStatus ? 'Запущена' : 'Остановлена',
-      actionLabel: status.playlistUploadServiceStatus ? 'Остановить' : 'Запустить',
-      action: status.playlistUploadServiceStatus ? stopUploadService : startUploadService,
-      operationKey: status.playlistUploadServiceStatus ? 'stopUploadService' : 'startUploadService'
-    },
-    {
-      key: 'yadisk',
-      label: 'Яндекс диск',
-      isActive: Boolean(status.yaDiskMountStatus),
-      statusLabel: status.yaDiskMountStatus ? 'Смонтирован' : 'Не смонтирован',
-      actionLabel: null,
-      action: null
+  return serviceDescriptors.map((descriptor) => {
+    const isActive = Boolean(status[descriptor.statusKey])
+    const hasActions = Boolean(descriptor.startOperationKey && descriptor.stopOperationKey)
+    const operationKey = isActive ? descriptor.stopOperationKey : descriptor.startOperationKey
+    return {
+      key: descriptor.key,
+      label: descriptor.label,
+      isActive,
+      statusLabel: isActive ? descriptor.activeLabel : descriptor.inactiveLabel,
+      actionLabel: hasActions ? (isActive ? descriptor.stopLabel : descriptor.startLabel) : null,
+      action: hasActions ? serviceActionRunners[operationKey] : null,
+      operationKey
     }
-  ]
+  })
 })
 
 const resetSystemOperations = () => {
@@ -463,22 +543,6 @@ async function saveAllSettings() {
   return success
 }
 
-const startPlaybackService = async () => {
-  await runServiceOperation('startPlaybackService', devicesStore.startPlayback, 3000)
-}
-
-const stopPlaybackService = async () => {
-  await runServiceOperation('stopPlaybackService', devicesStore.stopPlayback, 3000)
-}
-
-const startUploadService = async () => {
-  await runServiceOperation('startUploadService', devicesStore.startUpload, 3000)
-}
-
-const stopUploadService = async () => {
-  await runServiceOperation('stopUploadService', devicesStore.stopUpload, 3000)
-}
-
 const runWithDevice = async (handler) => {
   if (!props.deviceId || typeof handler !== 'function') return false
   try {
@@ -491,8 +555,8 @@ const runWithDevice = async (handler) => {
   }
 }
 
-const runServiceOperation = async (key, handler, timeout) => {
-  if (!['startPlaybackService', 'stopPlaybackService', 'startUploadService', 'stopUploadService'].includes(key)) return
+const runServiceOperation = async (key, handler, timeout, successMessage) => {
+  if (!serviceOperationConfigs[key]) return
   resetSystemOperationTimer(key)
   operationInProgress.value[key] = true
   const success = await runWithDevice(handler)
@@ -510,15 +574,11 @@ const runServiceOperation = async (key, handler, timeout) => {
     await updateServiceStatus()
     operationInProgress.value[key] = false
     systemOperationTimers.value[key] = null
-    
+
     // Show completion message based on operation type
-    const completionMessages = {
-      startPlaybackService: 'Служба воспроизведения запущена',
-      stopPlaybackService: 'Служба воспроизведения остановлена',
-      startUploadService: 'Служба загрузки запущена',
-      stopUploadService: 'Служба загрузки остановлена'
+    if (successMessage) {
+      alertStore.success(successMessage)
     }
-    alertStore.success(completionMessages[key])
   }, timeout)
 }
 

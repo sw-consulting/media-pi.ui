@@ -295,8 +295,10 @@ describe('devices.store', () => {
   it.each([
     ['startPlayback', 'post', '/devices/9/playback/start', {}],
     ['stopPlayback', 'post', '/devices/9/playback/stop', {}],
-    ['startUpload', 'post', '/devices/9/playlist/start-upload', {}],
-    ['stopUpload', 'post', '/devices/9/playlist/stop-upload', {}],
+    ['startPlaylistUpload', 'post', '/devices/9/playlist/start-upload', {}],
+    ['stopPlaylistUpload', 'post', '/devices/9/playlist/stop-upload', {}],
+    ['startVideoUpload', 'post', '/devices/9/video/start-upload', {}],
+    ['stopVideoUpload', 'post', '/devices/9/video/stop-upload', {}],
     ['getServiceStatus', 'get', '/devices/9/service/status']
   ])('%s calls %s on expected endpoint', async (method, httpMethod, urlPart, body) => {
     const store = useDevicesStore()
