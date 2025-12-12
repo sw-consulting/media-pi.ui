@@ -57,7 +57,6 @@ import { useConfirmation } from '@/helpers/confirmation.js'
 import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpers/user.helpers.js'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 import DeviceStatusDialog from '@/components/Device_Status_Dialog.vue'
-import DeviceManagementDialog from '@/components/Device_Management_Dialog.vue'
 import InlineAssignment from '@/components/InlineAssignment.vue'
 
 const router = useRouter()
@@ -616,13 +615,6 @@ onBeforeUnmount(() => {
       :device-id="statusDialogDeviceId"
     />
 
-    <!-- Device Management Dialog -->
-    <DeviceManagementDialog
-      v-if="managementDialogDeviceId"
-      v-model="managementDialogOpen"
-      :device-id="managementDialogDeviceId"
-    />
-    
     <!-- Global alert messages -->
     <div v-if="alert && !statusDialogOpen && !managementDialogOpen" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
