@@ -27,3 +27,5 @@ analysis
 *.sw?
 
 .env
+.vscode/chrome
+
