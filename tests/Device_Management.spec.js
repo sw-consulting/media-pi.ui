@@ -55,12 +55,15 @@ const updateConfiguration = vi.fn(() => Promise.resolve())
 const getServiceStatus = vi.fn(() => Promise.resolve({
   playbackServiceStatus: false,
   playlistUploadServiceStatus: false,
+  videoUploadServiceStatus: false,
   yaDiskMountStatus: false
 }))
 const startPlayback = vi.fn(() => Promise.resolve())
 const stopPlayback = vi.fn(() => Promise.resolve())
-const startUpload = vi.fn(() => Promise.resolve())
-const stopUpload = vi.fn(() => Promise.resolve())
+const startPlaylistUpload = vi.fn(() => Promise.resolve())
+const stopPlaylistUpload = vi.fn(() => Promise.resolve())
+const startVideoUpload = vi.fn(() => Promise.resolve())
+const stopVideoUpload = vi.fn(() => Promise.resolve())
 const alertError = vi.fn()
 const alertSuccess = vi.fn()
 const alertClear = vi.fn()
@@ -100,8 +103,10 @@ vi.mock('@/stores/devices.store.js', () => ({
     getServiceStatus,
     startPlayback,
     stopPlayback,
-    startUpload,
-    stopUpload
+    startPlaylistUpload,
+    stopPlaylistUpload,
+    startVideoUpload,
+    stopVideoUpload
   })
 }))
 
@@ -339,7 +344,7 @@ describe('Device_Management.vue', () => {
     expect(getServiceStatus).toHaveBeenCalledTimes(2)
   })
 
-  it('starts upload service successfully', async () => {
+  it('starts playlist upload service successfully', async () => {
     const wrapper = mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
@@ -352,11 +357,11 @@ describe('Device_Management.vue', () => {
     await flushPromises()
 
     // Trigger start upload
-    await wrapper.find('[data-test="service-action-upload"]').trigger('click')
+    await wrapper.find('[data-test="service-action-playlistUpload"]').trigger('click')
     await flushPromises()
 
-    expect(startUpload).toHaveBeenCalledTimes(1)
-    expect(startUpload).toHaveBeenCalledWith(1)
+    expect(startPlaylistUpload).toHaveBeenCalledTimes(1)
+    expect(startPlaylistUpload).toHaveBeenCalledWith(1)
 
     await vi.runAllTimersAsync()
     await flushPromises()
@@ -365,10 +370,11 @@ describe('Device_Management.vue', () => {
     expect(getServiceStatus).toHaveBeenCalledTimes(2)
   })
 
-  it('stops upload service successfully', async () => {
+  it('stops playlist upload service successfully', async () => {
     getServiceStatus.mockResolvedValue({
       playbackServiceStatus: false,
       playlistUploadServiceStatus: true,
+      videoUploadServiceStatus: false,
       yaDiskMountStatus: false
     })
 
@@ -384,16 +390,71 @@ describe('Device_Management.vue', () => {
     await flushPromises()
 
     // Trigger stop upload
-    await wrapper.find('[data-test="service-action-upload"]').trigger('click')
+    await wrapper.find('[data-test="service-action-playlistUpload"]').trigger('click')
     await flushPromises()
 
-    expect(stopUpload).toHaveBeenCalledTimes(1)
-    expect(stopUpload).toHaveBeenCalledWith(1)
+    expect(stopPlaylistUpload).toHaveBeenCalledTimes(1)
+    expect(stopPlaylistUpload).toHaveBeenCalledWith(1)
 
     await vi.runAllTimersAsync()
     await flushPromises()
 
     // Verify service status is refreshed after operation
+    expect(getServiceStatus).toHaveBeenCalledTimes(2)
+  })
+
+  it('starts video upload service successfully', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    await wrapper.find('[data-test="service-action-videoUpload"]').trigger('click')
+    await flushPromises()
+
+    expect(startVideoUpload).toHaveBeenCalledTimes(1)
+    expect(startVideoUpload).toHaveBeenCalledWith(1)
+
+    await vi.runAllTimersAsync()
+    await flushPromises()
+
+    expect(getServiceStatus).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops video upload service successfully', async () => {
+    getServiceStatus.mockResolvedValue({
+      playbackServiceStatus: false,
+      playlistUploadServiceStatus: false,
+      videoUploadServiceStatus: true,
+      yaDiskMountStatus: false
+    })
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    await wrapper.find('[data-test="service-action-videoUpload"]').trigger('click')
+    await flushPromises()
+
+    expect(stopVideoUpload).toHaveBeenCalledTimes(1)
+    expect(stopVideoUpload).toHaveBeenCalledWith(1)
+
+    await vi.runAllTimersAsync()
+    await flushPromises()
+
     expect(getServiceStatus).toHaveBeenCalledTimes(2)
   })
 

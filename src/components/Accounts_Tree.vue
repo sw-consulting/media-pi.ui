@@ -82,7 +82,6 @@ const transitioningDevices = ref(new Set())
 const statusDialogOpen = ref(false)
 const statusDialogDeviceId = ref(null)
 
-const managementDialogOpen = ref(false)
 
 
 const openDeviceStatus = (item) => {
@@ -615,7 +614,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- Global alert messages -->
-    <div v-if="alert && !statusDialogOpen && !managementDialogOpen" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+    <div v-if="alert && !statusDialogOpen" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
     </div>

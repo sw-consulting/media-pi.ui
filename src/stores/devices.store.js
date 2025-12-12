@@ -264,8 +264,13 @@ export const useDevicesStore = defineStore('devices', () => {
   const shutdownSystem = (id) => executeDeviceRequest('post', id, ['system', 'shutdown'])
   const startPlayback = (id) => executeDeviceRequest('post', id, ['playback', 'start'])
   const stopPlayback = (id) => executeDeviceRequest('post', id, ['playback', 'stop'])
-  const startUpload = (id) => executeDeviceRequest('post', id, ['playlist', 'start-upload'])
-  const stopUpload = (id) => executeDeviceRequest('post', id, ['playlist', 'stop-upload'])
+  const buildUploadAction = (resource, action) => (id) =>
+    executeDeviceRequest('post', id, [resource, `${action}-upload`])
+
+  const startPlaylistUpload = buildUploadAction('playlist', 'start')
+  const stopPlaylistUpload = buildUploadAction('playlist', 'stop')
+  const startVideoUpload = buildUploadAction('video', 'start')
+  const stopVideoUpload = buildUploadAction('video', 'stop')
   const getServiceStatus = (id) => executeDeviceRequest('get', id, ['service', 'status'])
 
 
@@ -298,8 +303,10 @@ export const useDevicesStore = defineStore('devices', () => {
     shutdownSystem,
     startPlayback,
     stopPlayback,
-    startUpload,
-    stopUpload,
+    startPlaylistUpload,
+    stopPlaylistUpload,
+    startVideoUpload,
+    stopVideoUpload,
     getServiceStatus
   }
 })
