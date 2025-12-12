@@ -257,13 +257,8 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
-  // storage check removed: endpoint deprecated
-  const getPlaylist = (id) => executeDeviceRequest('get', id, ['playlist', 'get'])
-  const updatePlaylist = (id, params) => executeDeviceRequest('put', id, ['playlist', 'update'], params)
-  const getSchedule = (id) => executeDeviceRequest('get', id, ['schedule', 'get'])
-  const updateSchedule = (id, params) => executeDeviceRequest('put', id, ['schedule', 'update'], params)
-  const getAudio = (id) => executeDeviceRequest('get', id, ['audio', 'get'])
-  const updateAudio = (id, params) => executeDeviceRequest('put', id, ['audio', 'update'], params)
+  const getConfiguration = (id) => executeDeviceRequest('get', id, ['configuration', 'get'])
+  const updateConfiguration = (id, params) => executeDeviceRequest('put', id, ['configuration', 'update'], params)
   const reloadSystem = (id) => executeDeviceRequest('post', id, ['system', 'reload'])
   const rebootSystem = (id) => executeDeviceRequest('post', id, ['system', 'reboot'])
   const shutdownSystem = (id) => executeDeviceRequest('post', id, ['system', 'shutdown'])
@@ -296,12 +291,8 @@ export const useDevicesStore = defineStore('devices', () => {
     restartService,
     enableService,
     disableService,
-    getPlaylist,
-    updatePlaylist,
-    getSchedule,
-    updateSchedule,
-    getAudio,
-    updateAudio,
+    getConfiguration,
+    updateConfiguration,
     reloadSystem,
     rebootSystem,
     shutdownSystem,

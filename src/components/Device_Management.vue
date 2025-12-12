@@ -159,6 +159,71 @@ const applyScheduleValues = (values) => {
   }
 }
 
+const createDefaultConfiguration = () => ({
+  playlist: { source: '', destination: '' },
+  schedule: createDefaultScheduleValues(),
+  audio: { output: 'hdmi' }
+})
+
+const setOperationFlags = (keys, value) => {
+  ;(keys || []).forEach((key) => {
+    operationInProgress.value[key] = value
+  })
+}
+
+const normalizeConfiguration = (config = {}) => {
+  const allowedOutputs = ['hdmi', 'jack']
+  const rawAudioOutput = typeof config?.audio?.output === 'string'
+    ? config.audio.output.trim().toLowerCase()
+    : ''
+  const audioFallback = !allowedOutputs.includes(rawAudioOutput)
+
+  return {
+    playlist: {
+      source: typeof config?.playlist?.source === 'string' ? config.playlist.source : '',
+      destination: typeof config?.playlist?.destination === 'string' ? config.playlist.destination : ''
+    },
+    schedule: {
+      playlist: normalizeTimeList(config?.schedule?.playlist),
+      video: normalizeTimeList(config?.schedule?.video),
+      rest: normalizeRestList(config?.schedule?.rest)
+    },
+    audio: {
+      output: audioFallback ? 'hdmi' : rawAudioOutput
+    },
+    audioFallback
+  }
+}
+
+const applyConfiguration = (configuration, originalConfig = {}) => {
+  const normalized = configuration ?? createDefaultConfiguration()
+  playlistSettings.value.source = normalized.playlist.source
+  playlistSettings.value.destination = normalized.playlist.destination
+  applyScheduleValues(normalized.schedule)
+
+  if (normalized.audioFallback && originalConfig?.audio) {
+    alertStore.error('Неизвестный тип аудио выхода. Установлено значение по умолчанию: HDMI')
+  }
+  audioSettings.value.output = normalized.audio.output
+}
+
+const buildSchedulePayload = (values) => ({
+  playlist: [...normalizeTimeList(values?.playlist)],
+  video: [...normalizeTimeList(values?.video)],
+  rest: normalizeRestList(values?.rest).map((item) => ({ start: item.start, stop: item.stop }))
+})
+
+const buildConfigurationPayload = (scheduleValuesOverride) => ({
+  playlist: {
+    source: playlistSettings.value.source || '',
+    destination: playlistSettings.value.destination || ''
+  },
+  schedule: buildSchedulePayload(scheduleValuesOverride ?? scheduleFormValues.value),
+  audio: {
+    output: ['hdmi', 'jack'].includes(audioSettings.value.output) ? audioSettings.value.output : 'hdmi'
+  }
+})
+
 
 const componentActive = ref(true)
 
@@ -293,115 +358,62 @@ const resetSystemOperations = () => {
   })
 }
 
-// Audio methods
-async function updateAudioSettings() {
-  operationInProgress.value.audioUpdate = true
+const loadConfigurationFor = async (operationKeys = [], errorPrefix = 'Не удалось загрузить настройки') => {
+  setOperationFlags(operationKeys, true)
   try {
-    const result = await devicesStore.getAudio(props.deviceId)
-    if (result?.output === 'unknown' || !['hdmi', 'jack'].includes(result?.output)) {
-      alertStore.error('Неизвестный тип аудио выхода. Установлено значение по умолчанию: HDMI')
-      audioSettings.value.output = 'hdmi'
-    } else {
-      audioSettings.value.output = result.output
+    const configuration = await devicesStore.getConfiguration(props.deviceId)
+    const normalized = normalizeConfiguration(configuration || createDefaultConfiguration())
+    applyConfiguration(normalized, configuration)
+    return true
+  } catch (err) {
+    alertStore.error(`${errorPrefix}: ${err?.message || 'Неизвестная ошибка'}`)
+    return false
+  } finally {
+    setOperationFlags(operationKeys, false)
+  }
+}
+
+const persistConfiguration = async ({
+  validateSchedule = false,
+  successMessage,
+  errorPrefix
+} = {}) => {
+  const formRef = scheduleFormRef.value
+  if (validateSchedule) {
+    const validationResult = formRef ? await formRef.validate() : { valid: true }
+    if (!validationResult.valid) {
+      alertStore.error('Исправьте ошибки в настройках таймеров, чтобы продолжить')
+      return false
+    }
+  }
+
+  const scheduleValues = validateSchedule && formRef?.values
+    ? formRef.values
+    : scheduleFormValues.value
+
+  const payload = buildConfigurationPayload(scheduleValues)
+
+  try {
+    await devicesStore.updateConfiguration(props.deviceId, payload)
+    if (validateSchedule) {
+      applyScheduleValues(payload.schedule)
+    }
+    if (successMessage) {
+      alertStore.success(successMessage)
     }
     return true
   } catch (err) {
-    alertStore.error('Не удалось загрузить настройки аудио: ' + (err?.message || 'Неизвестная ошибка'))
+    alertStore.error(`${errorPrefix}: ${err?.message || 'Неизвестная ошибка'}`)
     return false
-  } finally {
-    operationInProgress.value.audioUpdate = false
   }
 }
 
-async function saveAudioSettings() {
-  operationInProgress.value.audioSave = true
+const saveConfigurationWithContext = async (operationKeys, options) => {
+  setOperationFlags(operationKeys, true)
   try {
-    await devicesStore.updateAudio(props.deviceId, { output: audioSettings.value.output })
-    alertStore.success('Настройки аудио сохранены')
-    return true
-  } catch (err) {
-    alertStore.error('Не удалось сохранить настройки аудио: ' + (err?.message || 'Неизвестная ошибка'))
-    return false
+    return await persistConfiguration(options)
   } finally {
-    operationInProgress.value.audioSave = false
-  }
-}
-
-// Playlist methods
-async function updatePlaylistSettings() {
-  operationInProgress.value.playlistUpdate = true
-  try {
-    const result = await devicesStore.getPlaylist(props.deviceId)
-    playlistSettings.value.source = result?.source || ''
-    playlistSettings.value.destination = result?.destination || ''
-    return true
-  } catch (err) {
-    alertStore.error('Не удалось загрузить настройки плей-листа: ' + (err?.message || 'Неизвестная ошибка'))
-    return false
-  } finally {
-    operationInProgress.value.playlistUpdate = false
-  }
-}
-
-async function savePlaylistSettings() {
-  operationInProgress.value.playlistSave = true
-  try {
-    await devicesStore.updatePlaylist(props.deviceId, {
-      source: playlistSettings.value.source,
-      destination: playlistSettings.value.destination
-    })
-    alertStore.success('Настройки плей-листа сохранены')
-    return true
-  } catch (err) {
-    alertStore.error('Не удалось сохранить настройки плей-листа: ' + (err?.message || 'Неизвестная ошибка'))
-    return false
-  } finally {
-    operationInProgress.value.playlistSave = false
-  }
-}
-
-async function updateScheduleSettings() {
-  operationInProgress.value.scheduleUpdate = true
-  try {
-    const result = await devicesStore.getSchedule(props.deviceId)
-    applyScheduleValues(result || createDefaultScheduleValues())
-    return true
-  } catch (err) {
-    alertStore.error('Не удалось загрузить настройки таймеров: ' + (err?.message || 'Неизвестная ошибка'))
-    return false
-  } finally {
-    operationInProgress.value.scheduleUpdate = false
-  }
-}
-
-async function saveScheduleSettings() {
-  const formRef = scheduleFormRef.value
-  const validationResult = formRef ? await formRef.validate() : { valid: true }
-  if (!validationResult.valid) {
-    alertStore.error('Исправьте ошибки в настройках таймеров, чтобы продолжить')
-    return false
-  }
-
-  // Get current reactive form values instead of initial scheduleFormValues
-  const liveValues = formRef?.values || scheduleFormValues.value
-
-  const payload = {
-    playlist: [...(liveValues.playlist || [])],
-    video: [...(liveValues.video || [])],
-    rest: (liveValues.rest || []).map((item) => ({ start: item.start, stop: item.stop }))
-  }
-  operationInProgress.value.scheduleSave = true
-  try {
-    await devicesStore.updateSchedule(props.deviceId, payload)
-    // Sync internal copy so reopening dialog shows what was just saved
-    applyScheduleValues(payload)
-    alertStore.success('Настройки таймеров сохранены')
-    return true
-  } catch (err) {
-    alertStore.error('Не удалось сохранить настройки таймеров: ' + (err?.message || 'Неизвестная ошибка'))
-    return false
-  } finally {
-    operationInProgress.value.scheduleSave = false
+    setOperationFlags(operationKeys, false)
   }
 }
 
@@ -429,35 +441,26 @@ async function updateServiceStatus() {
 }
 
 async function readAllSettings() {
-  operationInProgress.value.readAll = true
+  const readOperationKeys = ['readAll', 'audioUpdate', 'playlistUpdate', 'scheduleUpdate']
+  setOperationFlags(readOperationKeys, true)
   try {
     await Promise.all([
       updateServiceStatus(),
-      updateAudioSettings(),
-      updatePlaylistSettings(),
-      updateScheduleSettings()
+      loadConfigurationFor([], 'Не удалось загрузить настройки конфигурации')
     ])
   } finally {
-    operationInProgress.value.readAll = false
+    setOperationFlags(readOperationKeys, false)
   }
 }
 
 async function saveAllSettings() {
-  operationInProgress.value.saveAll = true
-  try {
-    const results = await Promise.all([
-      saveAudioSettings(),
-      savePlaylistSettings(),
-      saveScheduleSettings()
-    ])
-    if (results.every(Boolean)) {
-      alertStore.success('Все настройки сохранены')
-    } else if (results.some(Boolean)) {
-      alertStore.error('Некоторые настройки не удалось сохранить')
-    }
-  } finally {
-    operationInProgress.value.saveAll = false
-  }
+  const saveOperationKeys = ['saveAll', 'audioSave', 'playlistSave', 'scheduleSave']
+  const success = await saveConfigurationWithContext(saveOperationKeys, {
+    validateSchedule: true,
+    errorPrefix: 'Не удалось сохранить настройки',
+    successMessage: 'Все настройки сохранены'
+  })
+  return success
 }
 
 const startPlaybackService = async () => {
