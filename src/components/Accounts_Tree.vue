@@ -83,7 +83,6 @@ const statusDialogOpen = ref(false)
 const statusDialogDeviceId = ref(null)
 
 const managementDialogOpen = ref(false)
-const managementDialogDeviceId = ref(null)
 
 
 const openDeviceStatus = (item) => {
