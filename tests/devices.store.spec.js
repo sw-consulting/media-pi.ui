@@ -327,14 +327,27 @@ describe('devices.store', () => {
 
 
 
-  it('updatePlaylist calls fetchWrapper.put with payload', async () => {
+  it('getConfiguration calls combined endpoint', async () => {
     const store = useDevicesStore()
-    const payload = { playlist: ['video1'] }
+    const payload = { playlist: {}, schedule: {}, audio: {} }
+    fetchWrapper.get.mockResolvedValueOnce(payload)
+
+    const response = await store.getConfiguration(4)
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/devices/4/configuration/get'))
+    expect(response).toEqual(payload)
+    expect(store.loading).toBe(false)
+  })
+
+  it('updateConfiguration forwards payload to combined endpoint', async () => {
+    const store = useDevicesStore()
+    const payload = { playlist: { source: '/a' }, schedule: {}, audio: { output: 'hdmi' } }
     fetchWrapper.put.mockResolvedValueOnce({ success: true })
-    const response = await store.updatePlaylist(7, payload)
+
+    const response = await store.updateConfiguration(7, payload)
 
     expect(fetchWrapper.put).toHaveBeenCalledWith(
-      expect.stringContaining('/devices/7/playlist/update'),
+      expect.stringContaining('/devices/7/configuration/update'),
       payload
     )
     expect(response).toEqual({ success: true })
