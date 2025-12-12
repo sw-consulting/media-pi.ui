@@ -41,16 +41,17 @@ const getDeviceStatusById = vi.fn(() => {
 const reloadSystem = vi.fn(() => Promise.resolve())
 const rebootSystem = vi.fn(() => Promise.resolve())
 const shutdownSystem = vi.fn(() => Promise.resolve())
-const getAudio = vi.fn(() => Promise.resolve({ output: 'hdmi' }))
-const updateAudio = vi.fn(() => Promise.resolve())
-const getPlaylist = vi.fn(() => Promise.resolve({ source: '', destination: '' }))
-const updatePlaylist = vi.fn(() => Promise.resolve())
-const getSchedule = vi.fn(() => Promise.resolve({
-  playlist: ['00:00'],
-  video: ['00:00'],
-  rest: [{ start: '00:00', stop: '00:00' }]
-}))
-const updateSchedule = vi.fn(() => Promise.resolve())
+const configurationResponse = {
+  playlist: { source: '', destination: '' },
+  schedule: {
+    playlist: ['00:00'],
+    video: ['00:00'],
+    rest: [{ start: '00:00', stop: '00:00' }]
+  },
+  audio: { output: 'hdmi' }
+}
+const getConfiguration = vi.fn(() => Promise.resolve(configurationResponse))
+const updateConfiguration = vi.fn(() => Promise.resolve())
 const getServiceStatus = vi.fn(() => Promise.resolve({
   playbackServiceStatus: false,
   playlistUploadServiceStatus: false,
@@ -94,12 +95,8 @@ vi.mock('@/stores/devices.store.js', () => ({
     reloadSystem,
     rebootSystem,
     shutdownSystem,
-    getAudio,
-    updateAudio,
-    getPlaylist,
-    updatePlaylist,
-    getSchedule,
-    updateSchedule,
+    getConfiguration,
+    updateConfiguration,
     getServiceStatus,
     startPlayback,
     stopPlayback,
@@ -156,9 +153,8 @@ describe('Device_Management.vue', () => {
     await flushPromises()
 
     expect(getDeviceStatusById).toHaveBeenCalledTimes(1)
-    expect(getAudio).toHaveBeenCalledTimes(1)
-    expect(getPlaylist).toHaveBeenCalledTimes(1)
-    expect(getSchedule).toHaveBeenCalledTimes(1)
+    expect(getConfiguration).toHaveBeenCalledTimes(1)
+    expect(getConfiguration).toHaveBeenCalledWith(1)
     expect(getServiceStatus).toHaveBeenCalledTimes(1)
     const headerText = wrapper.get('h1.primary-heading span').text()
     expect(headerText).toContain('Device 1')
@@ -205,24 +201,8 @@ describe('Device_Management.vue', () => {
     expect(routerGo).toHaveBeenCalledWith(-1)
   })
 
-  it('loads audio settings successfully', async () => {
-    mount(DeviceManagement, {
-      props: { deviceId: 1 },
-      global: {
-        stubs: {
-          'font-awesome-icon': { template: '<i />' }
-        }
-      }
-    })
-
-    await flushPromises()
-
-    // Verify audio settings loaded
-    expect(getAudio).toHaveBeenCalledTimes(1)
-    expect(getAudio).toHaveBeenCalledWith(1)
-  })
-
-  it('saves all settings including audio successfully', async () => {
+  it('saves all settings using combined endpoint', async () => {
+    vi.useRealTimers()
     const wrapper = mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
@@ -234,20 +214,16 @@ describe('Device_Management.vue', () => {
 
     await flushPromises()
 
-    // Trigger save all settings
-    await wrapper.find('[data-test="system-save"]').trigger('click')
+    await wrapper.vm.saveAllSettings()
     await flushPromises()
 
-    expect(updateAudio).toHaveBeenCalledTimes(1)
-    expect(updateAudio).toHaveBeenCalledWith(1, { output: 'hdmi' })
-    expect(updatePlaylist).toHaveBeenCalledTimes(1)
-    // Each individual save shows its own success message
-    expect(alertSuccess).toHaveBeenCalledWith('Настройки аудио сохранены')
-    expect(alertSuccess).toHaveBeenCalledWith('Настройки плей-листа сохранены')
+    expect(updateConfiguration).toHaveBeenCalledTimes(1)
+    expect(updateConfiguration).toHaveBeenCalledWith(1, expect.objectContaining({ audio: { output: 'hdmi' } }))
+    expect(alertSuccess).toHaveBeenCalledWith('Все настройки сохранены')
   })
 
-  it('handles audio settings update error', async () => {
-    getAudio.mockRejectedValueOnce(new Error('Network error'))
+  it('handles configuration load error on readAll', async () => {
+    getConfiguration.mockRejectedValueOnce(new Error('Network error'))
 
     mount(DeviceManagement, {
       props: { deviceId: 1 },
@@ -260,11 +236,12 @@ describe('Device_Management.vue', () => {
 
     await flushPromises()
 
-    expect(alertError).toHaveBeenCalledWith('Не удалось загрузить настройки аудио: Network error')
+    expect(alertError).toHaveBeenCalledWith('Не удалось загрузить настройки конфигурации: Network error')
   })
 
-  it('handles audio settings save error', async () => {
-    updateAudio.mockRejectedValueOnce(new Error('Save failed'))
+  it('handles configuration save error', async () => {
+    vi.useRealTimers()
+    updateConfiguration.mockRejectedValueOnce(new Error('Save failed'))
 
     const wrapper = mount(DeviceManagement, {
       props: { deviceId: 1 },
@@ -277,124 +254,10 @@ describe('Device_Management.vue', () => {
 
     await flushPromises()
 
-    // Trigger save all settings
-    await wrapper.find('[data-test="system-save"]').trigger('click')
+    await wrapper.vm.saveAllSettings()
     await flushPromises()
 
-    expect(alertError).toHaveBeenCalledWith('Не удалось сохранить настройки аудио: Save failed')
-  })
-
-  it('loads playlist settings successfully', async () => {
-    mount(DeviceManagement, {
-      props: { deviceId: 1 },
-      global: {
-        stubs: {
-          'font-awesome-icon': { template: '<i />' }
-        }
-      }
-    })
-
-    await flushPromises()
-
-    // Verify playlist settings loaded
-    expect(getPlaylist).toHaveBeenCalledTimes(1)
-    expect(getPlaylist).toHaveBeenCalledWith(1)
-  })
-
-  it('handles playlist settings update error', async () => {
-    getPlaylist.mockRejectedValueOnce(new Error('Network error'))
-
-    mount(DeviceManagement, {
-      props: { deviceId: 1 },
-      global: {
-        stubs: {
-          'font-awesome-icon': { template: '<i />' }
-        }
-      }
-    })
-
-    await flushPromises()
-
-    expect(alertError).toHaveBeenCalledWith('Не удалось загрузить настройки плей-листа: Network error')
-  })
-
-  it('handles playlist settings save error', async () => {
-    updatePlaylist.mockRejectedValueOnce(new Error('Save failed'))
-
-    const wrapper = mount(DeviceManagement, {
-      props: { deviceId: 1 },
-      global: {
-        stubs: {
-          'font-awesome-icon': { template: '<i />' }
-        }
-      }
-    })
-
-    await flushPromises()
-
-    // Trigger save all settings
-    await wrapper.find('[data-test="system-save"]').trigger('click')
-    await flushPromises()
-
-    expect(alertError).toHaveBeenCalledWith('Не удалось сохранить настройки плей-листа: Save failed')
-  })
-
-  it('loads schedule settings successfully', async () => {
-    mount(DeviceManagement, {
-      props: { deviceId: 1 },
-      global: {
-        stubs: {
-          'font-awesome-icon': { template: '<i />' }
-        }
-      }
-    })
-
-    await flushPromises()
-
-    // Verify schedule settings loaded
-    expect(getSchedule).toHaveBeenCalledTimes(1)
-    expect(getSchedule).toHaveBeenCalledWith(1)
-  })
-
-  it('handles schedule settings update error', async () => {
-    getSchedule.mockRejectedValueOnce(new Error('Network error'))
-
-    mount(DeviceManagement, {
-      props: { deviceId: 1 },
-      global: {
-        stubs: {
-          'font-awesome-icon': { template: '<i />' }
-        }
-      }
-    })
-
-    await flushPromises()
-
-    expect(alertError).toHaveBeenCalledWith('Не удалось загрузить настройки таймеров: Network error')
-  })
-
-  it('handles schedule settings save error through saveAll', async () => {
-    updateSchedule.mockRejectedValueOnce(new Error('Save failed'))
-
-    const wrapper = mount(DeviceManagement, {
-      props: { deviceId: 1 },
-      global: {
-        stubs: {
-          'font-awesome-icon': { template: '<i />' }
-        }
-      }
-    })
-
-    await flushPromises()
-    vi.clearAllMocks()
-
-    // Trigger save all settings
-    await wrapper.find('[data-test="system-save"]').trigger('click')
-    await flushPromises()
-
-    // The audio and playlist should still succeed even if schedule fails
-    expect(alertSuccess).toHaveBeenCalledWith('Настройки аудио сохранены')
-    expect(alertSuccess).toHaveBeenCalledWith('Настройки плей-листа сохранены')
+    expect(alertError).toHaveBeenCalledWith('Не удалось сохранить настройки: Save failed')
   })
 
   it('reads all settings on demand', async () => {
@@ -410,13 +273,11 @@ describe('Device_Management.vue', () => {
     await flushPromises()
     vi.clearAllMocks()
 
-    // Trigger read all settings
     await wrapper.find('[data-test="system-read"]').trigger('click')
     await flushPromises()
 
-    expect(getAudio).toHaveBeenCalledTimes(1)
-    expect(getPlaylist).toHaveBeenCalledTimes(1)
-    expect(getSchedule).toHaveBeenCalledTimes(1)
+    expect(getConfiguration).toHaveBeenCalledTimes(1)
+    expect(getConfiguration).toHaveBeenCalledWith(1)
     expect(getServiceStatus).toHaveBeenCalledTimes(1)
   })
 
@@ -557,28 +418,4 @@ describe('Device_Management.vue', () => {
     expect(alertError).toHaveBeenCalledWith('Service error')
   })
 
-  it('handles partial save failures through saveAll', async () => {
-    updatePlaylist.mockRejectedValueOnce(new Error('Playlist save failed'))
-
-    const wrapper = mount(DeviceManagement, {
-      props: { deviceId: 1 },
-      global: {
-        stubs: {
-          'font-awesome-icon': { template: '<i />' }
-        }
-      }
-    })
-
-    await flushPromises()
-    vi.clearAllMocks()
-
-    // Trigger save all settings
-    await wrapper.find('[data-test="system-save"]').trigger('click')
-    await flushPromises()
-
-    // Individual save function shows its own error
-    expect(alertError).toHaveBeenCalledWith('Не удалось сохранить настройки плей-листа: Playlist save failed')
-    // Audio should succeed
-    expect(alertSuccess).toHaveBeenCalledWith('Настройки аудио сохранены')
-  })
 })
