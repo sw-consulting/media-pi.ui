@@ -57,8 +57,8 @@ const serviceDescriptors = Object.freeze([
     startHandler: devicesStore.startPlayback,
     stopHandler: devicesStore.stopPlayback,
     successMessages: {
-      start: 'Служба воспроизведения запущена',
-      stop: 'Служба воспроизведения остановлена'
+      start: 'Выполнен запуск службы воспроизведения',
+      stop: 'Выполнена остановка службы воспроизведения'
     }
   },
   {
@@ -74,8 +74,8 @@ const serviceDescriptors = Object.freeze([
     startHandler: devicesStore.startPlaylistUpload,
     stopHandler: devicesStore.stopPlaylistUpload,
     successMessages: {
-      start: 'Служба загрузки плейлистов запущена',
-      stop: 'Служба загрузки плейлистов остановлена'
+      start: 'Выполнен запуск службы загрузки плейлистов',
+      stop: 'Выполнена остановка службы загрузки плейлистов'
     }
   },
   {
@@ -91,8 +91,8 @@ const serviceDescriptors = Object.freeze([
     startHandler: devicesStore.startVideoUpload,
     stopHandler: devicesStore.stopVideoUpload,
     successMessages: {
-      start: 'Служба загрузки видео запущена',
-      stop: 'Служба загрузки видео остановлена'
+      start: 'Выполнен запуск службы загрузки видео',
+      stop: 'Выполнена остановка службы загрузки видео'
     }
   },
   {
@@ -336,7 +336,6 @@ watch(() => props.deviceId, async () => {
   }
 })
 
-// Watch for device coming online to load audio settings
 watch(() => currentStatus.value?.isOnline, async (isOnline, wasOnline) => {
   // Only load audio settings when device comes online (was offline, now online)
   if (isOnline && wasOnline === false && props.deviceId) {
@@ -373,6 +372,39 @@ const isDisabled = computed(() => !currentStatus.value?.isOnline)
 const hasAnyOperationInProgress = computed(() =>
   Object.values(operationInProgress.value).some(Boolean)
 )
+
+// Device information display helpers
+const fmtDate = (value) => {
+  if (!value) return '—'
+  try {
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return String(value)
+    // Force Russian locale and a consistent date/time format
+    return d.toLocaleString('ru-RU', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } catch {
+    return String(value)
+  }
+}
+
+const deviceInfo = computed(() => {
+  const dev = device.value
+  const status = currentStatus.value
+  return {
+    name: dev?.name || '—',
+    ipAddress: dev?.ipAddress || '—',
+    softwareVersion: status?.softwareVersion || '—',
+    isOnline: status?.isOnline ? 'Да' : 'Нет',
+    lastChecked: fmtDate(status?.lastChecked),
+    connectLatencyMs: status?.connectLatencyMs ?? '—'
+  }
+})
 
 const serviceOperationConfigs = serviceDescriptors.reduce((acc, descriptor) => {
   if (descriptor.startOperationKey) {
@@ -445,30 +477,29 @@ const loadConfiguration = async (errorPrefix = 'Не удалось загруз
 }
 
 const persistConfiguration = async ({
-  validateSchedule = false,
   successMessage,
   errorPrefix = 'Не удалось сохранить настройки'
 } = {}) => {
   const formRef = scheduleFormRef.value
-  if (validateSchedule) {
-    const validationResult = formRef ? await formRef.validate() : { valid: true }
+
+  // Always validate when the form is mounted
+  if (formRef) {
+    const validationResult = await formRef.validate()
     if (!validationResult.valid) {
       alertStore.error('Исправьте ошибки в настройках таймеров, чтобы продолжить')
       return false
     }
   }
 
-  const scheduleValues = validateSchedule && formRef?.values
-    ? formRef.values
-    : scheduleFormValues.value
+  // Prefer live form values when form is mounted; fallback to internal values
+  const scheduleValues = formRef?.values ?? scheduleFormValues.value
 
   const payload = buildConfigurationPayload(scheduleValues)
 
   try {
     await devicesStore.updateConfiguration(props.deviceId, payload)
-    if (validateSchedule) {
-      applyScheduleValues(payload.schedule)
-    }
+    // always apply schedule values from saved payload so internal state reflects saved data
+    applyScheduleValues(payload.schedule)
     if (successMessage) {
       alertStore.success(successMessage)
     }
@@ -506,24 +537,12 @@ async function readAllSettings() {
   operationInProgress.value.readAll = true
   try {
     await Promise.all([
+      fetchDeviceStatus(),
       updateServiceStatus(),
       loadConfiguration('Не удалось загрузить настройки конфигурации')
     ])
   } finally {
     operationInProgress.value.readAll = false
-  }
-}
-
-async function saveAllSettings() {
-  operationInProgress.value.saveAll = true
-  try {
-    return await persistConfiguration({
-      validateSchedule: true,
-      errorPrefix: 'Не удалось сохранить настройки',
-      successMessage: 'Все настройки сохранены'
-    })
-  } finally {
-    operationInProgress.value.saveAll = false
   }
 }
 
@@ -567,7 +586,7 @@ const runServiceOperation = async (key, handler, timeout, successMessage) => {
 }
 
 const runSystemOperation = async (key, handler, timeout) => {
-  if (!['apply', 'reboot', 'shutdown'].includes(key)) return
+  if (!['reboot', 'shutdown'].includes(key)) return
   resetSystemOperationTimer(key)
   operationInProgress.value[key] = true
   const success = await runWithDevice(handler)
@@ -588,7 +607,6 @@ const runSystemOperation = async (key, handler, timeout) => {
     
     // Show completion message based on operation type
     const completionMessages = {
-      apply: 'Изменения применены, выполнен перезапуск сервисов',
       reboot: 'Устройство перезагружено',
       shutdown: 'Устройство выключено'
     }
@@ -604,7 +622,38 @@ const resetSystemOperationTimer = (key) => {
 }
 
 const apply = async () => {
-  await runSystemOperation('apply', devicesStore.reloadSystem, timeouts.apply)
+  if (operationInProgress.value.apply) return
+  
+  resetSystemOperationTimer('apply')
+  operationInProgress.value.apply = true
+  
+  try {
+    // Save current form values (with validation)
+    const success = await persistConfiguration({
+      errorPrefix: 'Не удалось сохранить настройки'
+    })
+    
+    if (!success) {
+      operationInProgress.value.apply = false
+      return
+    }
+    
+    // Set timeout for completion message
+    const deviceIdAtStart = props.deviceId
+    systemOperationTimers.value.apply = setTimeout(async () => {
+      if (!componentActive.value || props.deviceId !== deviceIdAtStart) {
+        operationInProgress.value.apply = false
+        return
+      }
+      await fetchDeviceStatus()
+      operationInProgress.value.apply = false
+      systemOperationTimers.value.apply = null
+      alertStore.success('Настройки сохранены, выполнен перезапуск сервисов')
+    }, timeouts.apply)
+  } catch (err) {
+    operationInProgress.value.apply = false
+    alertStore.error('Не удалось сохранить настройки: ' + (err?.message || 'Неизвестная ошибка'))
+  }
 }
 
 const reboot = async () => {
@@ -638,14 +687,14 @@ onBeforeUnmount(() => {
         </span>
       </h1>
        <div class="flex-center">
-        <div v-if="loading" class="header-actions header-actions-group">
+        <div v-if="loading || hasAnyOperationInProgress" class="header-actions header-actions-group">
           <span class="spinner-border"></span>
         </div>
         <div class="header-actions header-actions-group">
           <ActionButton 
             icon="fa-solid fa-xmark" 
             iconSize="2x" 
-            tooltipText="Назад"
+            tooltipText="Выход из настроек устройства"
             :item="{}"
             @click="router.go(-1)"
           />
@@ -654,12 +703,40 @@ onBeforeUnmount(() => {
     </div>
     <hr class="hr" />
 
+    <!-- Device Information Section -->
+    <div class="form-group mt-4 form-group-add">
+      <h2 class="secondary-header">Об устройстве</h2>
+      <div class="device-info-grid">
+        <div class="label service-label">Название</div>
+        <div class="value">{{ deviceInfo.name }}</div>
+
+        <div class="label service-label">IP адрес</div>
+        <div class="value">{{ deviceInfo.ipAddress }}</div>
+
+        <div class="label service-label">Версия агента</div>
+        <div class="value">{{ deviceInfo.softwareVersion }}</div>
+
+        <div class="label service-label">Онлайн</div>
+        <div class="value">
+          <span :class="onlineClass">
+            {{ deviceInfo.isOnline }}
+          </span>
+        </div>
+
+        <div class="label service-label">Последняя проверка</div>
+        <div class="value">{{ deviceInfo.lastChecked }}</div>
+
+        <div class="label service-label">Задержка</div>
+        <div class="value">{{ deviceInfo.connectLatencyMs }}{{ deviceInfo.connectLatencyMs !== '—' ? ' мс' : '' }}</div>
+      </div>
+    </div>
+
     <!-- Service Management Section -->
     <div class="form-group mt-4 form-group-add">
       <h2 class="secondary-header">Управление сервисами</h2>
       <div class="service-grid">
         <template v-for="row in serviceRows" :key="row.key">
-          <div class="service-cell label">{{ row.label }}</div>
+          <div class="service-cell label service-label">{{ row.label }}</div>
           <div
             class="service-cell service-status"
             :class="row.isActive ? 'text-success' : 'text-danger'"
@@ -796,7 +873,7 @@ onBeforeUnmount(() => {
           type="text"
           class="form-control input"
           :disabled="isDisabled || hasAnyOperationInProgress"
-          placeholder="Путь к локальному диску"
+          placeholder="Путь к локальному диске"
         />
         </div>
       </div>
@@ -824,46 +901,41 @@ onBeforeUnmount(() => {
       <h2 class="secondary-header">Управление системой</h2>
       <div class="system-actions">
         <ActionButton
-          icon="fa-solid fa-rotate-right"
+          :icon="operationInProgress.readAll ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
           iconSize="2x"
-          :tooltipText="operationInProgress.readAll ? 'Читается...' : 'Прочитать'"
+          :tooltipText="operationInProgress.readAll ? 'Информация обновляется...' : 'Обновить информацию'"
           :item="{}"
+          :class="{ 'fa-spin': operationInProgress.readAll }"
           data-test="system-read"
-          :disabled="isDisabled || hasAnyOperationInProgress"
+          :disabled="hasAnyOperationInProgress"
           @click="readAllSettings"
         />
         <ActionButton
-          icon="fa-regular fa-save"
+          :icon="operationInProgress.apply ? 'fa-solid fa-spinner' : 'fa-solid fa-download'"
           iconSize="2x"
-          :tooltipText="operationInProgress.saveAll ? 'Сохраняется...' : 'Сохранить'"
+          :tooltipText="operationInProgress.apply ? 'Сохраняются настройки...' : 'Сохранить и применить настройки'"
           :item="{}"
-          data-test="system-save"
-          :disabled="isDisabled || hasAnyOperationInProgress"
-          @click="saveAllSettings"
-        />
-        <ActionButton
-          icon="fa-solid fa-download"
-          iconSize="2x"
-          :tooltipText="operationInProgress.apply ? 'Изменения применяются...' : 'Применить изменения'"
-          :item="{}"
+          :class="{ 'fa-spin': operationInProgress.apply }"
           data-test="system-apply"
           :disabled="isDisabled || hasAnyOperationInProgress"
           @click="apply"
         />
         <ActionButton
-          icon="fa-solid fa-retweet"
+          :icon="operationInProgress.reboot ? 'fa-solid fa-spinner' : 'fa-solid fa-retweet'"
           iconSize="2x"
-          :tooltipText="operationInProgress.reboot ? 'Перезагружается...' : 'Перезагрузить'"
+          :tooltipText="operationInProgress.reboot ? 'Перезагружается...' : 'Перезагрузить устройство'"
           :item="{}"
+          :class="{ 'fa-spin': operationInProgress.reboot }"
           data-test="system-reboot"
           :disabled="isDisabled || hasAnyOperationInProgress"
           @click="reboot"
         />
         <ActionButton
-          icon="fa-solid fa-power-off"
+          :icon="operationInProgress.shutdown ? 'fa-solid fa-spinner' : 'fa-solid fa-power-off'"
           iconSize="2x"
-          :tooltipText="operationInProgress.shutdown ? 'Выключается...' : 'Выключить'"
+          :tooltipText="operationInProgress.shutdown ? 'Выключается...' : 'Выключить устройство'"
           :item="{}"
+          :class="{ 'fa-spin': operationInProgress.shutdown }"
           data-test="system-shutdown"
           :disabled="isDisabled || hasAnyOperationInProgress"
           @click="shutdown"
@@ -884,6 +956,10 @@ onBeforeUnmount(() => {
 .form-compact {
   overflow-x: auto;
   max-width: 1200px;  
+}
+
+.header-with-actions {
+  margin-right: 0.5rem;
 }
 
 .secondary-header {
@@ -908,17 +984,27 @@ onBeforeUnmount(() => {
   width: 1200px;
 }
 
-.service-grid {
+.device-info-grid {
   display: grid;
-  grid-template-columns: 160px 1fr auto;
+  grid-template-columns: 200px 1fr;
   gap: 0.5rem 1rem;
   align-items: center;
   padding: 1rem 0;
 }
 
+.service-grid {
+  display: grid;
+  grid-template-columns:200px 1fr auto;
+  gap: 0.7rem;
+}
+
 .service-cell {
   display: flex;
   align-items: center;
+}
+
+.service-label {
+  width:  140px;
 }
 
 .service-action {
