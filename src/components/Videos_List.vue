@@ -219,10 +219,10 @@ function filterVideos(value, query, item) {
         item-value="id"
         class="elevation-1"
       >
-        <template #item.accountDisplay="{ item }">
+        <template v-slot:[`item.accountDisplay`]="{ item }">
           {{ item.accountDisplay || '—' }}
         </template>
-        <template #item.actions="{ item }">
+        <template v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">
             <ActionButton
               data-test="edit-video-button"

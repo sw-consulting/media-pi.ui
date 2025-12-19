@@ -3,6 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref, nextTick } from 'vue'
 import VideosList from '@/components/Videos_List.vue'
 
+/* global File */
+
 let currentUser
 
 const makeAuthStore = () => ({ user: currentUser })
