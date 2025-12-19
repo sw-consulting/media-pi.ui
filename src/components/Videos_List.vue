@@ -132,7 +132,7 @@ function onFileChange(event) {
 }
 
 function editVideo(item) {
-  console.warn('Видео редактирование пока не реализовано', item)
+  console.warn('Редактирование видео пока не реализовано', item)
   alertStore.error('Редактирование видео пока не поддерживается')
 }
 
