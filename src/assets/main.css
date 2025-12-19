@@ -1236,3 +1236,9 @@ a,
   padding-left: 8px;
   border-left: 1px solid #d0d7de;
 }
+
+.header-actions-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

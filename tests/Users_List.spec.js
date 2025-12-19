@@ -205,7 +205,7 @@ describe('Users_List.vue', () => {
   it('navigates to edit user page when userSettings is invoked', async () => {
     const wrapper = mountComponent()
     await wrapper.vm.userSettings({ id: 1 })
-    expect(router.push).toHaveBeenCalledWith('user/edit/1')
+    expect(router.push).toHaveBeenCalledWith('/user/edit/1')
   })
 
   // New tests
