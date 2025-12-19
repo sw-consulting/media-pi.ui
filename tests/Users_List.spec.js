@@ -12,10 +12,12 @@ import { resolveAll } from './helpers/test-utils'
 const mockUsers = ref([
   { id: 1, firstName: 'John', lastName: 'Doe', patronymic: '', email: 'john@example.com', roles: ['administrator'] }
 ])
+const mockLoading = ref(false)
+const mockError = ref(null)
 
 // Centralized mock functions
 const getAll = vi.hoisted(() => vi.fn())
-const deleteUserFn = vi.hoisted(() => vi.fn())
+const deleteUserFn = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const errorFn = vi.hoisted(() => vi.fn())
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const ensureLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()))
@@ -28,13 +30,15 @@ vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
   return {
     ...actual,
-    storeToRefs: () => ({ users: mockUsers })
+    storeToRefs: () => ({ users: mockUsers, loading: mockLoading, error: mockError })
   }
 })
 
 vi.mock('@/stores/users.store.js', () => ({
   useUsersStore: () => ({
     users: mockUsers,
+    loading: mockLoading,
+    error: mockError,
     getAll,
     delete: deleteUserFn
   })
@@ -91,13 +95,51 @@ vi.mock('@/router', () => ({
   default: router
 }), { virtual: true })
 
+const actionButtonStub = {
+  name: 'ActionButton',
+  props: ['item', 'icon', 'tooltipText', 'iconSize', 'disabled'],
+  emits: ['click'],
+  template: '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
+}
+
+const baseMountOptions = {
+  global: {
+    stubs: {
+      'v-card': true,
+      'v-data-table': true,
+      'v-text-field': true,
+      'font-awesome-icon': true,
+      'router-link': true,
+      ActionButton: actionButtonStub
+    }
+  }
+}
+
+function mountComponent(overrides = {}) {
+  return mount(UsersList, {
+    ...baseMountOptions,
+    ...overrides,
+    global: {
+      ...baseMountOptions.global,
+      ...overrides.global,
+      stubs: {
+        ...baseMountOptions.global.stubs,
+        ...(overrides.global?.stubs || {})
+      }
+    }
+  })
+}
+
 describe('Users_List.vue', () => {
   beforeEach(() => {
     // Clear mocks before each test
     vi.clearAllMocks()
-    
+
     // Reset default mock behavior
     confirmMock.mockResolvedValue(true)
+    deleteUserFn.mockResolvedValue()
+    mockLoading.value = false
+    mockError.value = null
   })
   
   afterEach(() => {
@@ -106,17 +148,7 @@ describe('Users_List.vue', () => {
   })
 
   it('calls getAll on mount', async () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     // Wait for all async operations to complete
     await flushPromises()
@@ -127,33 +159,14 @@ describe('Users_List.vue', () => {
 
   it('handles empty users array', async () => {
     mockUsers.value = []
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     expect(wrapper.exists()).toBe(true)
     // Reset mock data for other tests
     mockUsers.value = [{ id: 1, firstName: 'John', lastName: 'Doe', patronymic: '', email: 'john@example.com', roles: ['administrator'] }]
   })
 
   it('handles search input', async () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     const searchInput = wrapper.findComponent({ name: 'v-text-field' }) || wrapper.find('input[type="text"]')
     if (searchInput.exists()) {
       await searchInput.setValue('John')
@@ -161,150 +174,78 @@ describe('Users_List.vue', () => {
     }
   })
 
-  it('calls delete function when delete button is clicked', async () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': {
-            template: '<div><slot name="item.actions" :item="{ id: 1 }"></slot></div>'
-          },
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
-    
-    const deleteButton = wrapper.find('button.delete-user')
-    if (deleteButton.exists()) {
-      await deleteButton.trigger('click')
-      expect(deleteUserFn).toHaveBeenCalledWith(1)
-    }
+  it('calls delete function when delete action is confirmed', async () => {
+    const wrapper = mountComponent()
+    const user = { id: 1, firstName: 'John', lastName: 'Doe' }
+
+    await wrapper.vm.deleteUser(user)
+
+    expect(deleteUserFn).toHaveBeenCalledWith(1)
   })
 
-  it('navigates to add user page when add button is clicked', async () => {    
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
-    
-    const addButton = wrapper.find('button.add-user')
-    if (addButton.exists()) {
-      await addButton.trigger('click')
-      expect(router.push).toHaveBeenCalledWith('/users/add')
-    }
+  it('navigates to add user page when add button is clicked', async () => {
+    const wrapper = mountComponent()
+
+    const addButton = wrapper.find('[data-test="register-user-button"]')
+    expect(addButton.exists()).toBe(true)
+    await addButton.trigger('click')
+    expect(router.push).toHaveBeenCalledWith('/register')
   })
 
-  it('navigates to edit user page when edit button is clicked', async () => {    
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': {
-            template: '<div><slot name="item.actions" :item="{ id: 1 }"></slot></div>'
-          },
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
-    
-    const editButton = wrapper.find('button.edit-user')
-    if (editButton.exists()) {
-      await editButton.trigger('click')
-      expect(router.push).toHaveBeenCalledWith('/users/edit/1')
-    }
+  it('shows loader and disables action button when loading', async () => {
+    mockLoading.value = true
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.find('.spinner-border').exists()).toBe(true)
+    const addButton = wrapper.find('[data-test="register-user-button"]')
+    expect(addButton.attributes('disabled')).toBeDefined()
+  })
+
+  it('navigates to edit user page when userSettings is invoked', async () => {
+    const wrapper = mountComponent()
+    await wrapper.vm.userSettings({ id: 1 })
+    expect(router.push).toHaveBeenCalledWith('/user/edit/1')
   })
 
   // New tests
   it('displays error when API call fails', async () => {
     // Reset mocks
     getAll.mockReset()
-    
-    // Create a mock implementation that sets the error in users.value
+
+    // Create a mock implementation that sets the error
     getAll.mockImplementation(async () => {
-      mockUsers.value = { error: 'Failed to fetch users' }
+      mockError.value = 'Failed to fetch users'
+      throw new Error('Failed to fetch users')
     })
-    
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
-    
-    // Wait for the promise to be handled
-    await vi.waitFor(() => {
-      expect(getAll).toHaveBeenCalled()
-      expect(mockUsers.value).toHaveProperty('error')
-      expect(wrapper.html()).toContain('Ошибка при загрузке списка пользователей')
-    }, { timeout: 2000 })
+
+    const wrapper = mountComponent()
+
+    await flushPromises()
+
+    expect(getAll).toHaveBeenCalled()
+    expect(wrapper.html()).toContain('Ошибка при загрузке списка пользователей: Failed to fetch users')
+    expect(errorFn).toHaveBeenCalled()
   })
 
   it('shows confirmation dialog before deleting a user', async () => {
     // Configure the confirm mock to return true for this test
     confirmMock.mockResolvedValue(true)
-    
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': {
-            template: '<div><slot name="item.actions" :item="{ id: 1 }"></slot></div>'
-          },
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
-    
-    const deleteButton = wrapper.find('button.delete-user')
-    if (deleteButton.exists()) {
-      await deleteButton.trigger('click')
-      expect(confirmMock).toHaveBeenCalled()
-      expect(deleteUserFn).toHaveBeenCalledWith(1)
-    }
+
+    const wrapper = mountComponent()
+    await wrapper.vm.deleteUser({ id: 1, firstName: 'John', lastName: 'Doe' })
+    expect(confirmMock).toHaveBeenCalled()
+    expect(deleteUserFn).toHaveBeenCalledWith(1)
   })
 
   it('does not delete user when confirmation is declined', async () => {
     // Configure the confirm mock to return false for this test
     confirmMock.mockResolvedValue(false)
-    
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': {
-            template: '<div><slot name="item.actions" :item="{ id: 1 }"></slot></div>'
-          },
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
-    
-    const deleteButton = wrapper.find('button.delete-user')
-    if (deleteButton.exists()) {
-      await deleteButton.trigger('click')
-      expect(confirmMock).toHaveBeenCalled()
-      expect(deleteUserFn).not.toHaveBeenCalled()
-    }
+
+    const wrapper = mountComponent()
+    await wrapper.vm.deleteUser({ id: 1, firstName: 'John', lastName: 'Doe' })
+    expect(confirmMock).toHaveBeenCalled()
+    expect(deleteUserFn).not.toHaveBeenCalled()
   })
 
   // Error handling test
@@ -320,17 +261,7 @@ describe('Users_List.vue', () => {
     const mockItem = { id: 1, firstName: 'John', lastName: 'Doe' }
     
     // Call the deleteUser method directly instead of trying to find and click a button
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     // Access the component instance and call the deleteUser method directly
     wrapper.vm.deleteUser(mockItem)
@@ -349,34 +280,14 @@ describe('Users_List.vue', () => {
   })
 
   it('calls ensureLoaded from roles store on component mount', async () => {
-    mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    mountComponent()
     await resolveAll()
     expect(ensureLoaded).toHaveBeenCalled()
   })
 
   // Test filterUsers function
   it('filters users by name fields', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const filterUsers = wrapper.vm.filterUsers || wrapper.vm.$options.methods?.filterUsers
     if (filterUsers) {
@@ -400,17 +311,7 @@ describe('Users_List.vue', () => {
   })
 
   it('filters users by role name', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const filterUsers = wrapper.vm.filterUsers || wrapper.vm.$options.methods?.filterUsers
     if (filterUsers) {
@@ -430,17 +331,7 @@ describe('Users_List.vue', () => {
   })
 
   it('filters users by managed account names', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const filterUsers = wrapper.vm.filterUsers || wrapper.vm.$options.methods?.filterUsers
     if (filterUsers) {
@@ -460,17 +351,7 @@ describe('Users_List.vue', () => {
   })
 
   it('returns false for filterUsers with null parameters', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const filterUsers = wrapper.vm.filterUsers || wrapper.vm.$options.methods?.filterUsers
     if (filterUsers) {
@@ -482,17 +363,7 @@ describe('Users_List.vue', () => {
 
   // Test getManagedAccountNames function
   it('returns empty array for non-manager users', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const getManagedAccountNames = wrapper.vm.getManagedAccountNames || wrapper.vm.$options.methods?.getManagedAccountNames
     if (getManagedAccountNames) {
@@ -502,17 +373,7 @@ describe('Users_List.vue', () => {
   })
 
   it('returns empty array for users without accountIds', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const getManagedAccountNames = wrapper.vm.getManagedAccountNames || wrapper.vm.$options.methods?.getManagedAccountNames
     if (getManagedAccountNames) {
@@ -525,17 +386,7 @@ describe('Users_List.vue', () => {
   })
 
   it('returns account names for manager users', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const getManagedAccountNames = wrapper.vm.getManagedAccountNames || wrapper.vm.$options.methods?.getManagedAccountNames
     if (getManagedAccountNames) {
@@ -547,17 +398,7 @@ describe('Users_List.vue', () => {
 
   // Test getCredentialsDisplay function
   it('displays role name only for non-manager users', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const getCredentialsDisplay = wrapper.vm.getCredentialsDisplay || wrapper.vm.$options.methods?.getCredentialsDisplay
     if (getCredentialsDisplay) {
@@ -567,17 +408,7 @@ describe('Users_List.vue', () => {
   })
 
   it('displays role name and account names for manager users', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const getCredentialsDisplay = wrapper.vm.getCredentialsDisplay || wrapper.vm.$options.methods?.getCredentialsDisplay
     if (getCredentialsDisplay) {
@@ -588,17 +419,7 @@ describe('Users_List.vue', () => {
 
   // Test getCredentialsSortValue function
   it('returns role name for sort value for non-manager users', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const getCredentialsSortValue = wrapper.vm.getCredentialsSortValue || wrapper.vm.$options.methods?.getCredentialsSortValue
     if (getCredentialsSortValue) {
@@ -608,17 +429,7 @@ describe('Users_List.vue', () => {
   })
 
   it('returns role name and sorted account names for manager users', () => {
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+    const wrapper = mountComponent()
     
     const getCredentialsSortValue = wrapper.vm.getCredentialsSortValue || wrapper.vm.$options.methods?.getCredentialsSortValue
     if (getCredentialsSortValue) {
@@ -630,18 +441,8 @@ describe('Users_List.vue', () => {
   it('returns empty array when users is null', async () => {
     const originalValue = mockUsers.value
     mockUsers.value = []
-    
-    const wrapper = mount(UsersList, {
-      global: {
-        stubs: {
-          'v-card': true,
-          'v-data-table': true,
-          'v-text-field': true,
-          'font-awesome-icon': true,
-          'router-link': true
-        }
-      }
-    })
+
+    const wrapper = mountComponent()
     
     await flushPromises()
     

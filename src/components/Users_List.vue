@@ -23,7 +23,7 @@ import { useAccountsStore } from '@/stores/accounts.store.js'
 const accountsStore = useAccountsStore()
 
 const usersStore = useUsersStore()
-const { users } = storeToRefs(usersStore)
+const { users, loading, error } = storeToRefs(usersStore)
 
 const enhancedUsers = computed(() => {
   if (!users.value || !Array.isArray(users.value)) return []
@@ -56,7 +56,11 @@ const { confirmDelete } = useConfirmation()
 
 function userSettings(item) {
   const id = item.id
-  router.push('user/edit/' + id)
+  router.push('/user/edit/' + id)
+}
+
+function goToRegister() {
+  router.push('/register')
 }
 
 function filterUsers(value, query, item) {
@@ -156,18 +160,26 @@ const headers = [
 
 <template>
   <div class="settings table-2">
-    <h1 class="primary-heading">Пользователи</h1>
-    <hr class="hr" />
-
-    <div class="link-crt">
-      <router-link to="/register" class="link"
-        ><font-awesome-icon
-          size="1x"
-          icon="fa-solid fa-user-plus"
-          class="link"
-        />&nbsp;&nbsp;&nbsp;Зарегистрировать пользователя
-      </router-link>
+    <div class="header-with-actions">
+      <h1 class="primary-heading">Пользователи</h1>
+      <div class="header-actions-container">
+        <div v-if="loading" class="header-actions header-actions-group">
+          <span class="spinner-border spinner-border-m"></span>
+        </div>
+        <div class="header-actions header-actions-group">
+          <ActionButton
+            data-test="register-user-button"
+            :item="null"
+            icon="fa-solid fa-user-plus"
+            tooltip-text="Зарегистрировать пользователя"
+            icon-size="2x"
+            :disabled="loading"
+            @click="goToRegister"
+          />
+        </div>
+      </div>
     </div>
+    <hr class="hr" />
 
     <v-card>
       <v-data-table
@@ -195,8 +207,20 @@ const headers = [
 
         <template v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">
-            <ActionButton :item="item" icon="fa-solid fa-pen" tooltip-text="Редактировать информацию о пользователе" @click="userSettings" />
-            <ActionButton :item="item" icon="fa-solid fa-trash-can" tooltip-text="Удалить информацию о пользователе" @click="deleteUser" />
+            <ActionButton
+              data-test="edit-user-button"
+              :item="item"
+              icon="fa-solid fa-pen"
+              tooltip-text="Редактировать информацию о пользователе"
+              @click="userSettings"
+            />
+            <ActionButton
+              data-test="delete-user-button"
+              :item="item"
+              icon="fa-solid fa-trash-can"
+              tooltip-text="Удалить информацию о пользователе"
+              @click="deleteUser"
+            />
           </div>
         </template>
       </v-data-table>
@@ -211,11 +235,11 @@ const headers = [
         />
       </div>
     </v-card>
-    <div v-if="users?.loading" class="text-center m-5">
+    <div v-if="loading" class="text-center m-5">
       <span class="spinner-border spinner-border-lg align-center"></span>
     </div>
-    <div v-if="users?.error" class="text-center m-5">
-      <div class="text-danger">Ошибка при загрузке списка пользователей: {{ users.error }}</div>
+    <div v-if="error" class="text-center m-5">
+      <div class="text-danger">Ошибка при загрузке списка пользователей: {{ error }}</div>
     </div>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>

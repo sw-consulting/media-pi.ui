@@ -49,9 +49,9 @@ export default defineConfig({
         secure: false,
         timeout: 300000, // 5 minutes for large uploads
         proxyTimeout: 300000,
-        configure: (proxy, options) => {
+        configure: (proxy) => {
           // Increase Node.js request limits for large files
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
             proxyReq.setHeader('content-length', req.headers['content-length'])
             if (req.headers['content-type']?.includes('multipart/form-data')) {
               proxyReq.setTimeout(300000) // 5 minute timeout for file uploads
