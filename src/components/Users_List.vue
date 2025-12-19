@@ -56,7 +56,7 @@ const { confirmDelete } = useConfirmation()
 
 function userSettings(item) {
   const id = item.id
-  router.push('user/edit/' + id)
+  router.push('/user/edit/' + id)
 }
 
 function goToRegister() {
