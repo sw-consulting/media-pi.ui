@@ -204,7 +204,7 @@ function filterVideos(value, query, item) {
     <hr class="hr" />
 
     <v-card>
-        <v-data-table
+      <v-data-table
         v-if="enhancedVideos?.length"
         v-model:items-per-page="itemsPerPage"
         items-per-page-text="Видео на странице"
