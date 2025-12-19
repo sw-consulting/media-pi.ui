@@ -169,7 +169,7 @@ const headers = [
         <div class="header-actions header-actions-group">
           <ActionButton
             data-test="register-user-button"
-            :item="{}"
+            :item="null"
             icon="fa-solid fa-user-plus"
             tooltip-text="Зарегистрировать пользователя"
             icon-size="2x"
