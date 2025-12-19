@@ -158,15 +158,15 @@ async function deleteVideo(item) {
 
 function filterVideos(value, query, item) {
   if (!query) return true
-  const v = item?.raw
-  if (!v) return false
+  const rawVideo = item?.raw
+  if (!rawVideo) return false
   const q = query.toLocaleLowerCase()
   return [
-    v.title,
-    v.originalFilename,
-    v.fileSize,
-    v.duration,
-    v.accountDisplay
+    rawVideo.title,
+    rawVideo.originalFilename,
+    rawVideo.fileSize,
+    rawVideo.duration,
+    rawVideo.accountDisplay
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
 }
 </script>
