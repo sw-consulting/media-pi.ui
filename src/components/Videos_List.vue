@@ -1,0 +1,271 @@
+// Copyright (c) 2025 sw.consulting
+// This file is a part of Media Pi  frontend application
+
+<script setup>
+import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { mdiMagnify } from '@mdi/js'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
+
+import { useVideosStore } from '@/stores/videos.store.js'
+import { useAccountsStore } from '@/stores/accounts.store.js'
+import { useAuthStore } from '@/stores/auth.store.js'
+import { useAlertStore } from '@/stores/alert.store.js'
+import { useConfirmation } from '@/helpers/confirmation.js'
+import { buildAccountOptions, getAccountDisplayName, useAccessibleAccounts } from '@/helpers/accounts.access.js'
+import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
+import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
+
+const videosStore = useVideosStore()
+const accountsStore = useAccountsStore()
+const authStore = useAuthStore()
+const alertStore = useAlertStore()
+const { confirmDelete } = useConfirmation()
+
+const { videos, loading, error } = storeToRefs(videosStore)
+const { loading: accountsLoading, error: accountsError } = storeToRefs(accountsStore)
+const { alert } = storeToRefs(alertStore)
+
+const accessibleAccounts = useAccessibleAccounts(authStore, accountsStore)
+const selectedAccountId = ref(null)
+const search = ref('')
+const fileInput = ref(null)
+const itemsPerPage = ref(10)
+const sortBy = ref([])
+const page = ref(1)
+
+const accountMap = computed(() => {
+  const map = new Map()
+  if (Array.isArray(accessibleAccounts.value)) {
+    accessibleAccounts.value.forEach(account => {
+      map.set(account.id, account)
+    })
+  }
+  return map
+})
+
+const accountOptions = computed(() => buildAccountOptions(accessibleAccounts.value))
+
+const headers = [
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
+  { title: 'Название', align: 'start', key: 'title' },
+  { title: 'Исходное имя файла', align: 'start', key: 'originalFilename' },
+  { title: 'Размер', align: 'start', key: 'fileSize' },
+  { title: 'Длительность', align: 'start', key: 'duration' },
+  { title: 'Лицевой счёт', align: 'start', key: 'accountDisplay' }
+]
+
+const enhancedVideos = computed(() => {
+  if (!videos.value || !Array.isArray(videos.value)) return []
+  return videos.value.map(video => ({
+    ...video,
+    accountDisplay: video.accountId === null
+      ? 'Общие'
+      : getAccountDisplayName(accountMap.value.get(video.accountId))
+  }))
+})
+
+const canManageSelectedAccount = computed(() => {
+  if (selectedAccountId.value === null) {
+    return isAdministrator(authStore.user)
+  }
+  return canManageAccountById(authStore.user, selectedAccountId.value)
+})
+
+const isBusy = computed(() => loading.value || accountsLoading.value)
+
+function ensureSelection(options) {
+  const availableValues = options.map(option => option.value)
+  if (!availableValues.includes(selectedAccountId.value)) {
+    selectedAccountId.value = availableValues.length ? availableValues[0] : null
+  }
+}
+
+const refreshVideos = async () => {
+  try {
+    await videosStore.getAllByAccount(selectedAccountId.value)
+  } catch (err) {
+    alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+  }
+}
+
+watch(accountOptions, (options) => ensureSelection(options), { immediate: true, deep: true })
+
+watch(selectedAccountId, async () => {
+  if (selectedAccountId.value === undefined) return
+  await refreshVideos()
+})
+
+onMounted(async () => {
+  try {
+    await accountsStore.getAll()
+    ensureSelection(accountOptions.value)
+    await refreshVideos()
+  } catch (err) {
+    alertStore.error('Не удалось загрузить лицевые счета: ' + (err?.message || err))
+  }
+})
+
+function triggerUpload() {
+  if (!fileInput.value) return
+  fileInput.value.value = null
+  fileInput.value.click()
+}
+
+async function uploadVideo(file) {
+  if (!file) return
+  if (!canManageSelectedAccount.value) {
+    alertStore.error('Недостаточно прав для загрузки видео в выбранный раздел')
+    return
+  }
+  try {
+    await videosStore.uploadFile(file, selectedAccountId.value, file.name)
+    await refreshVideos()
+  } catch (err) {
+    alertStore.error('Не удалось загрузить видео: ' + (err?.message || err))
+  }
+}
+
+function onFileChange(event) {
+  const file = event?.target?.files?.[0]
+  uploadVideo(file)
+}
+
+function editVideo(item) {
+  console.warn('Видео редактирование пока не реализовано', item)
+  alertStore.error('Редактирование видео пока не поддерживается')
+}
+
+function canManageVideo(item) {
+  if (!item) return false
+  if (item.accountId === null) {
+    return isAdministrator(authStore.user)
+  }
+  return canManageAccountById(authStore.user, item.accountId)
+}
+
+async function deleteVideo(item) {
+  if (!canManageVideo(item)) return
+  const confirmed = await confirmDelete(item.title || item.originalFilename || 'видео', 'видео')
+  if (!confirmed) return
+  try {
+    await videosStore.remove(item.id)
+    await refreshVideos()
+  } catch (err) {
+    alertStore.error('Не удалось удалить видео: ' + (err?.message || err))
+  }
+}
+
+function filterVideos(value, query, item) {
+  if (!query) return true
+  const v = item?.raw
+  if (!v) return false
+  const q = query.toLocaleLowerCase()
+  return [
+    v.title,
+    v.originalFilename,
+    v.fileSize,
+    v.duration,
+    v.accountDisplay
+  ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
+}
+</script>
+
+<template>
+  <div class="settings table-2">
+    <div class="header-with-actions">
+      <h1 class="primary-heading">Видеофайлы</h1>
+      <div class="header-actions-container">
+        <div class="header-actions header-actions-group">
+          <v-select
+            v-model="selectedAccountId"
+            :items="accountOptions"
+            label="Лицевой счёт"
+            item-title="title"
+            item-value="value"
+            density="compact"
+            variant="outlined"
+            hide-details
+            :disabled="isBusy"
+          />
+        </div>
+        <div class="header-actions header-actions-group">
+          <ActionButton
+            data-test="upload-video-button"
+            icon="fa-solid fa-cloud-arrow-up"
+            tooltip-text="Загрузить видеофайл"
+            :disabled="!canManageSelectedAccount || isBusy"
+            @click="triggerUpload"
+          />
+          <input ref="fileInput" class="d-none" type="file" accept="video/*" @change="onFileChange" />
+        </div>
+      </div>
+    </div>
+    <hr class="hr" />
+
+    <v-card>
+        <v-data-table
+        v-if="enhancedVideos?.length"
+        v-model:items-per-page="itemsPerPage"
+        items-per-page-text="Видео на странице"
+        :items-per-page-options="itemsPerPageOptions"
+        page-text="{0}-{1} из {2}"
+        v-model:page="page"
+        :headers="headers"
+        :items="enhancedVideos"
+        :search="search"
+        v-model:sort-by="sortBy"
+        :custom-filter="filterVideos"
+        item-value="id"
+        class="elevation-1"
+      >
+        <template #item.accountDisplay="{ item }">
+          {{ item.accountDisplay || '—' }}
+        </template>
+        <template #item.actions="{ item }">
+          <div class="actions-container">
+            <ActionButton
+              data-test="edit-video-button"
+              :item="item"
+              icon="fa-solid fa-pen"
+              tooltip-text="Редактировать видео"
+              :disabled="!canManageVideo(item)"
+              @click="editVideo(item)"
+            />
+            <ActionButton
+              data-test="delete-video-button"
+              :item="item"
+              icon="fa-solid fa-trash-can"
+              tooltip-text="Удалить видео"
+              :disabled="!canManageVideo(item)"
+              @click="deleteVideo(item)"
+            />
+          </div>
+        </template>
+      </v-data-table>
+      <div v-else class="text-center m-5">
+        {{ isBusy ? 'Загрузка...' : 'Список видео пуст' }}
+      </div>
+      <div v-if="enhancedVideos?.length">
+        <v-text-field
+          v-model="search"
+          :append-inner-icon="mdiMagnify"
+          label="Поиск по видео"
+          variant="solo"
+          hide-details
+        />
+      </div>
+    </v-card>
+
+    <div v-if="loading" class="text-center m-5">
+      <span class="spinner-border spinner-border-lg align-center"></span>
+    </div>
+    <div v-if="error || accountsError" class="text-center m-5">
+      <div class="text-danger">Ошибка при загрузке списка видео: {{ error || accountsError }}</div>
+    </div>
+    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
+      {{ alert.message }}
+    </div>
+  </div>
+</template>
