@@ -190,6 +190,7 @@ function filterVideos(value, query, item) {
         <div class="header-actions header-actions-group">
           <ActionButton
             data-test="upload-video-button"
+            :item="{}"
             icon="fa-solid fa-cloud-arrow-up"
             tooltip-text="Загрузить видеофайл"
             :disabled="!canManageSelectedAccount || isBusy"

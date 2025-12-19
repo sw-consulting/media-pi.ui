@@ -5,9 +5,13 @@ import { computed } from 'vue'
 import { isAdministrator } from '@/helpers/user.helpers.js'
 
 export function useAccessibleAccounts(authStore, accountsStore) {
-  return computed(() => {
+  return computed(async () => {
+    await accountsStore.getAll()
     const currentUser = authStore?.user
-    const allAccounts = accountsStore?.accounts?.value || []
+    const allAccounts = accountsStore.accounts || []
+
+    console.log('All accounts:', accountsStore.accounts)
+    console.log('Current user:', currentUser)
 
     if (!currentUser) {
       return []
@@ -46,7 +50,7 @@ export function buildAccountOptions(accessibleAccounts, includeCommon = true) {
   const options = []
 
   if (includeCommon) {
-    options.push({ title: 'Общие', value: null })
+    options.push({ title: 'Общие', value: 6 })
   }
 
   if (Array.isArray(accessibleAccounts)) {

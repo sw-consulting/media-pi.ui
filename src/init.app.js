@@ -43,7 +43,8 @@ import {
   faRetweet,
   faSpinner,
   faBookSkull,
-  faStop
+  faStop,
+  faCloudArrowUp
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -90,7 +91,8 @@ library.add(
   faSave,
   faSpinner,
   faBookSkull,
-  faStop
+  faStop,
+  faCloudArrowUp
 )
 
 import 'vuetify/styles'
