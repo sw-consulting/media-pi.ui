@@ -37,6 +37,30 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  server: {
+    // Support large file uploads (2GB) in development
+    host: true,
+    cors: true,
+    proxy: {
+      // Proxy API requests to backend with large file support
+      '/api': {
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        timeout: 300000, // 5 minutes for large uploads
+        proxyTimeout: 300000,
+        configure: (proxy, options) => {
+          // Increase Node.js request limits for large files
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            proxyReq.setHeader('content-length', req.headers['content-length'])
+            if (req.headers['content-type']?.includes('multipart/form-data')) {
+              proxyReq.setTimeout(300000) // 5 minute timeout for file uploads
+            }
+          })
+        }
+      }
+    }
+  },
   build: {
     rollupOptions: {
       output: {

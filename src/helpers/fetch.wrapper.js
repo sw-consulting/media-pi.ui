@@ -173,6 +173,7 @@ function requestFile(method) {
           }
           response = await fetch(url, requestOptions);
         } catch (error) {
+          console.log(error);
             // Handle network errors with user-friendly messages
             if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
                 throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
