@@ -31,6 +31,12 @@ describe('accounts.access helper', () => {
     expect(accessibleAccounts.value.map(a => a.id)).toEqual([2])
   })
 
+  it('returns only accessible accounts for non-admin/non-manager users with accountIds', () => {
+    const { authStore, accountsStore } = makeStores({ roles: [], accountIds: [1, 2] }, sampleAccounts)
+    const accessibleAccounts = useAccessibleAccounts(authStore, accountsStore)
+    expect(accessibleAccounts.value.map(a => a.id)).toEqual([1, 2])
+  })
+
   it('returns all accounts for administrator', () => {
     const { authStore, accountsStore } = makeStores({ roles: [1] }, sampleAccounts)
     const accessibleAccounts = useAccessibleAccounts(authStore, accountsStore)
