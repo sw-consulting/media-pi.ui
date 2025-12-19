@@ -89,18 +89,16 @@ const refreshVideos = async () => {
   }
 }
 
-watch(accountOptions, (options) => ensureSelection(options), { immediate: true, deep: true })
+watch(accountOptions, (options) => ensureSelection(options), { immediate: true })
 
 watch(selectedAccountId, async () => {
   if (selectedAccountId.value === undefined) return
   await refreshVideos()
-})
+}, { immediate: true })
 
 onMounted(async () => {
   try {
     await accountsStore.getAll()
-    ensureSelection(accountOptions.value)
-    await refreshVideos()
   } catch (err) {
     alertStore.error('Не удалось загрузить лицевые счета: ' + (err?.message || err))
   }
@@ -115,14 +113,14 @@ function triggerUpload() {
 async function uploadVideo(file) {
   if (!file) return
   if (!canManageSelectedAccount.value) {
-    alertStore.error('Недостаточно прав для загрузки видео в выбранный раздел')
+    alertStore.error('Недостаточно прав для загрузки видеофайлов в выбранный раздел')
     return
   }
   try {
     await videosStore.uploadFile(file, selectedAccountId.value, file.name)
     await refreshVideos()
   } catch (err) {
-    alertStore.error('Не удалось загрузить видео: ' + (err?.message || err))
+    alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
   }
 }
 
@@ -133,7 +131,7 @@ function onFileChange(event) {
 
 function editVideo(item) {
   console.warn('Редактирование видео пока не реализовано', item)
-  alertStore.error('Редактирование видео пока не поддерживается')
+  alertStore.error('Редактирование видеофайлов пока не поддерживается')
 }
 
 function canManageVideo(item) {
@@ -146,13 +144,13 @@ function canManageVideo(item) {
 
 async function deleteVideo(item) {
   if (!canManageVideo(item)) return
-  const confirmed = await confirmDelete(item.title || item.originalFilename || 'видео', 'видео')
+  const confirmed = await confirmDelete(item.title || item.originalFilename || 'видеофайлы', 'видеофайлы')
   if (!confirmed) return
   try {
     await videosStore.remove(item.id)
     await refreshVideos()
   } catch (err) {
-    alertStore.error('Не удалось удалить видео: ' + (err?.message || err))
+    alertStore.error('Не удалось удалить видеофайлы: ' + (err?.message || err))
   }
 }
 
@@ -204,6 +202,14 @@ function filterVideos(value, query, item) {
     <hr class="hr" />
 
     <v-card>
+      <v-text-field
+        v-if="enhancedVideos?.length"
+        v-model="search"
+        :append-inner-icon="mdiMagnify"
+        label="Поиск по видео"
+        variant="solo"
+        hide-details
+      />
       <v-data-table
         v-if="enhancedVideos?.length"
         v-model:items-per-page="itemsPerPage"
@@ -246,20 +252,7 @@ function filterVideos(value, query, item) {
       <div v-else class="text-center m-5">
         {{ isBusy ? 'Загрузка...' : 'Список видео пуст' }}
       </div>
-      <div v-if="enhancedVideos?.length">
-        <v-text-field
-          v-model="search"
-          :append-inner-icon="mdiMagnify"
-          label="Поиск по видео"
-          variant="solo"
-          hide-details
-        />
-      </div>
     </v-card>
-
-    <div v-if="loading" class="text-center m-5">
-      <span class="spinner-border spinner-border-lg align-center"></span>
-    </div>
     <div v-if="error || accountsError" class="text-center m-5">
       <div class="text-danger">Ошибка при загрузке списка видео: {{ error || accountsError }}</div>
     </div>

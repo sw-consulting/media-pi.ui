@@ -2,7 +2,7 @@
 // This file is a part of Media Pi  frontend application
 
 import { computed } from 'vue'
-import { isAdministrator, isManager } from '@/helpers/user.helpers.js'
+import { isAdministrator } from '@/helpers/user.helpers.js'
 
 export function useAccessibleAccounts(authStore, accountsStore) {
   return computed(() => {
@@ -20,10 +20,6 @@ export function useAccessibleAccounts(authStore, accountsStore) {
     const managedAccountIds = Array.isArray(currentUser.accountIds)
       ? currentUser.accountIds
       : []
-
-    if (isManager(currentUser)) {
-      return allAccounts.filter(account => managedAccountIds.includes(account.id))
-    }
 
     if (managedAccountIds.length > 0) {
       return allAccounts.filter(account => managedAccountIds.includes(account.id))

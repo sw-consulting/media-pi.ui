@@ -98,6 +98,15 @@ describe('Videos_List.vue', () => {
     expect(videosStore.uploadFile).not.toHaveBeenCalled()
   })
 
+  it('uploads file when user has permissions', async () => {
+    currentUser = { roles: [1], accountIds: [] }
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideo(file)
+    expect(videosStore.uploadFile).toHaveBeenCalledWith(file, null, 'test.mp4')
+  })
+
   it('deletes video after confirmation for administrator', async () => {
     videosStore.videos.value = [{ id: 9, title: 'Clip', accountId: null }]
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
