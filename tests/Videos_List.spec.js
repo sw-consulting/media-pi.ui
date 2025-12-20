@@ -81,7 +81,7 @@ describe('Videos_List.vue', () => {
 
     await flushPromises()
     expect(accountsStore.getAll).toHaveBeenCalled()
-    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(null)
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0)
 
     wrapper.vm.selectedAccountId = 5
     await nextTick()
@@ -104,7 +104,7 @@ describe('Videos_List.vue', () => {
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
     await wrapper.vm.uploadVideo(file)
-    expect(videosStore.uploadFile).toHaveBeenCalledWith(file, null, 'test.mp4')
+    expect(videosStore.uploadFile).toHaveBeenCalledWith(file, 0, 'test.mp4')
   })
 
   it('deletes video after confirmation for administrator', async () => {

@@ -12,7 +12,6 @@ import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
-import { buildAccountOptions, getAccountDisplayName, useAccessibleAccounts } from '@/helpers/accounts.access.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
 
@@ -23,10 +22,9 @@ const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 
 const { videos, loading, error } = storeToRefs(videosStore)
-const { loading: accountsLoading, error: accountsError } = storeToRefs(accountsStore)
+const { loading: accountsLoading, error: accountsError, accounts } = storeToRefs(accountsStore)
 const { alert } = storeToRefs(alertStore)
 
-const accessibleAccounts = useAccessibleAccounts(authStore, accountsStore)
 const selectedAccountId = ref(null)
 const search = ref('')
 const fileInput = ref(null)
@@ -34,35 +32,47 @@ const itemsPerPage = ref(10)
 const sortBy = ref([])
 const page = ref(1)
 
-const accountMap = computed(() => {
-  const map = new Map()
-  if (Array.isArray(accessibleAccounts.value)) {
-    accessibleAccounts.value.forEach(account => {
-      map.set(account.id, account)
-    })
-  }
-  return map
+
+const accountOptions = computed(() => {
+
+    if (!authStore.user) {
+      return []
+    }
+
+    const pre_accounts = (accounts.value || []).map(acc => ({
+      value: acc.id,
+      title: acc.name
+    }))
+    
+    const accountsList = [{ title: 'Общие видео файлы', value: 0 }, ...pre_accounts]
+
+    if (isAdministrator(authStore.user)) {
+      return accountsList
+    }
+
+    const managedAccountIds = Array.isArray(authStore.user.accountIds)
+      ? authStore.user.accountIds
+      : []
+
+      return accountsList.filter(account => managedAccountIds.includes(account.value))
 })
 
-const accountOptions = computed(() => buildAccountOptions(accessibleAccounts.value))
 
 const headers = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
   { title: 'Название', align: 'start', key: 'title' },
-  { title: 'Исходное имя файла', align: 'start', key: 'originalFilename' },
+  { title: 'Имя файла', align: 'start', key: 'originalFilename' },
   { title: 'Размер', align: 'start', key: 'fileSize' },
   { title: 'Длительность', align: 'start', key: 'duration' },
-  { title: 'Лицевой счёт', align: 'start', key: 'accountDisplay' }
 ]
 
-const enhancedVideos = computed(() => {
-  if (!videos.value || !Array.isArray(videos.value)) return []
-  return videos.value.map(video => ({
-    ...video,
-    accountDisplay: video.accountId === null
-      ? 'Общие'
-      : getAccountDisplayName(accountMap.value.get(video.accountId))
-  }))
+const selectWidth = computed(() => {
+  if (!accountOptions.value.length) return 'auto'
+  const longestTitle = accountOptions.value.reduce((longest, option) => 
+    option.title.length > longest.length ? option.title : longest, ''
+  )
+  // Approximate width: 8px per character + padding + dropdown arrow
+  return `${Math.max(longestTitle.length * 9 + 65, 200)}px`
 })
 
 const canManageSelectedAccount = computed(() => {
@@ -175,6 +185,7 @@ function filterVideos(value, query, item) {
       <h1 class="primary-heading">Видеофайлы</h1>
       <div class="header-actions-container">
         <div class="header-actions header-actions-group">
+
           <v-select
             v-model="selectedAccountId"
             :items="accountOptions"
@@ -185,8 +196,8 @@ function filterVideos(value, query, item) {
             variant="outlined"
             hide-details
             :disabled="isBusy"
+            :style="{ width: selectWidth, marginRight: '12px' }"
           />
-        </div>
         <div class="header-actions header-actions-group">
           <ActionButton
             data-test="upload-video-button"
@@ -198,28 +209,21 @@ function filterVideos(value, query, item) {
           />
           <input ref="fileInput" class="d-none" type="file" accept="video/*" @change="onFileChange" />
         </div>
+        </div>
       </div>
     </div>
     <hr class="hr" />
 
     <v-card>
-      <v-text-field
-        v-if="enhancedVideos?.length"
-        v-model="search"
-        :append-inner-icon="mdiMagnify"
-        label="Поиск по видео"
-        variant="solo"
-        hide-details
-      />
       <v-data-table
-        v-if="enhancedVideos?.length"
+        v-if="videos?.length"
         v-model:items-per-page="itemsPerPage"
         items-per-page-text="Видео на странице"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
         v-model:page="page"
         :headers="headers"
-        :items="enhancedVideos"
+        :items="videos"
         :search="search"
         v-model:sort-by="sortBy"
         :custom-filter="filterVideos"
@@ -250,8 +254,17 @@ function filterVideos(value, query, item) {
           </div>
         </template>
       </v-data-table>
-      <div v-else class="text-center m-5">
+      <div v-if="!videos?.length" class="text-center m-5">
         {{ isBusy ? 'Загрузка...' : 'Список видео пуст' }}
+      </div>
+      <div v-if="videos?.length">
+        <v-text-field
+          v-model="search"
+          :append-inner-icon="mdiMagnify"
+          label="Поиск любой информации о видео файле"
+          variant="solo"
+          hide-details
+        />
       </div>
     </v-card>
     <div v-if="error || accountsError" class="text-center m-5">
