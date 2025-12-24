@@ -2,7 +2,7 @@
 // This file is a part of Media Pi  frontend application
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { mdiMagnify } from '@mdi/js'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
@@ -34,6 +34,7 @@ const page = ref(1)
 const editingVideoId = ref(null)
 const editingTitle = ref('')
 const titleSaving = ref(false)
+const titleInputRef = ref(null)
 
 const accountOptions = computed(() => {
 
@@ -151,10 +152,14 @@ function canManageVideo(item) {
 
 const isEditing = (item) => editingVideoId.value === item?.id
 
-function startEdit(item) {
+async function startEdit(item) {
   if (!canManageVideo(item)) return
   editingVideoId.value = item.id
   editingTitle.value = item.title || ''
+  await nextTick()
+  if (titleInputRef.value) {
+    titleInputRef.value.focus()
+  }
 }
 
 function cancelEdit() {
@@ -295,6 +300,7 @@ watch(videos, (current) => {
           <div class="title-cell">
             <div v-if="isEditing(item)" class="title-edit">
               <input
+                ref="titleInputRef"
                 v-model="editingTitle"
                 class="title-input"
                 type="text"
