@@ -2,7 +2,7 @@
 // This file is a part of Media Pi  frontend application
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { mdiMagnify } from '@mdi/js'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
@@ -28,18 +28,13 @@ const { alert } = storeToRefs(alertStore)
 const selectedAccountId = ref(null)
 const search = ref('')
 const fileInput = ref(null)
+const titleInputRef = ref(null)
 const itemsPerPage = ref(10)
 const sortBy = ref([])
 const page = ref(1)
 const editingVideoId = ref(null)
 const editingTitle = ref('')
 const titleSaving = ref(false)
-
-function setTitleInputRef(el) {
-  if (el) {
-    el.focus()
-  }
-}
 
 const accountOptions = computed(() => {
 
@@ -149,7 +144,7 @@ function onFileChange(event) {
 
 function canManageVideo(item) {
   if (!item) return false
-  if (item.accountId === null) {
+  if (item.accountId === 0) {
     return isAdministrator(authStore.user)
   }
   return canManageAccountById(authStore.user, item.accountId)
@@ -157,10 +152,12 @@ function canManageVideo(item) {
 
 const isEditing = (item) => editingVideoId.value === item?.id
 
-function startEdit(item) {
+async function startEdit(item) {
   if (!canManageVideo(item)) return
   editingVideoId.value = item.id
   editingTitle.value = item.title || ''
+  await nextTick()
+  titleInputRef.value?.focus()
 }
 
 function cancelEdit() {
@@ -301,12 +298,12 @@ watch(videos, (current) => {
           <div class="title-cell">
             <div v-if="isEditing(item)" class="title-edit">
               <input
-                :ref="setTitleInputRef"
+                ref="titleInputRef"
                 v-model="editingTitle"
                 class="title-input"
                 type="text"
                 data-test="edit-title-input"
-                aria-label="Редактировать название"
+                aria-label="Название видео"
                 @keydown="handleTitleKeydown($event, item)"
               />
               <ActionButton
@@ -327,12 +324,12 @@ watch(videos, (current) => {
               />
             </div>
             <div v-else class="title-display">
-              <span class="title-text">{{ item.title || item.originalFilename || '—' }}</span>
+              <span class="title-text">{{ item.title || '—' }}</span>
               <ActionButton
                 data-test="edit-video-button"
                 :item="item"
                 icon="fa-solid fa-pen"
-                tooltip-text="Редактировать видеофайл"
+                tooltip-text="Редактировать название видео"
                 :disabled="!canManageVideo(item)"
                 @click="startEdit(item)"
               />
