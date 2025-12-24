@@ -114,6 +114,11 @@ const router = createRouter({
       name: 'Видеофайлы',
       component: () => import('@/views/Videos_View.vue')
     },
+    {
+      path: '/playlists',
+      name: 'Плейлисты',
+      component: () => import('@/views/Playlists_View.vue')
+    },
 
   ]
 })
