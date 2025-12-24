@@ -185,8 +185,7 @@ function handleTitleKeydown(event, item) {
   if (event.key === 'Enter') {
     event.preventDefault()
     saveEdit(item)
-  }
-  if (event.key === 'Escape') {
+  } else if (event.key === 'Escape') {
     event.preventDefault()
     cancelEdit()
   }
