@@ -35,6 +35,12 @@ const editingVideoId = ref(null)
 const editingTitle = ref('')
 const titleSaving = ref(false)
 
+function setTitleInputRef(el) {
+  if (el) {
+    el.focus()
+  }
+}
+
 const accountOptions = computed(() => {
 
     if (!authStore.user) {
@@ -295,6 +301,7 @@ watch(videos, (current) => {
           <div class="title-cell">
             <div v-if="isEditing(item)" class="title-edit">
               <input
+                :ref="setTitleInputRef"
                 v-model="editingTitle"
                 class="title-input"
                 type="text"
