@@ -388,5 +388,8 @@ watch(videos, (current) => {
   flex: 1;
   min-width: 0;
   padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
 }
 </style>
