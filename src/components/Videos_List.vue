@@ -32,7 +32,6 @@ const itemsPerPage = ref(10)
 const sortBy = ref([])
 const page = ref(1)
 
-
 const accountOptions = computed(() => {
 
     if (!authStore.user) {
