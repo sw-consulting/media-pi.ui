@@ -251,7 +251,7 @@ function filterVideos(value, query, item) {
               data-test="edit-video-button"
               :item="item"
               icon="fa-solid fa-pen"
-              tooltip-text="Редактировать видео"
+              tooltip-text="Редактировать видеофайл"
               :disabled="!canManageVideo(item)"
               @click="editVideo(item)"
             />
@@ -259,7 +259,7 @@ function filterVideos(value, query, item) {
               data-test="delete-video-button"
               :item="item"
               icon="fa-solid fa-trash-can"
-              tooltip-text="Удалить видео"
+              tooltip-text="Удалить видеофайл"
               :disabled="!canManageVideo(item)"
               @click="deleteVideo(item)"
             />
