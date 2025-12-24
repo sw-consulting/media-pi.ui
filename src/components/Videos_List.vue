@@ -190,7 +190,9 @@ function handleTitleKeydown(event, item) {
     saveEdit(item)
   } else if (event.key === 'Escape') {
     event.preventDefault()
-    cancelEdit()
+    if (!titleSaving.value) {
+      cancelEdit()
+    }
   }
 }
 
