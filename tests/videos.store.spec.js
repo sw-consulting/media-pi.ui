@@ -176,7 +176,7 @@ describe('videos.store', () => {
     expect(store.error).toBe(error)
   })
 
-  it('getAllByAccount uses root endpoint for common category', async () => {
+  it('getAllByAccount returns early without making API call when accountId is null', async () => {
     fetchWrapper.get.mockResolvedValueOnce([])
     const store = useVideosStore()
     await store.getAllByAccount(null)
