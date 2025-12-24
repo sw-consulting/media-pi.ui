@@ -61,11 +61,11 @@ const accountOptions = computed(() => {
 
 
 const headers = [
-  { title: '', align: 'center', key: 'actions', sortable: false, width: '12.5%' },
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
   { title: 'Название', align: 'start', key: 'title', width: '50%' },
-  { title: 'Имя файла', align: 'start', key: 'originalFilename', width: '12.5%' },
-  { title: 'Размер', align: 'start', key: 'fileSize', width: '12.5%' },
-  { title: 'Длительность', align: 'start', key: 'duration', width: '12.5%' },
+  { title: 'Имя файла', align: 'start', key: 'originalFilename', width: '19%' },
+  { title: 'Размер', align: 'start', key: 'fileSize', width: '13%' },
+  { title: 'Длительность', align: 'start', key: 'duration', width: '13%' },
 ]
 
 const selectWidth = computed(() => {
@@ -388,7 +388,7 @@ watch(videos, (current) => {
   flex: 1;
   min-width: 0;
   padding: 4px 8px;
-  border: 1px solid #ccc;
+  border: 1px solid #666;
   border-radius: 4px;
   background-color: #fff;
 }
