@@ -101,9 +101,12 @@ export const useVideosStore = defineStore('videos', () => {
   }
 
   async function getAllByAccount(accountId) {
-    if (accountId === null) return Promise.resolve()
     return handleRequest(
       async () => {
+        if (accountId === null) {
+          videos.value = []
+          return videos.value
+        }
         const result = await fetchWrapper.get(`${baseUrl}/by-account/${accountId}`)
         videos.value = result || []
         return videos.value
