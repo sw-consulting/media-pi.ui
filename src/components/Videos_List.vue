@@ -31,6 +31,9 @@ const fileInput = ref(null)
 const itemsPerPage = ref(10)
 const sortBy = ref([])
 const page = ref(1)
+const editingVideoId = ref(null)
+const editingTitle = ref('')
+const titleSaving = ref(false)
 
 const accountOptions = computed(() => {
 
@@ -58,11 +61,11 @@ const accountOptions = computed(() => {
 
 
 const headers = [
-  { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
-  { title: 'Название', align: 'start', key: 'title' },
-  { title: 'Имя файла', align: 'start', key: 'originalFilename' },
-  { title: 'Размер', align: 'start', key: 'fileSize' },
-  { title: 'Длительность', align: 'start', key: 'duration' },
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '12.5%' },
+  { title: 'Название', align: 'start', key: 'title', width: '50%' },
+  { title: 'Имя файла', align: 'start', key: 'originalFilename', width: '12.5%' },
+  { title: 'Размер', align: 'start', key: 'fileSize', width: '12.5%' },
+  { title: 'Длительность', align: 'start', key: 'duration', width: '12.5%' },
 ]
 
 const selectWidth = computed(() => {
@@ -138,17 +141,55 @@ function onFileChange(event) {
   uploadVideo(file)
 }
 
-function editVideo(item) {
-  console.warn('Редактирование видео пока не реализовано', item)
-  alertStore.error('Редактирование видеофайлов пока не поддерживается')
-}
-
 function canManageVideo(item) {
   if (!item) return false
   if (item.accountId === null) {
     return isAdministrator(authStore.user)
   }
   return canManageAccountById(authStore.user, item.accountId)
+}
+
+const isEditing = (item) => editingVideoId.value === item?.id
+
+function startEdit(item) {
+  if (!canManageVideo(item)) return
+  editingVideoId.value = item.id
+  editingTitle.value = item.title || ''
+}
+
+function cancelEdit() {
+  editingVideoId.value = null
+  editingTitle.value = ''
+}
+
+async function saveEdit(item) {
+  if (!item || titleSaving.value) return
+  const newTitle = editingTitle.value.trim()
+  if (!newTitle) {
+    alertStore.error('Название не может быть пустым')
+    return
+  }
+  titleSaving.value = true
+  try {
+    await videosStore.update(item.id, { title: newTitle })
+    await refreshVideos()
+    cancelEdit()
+  } catch (err) {
+    alertStore.error('Не удалось обновить название: ' + (err?.message || err))
+  } finally {
+    titleSaving.value = false
+  }
+}
+
+function handleTitleKeydown(event, item) {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    saveEdit(item)
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    cancelEdit()
+  }
 }
 
 async function deleteVideo(item) {
@@ -176,6 +217,14 @@ function filterVideos(value, query, item) {
     rawVideo.accountDisplay
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
 }
+
+watch(videos, (current) => {
+  if (!editingVideoId.value) return
+  const exists = (current || []).some(video => video.id === editingVideoId.value)
+  if (!exists) {
+    cancelEdit()
+  }
+})
 </script>
 
 <template>
@@ -243,16 +292,48 @@ function filterVideos(value, query, item) {
         <template v-slot:[`item.accountDisplay`]="{ item }">
           {{ item.accountDisplay || '—' }}
         </template>
+        <template v-slot:[`item.title`]="{ item }">
+          <div class="title-cell">
+            <div v-if="isEditing(item)" class="title-edit">
+              <input
+                v-model="editingTitle"
+                class="title-input"
+                type="text"
+                data-test="edit-title-input"
+                @keydown="handleTitleKeydown($event, item)"
+              />
+              <ActionButton
+                data-test="save-title-button"
+                :item="item"
+                icon="fa-solid fa-check-double"
+                tooltip-text="Сохранить"
+                :disabled="titleSaving"
+                @click="saveEdit(item)"
+              />
+              <ActionButton
+                data-test="cancel-title-button"
+                :item="item"
+                icon="fa-solid fa-xmark"
+                tooltip-text="Отменить"
+                :disabled="titleSaving"
+                @click="cancelEdit"
+              />
+            </div>
+            <div v-else class="title-display">
+              <span class="title-text">{{ item.title || item.originalFilename || '—' }}</span>
+              <ActionButton
+                data-test="edit-video-button"
+                :item="item"
+                icon="fa-solid fa-pen"
+                tooltip-text="Редактировать видеофайл"
+                :disabled="!canManageVideo(item)"
+                @click="startEdit(item)"
+              />
+            </div>
+          </div>
+        </template>
         <template v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">
-            <ActionButton
-              data-test="edit-video-button"
-              :item="item"
-              icon="fa-solid fa-pen"
-              tooltip-text="Редактировать видеофайл"
-              :disabled="!canManageVideo(item)"
-              @click="editVideo(item)"
-            />
             <ActionButton
               data-test="delete-video-button"
               :item="item"
@@ -274,3 +355,39 @@ function filterVideos(value, query, item) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.title-cell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.title-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.title-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+}
+</style>

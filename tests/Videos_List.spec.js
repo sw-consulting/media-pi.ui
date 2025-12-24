@@ -21,6 +21,7 @@ const videosStore = {
   loading: ref(false),
   error: ref(null),
   getAllByAccount: vi.fn(async () => videosStore.videos.value),
+  update: vi.fn(async () => ({})),
   uploadFile: vi.fn(async () => ({})),
   remove: vi.fn(async () => ({}))
 }
@@ -60,7 +61,17 @@ const globalStubs = {
     },
     template: '<select @change="emitValue"><option v-for="item in items" :key="item.value" :value="item.value">{{ item.title }}</option></select>'
   },
-  'v-data-table': { props: ['items'], template: '<div class="data-table"><slot name="item.actions" v-for="item in items" :item="item" /></div>' },
+  'v-data-table': {
+    props: ['items'],
+    template: `
+      <div class="data-table">
+        <div v-for="item in items" :key="item.id">
+          <slot name="item.title" :item="item" />
+          <slot name="item.actions" :item="item" />
+        </div>
+      </div>
+    `
+  },
   'v-text-field': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' },
   'v-progress-linear': { template: '<div />' },
   'v-progress-circular': { template: '<div />' },
@@ -114,5 +125,34 @@ describe('Videos_List.vue', () => {
     await wrapper.vm.deleteVideo(videosStore.videos.value[0])
     expect(videosStore.remove).toHaveBeenCalledWith(9)
   })
-})
 
+  it('edits video title inline and saves on Enter', async () => {
+    videosStore.videos.value = [{ id: 1, title: 'Old', accountId: null }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    const input = wrapper.find('[data-test="edit-title-input"]')
+    await input.setValue('New Title')
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+
+    expect(videosStore.update).toHaveBeenCalledWith(1, { title: 'New Title' })
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
+  })
+
+  it('cancels editing on Escape without saving', async () => {
+    videosStore.videos.value = [{ id: 2, title: 'Stay', accountId: null }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    const input = wrapper.find('[data-test="edit-title-input"]')
+    await input.setValue('Ignored')
+    await input.trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+
+    expect(videosStore.update).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
+  })
+})
