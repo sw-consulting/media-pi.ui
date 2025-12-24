@@ -175,4 +175,11 @@ describe('videos.store', () => {
     expect(store.videos).toEqual([])
     expect(store.error).toBe(error)
   })
+
+  it('getAllByAccount returns early without making API call when accountId is null', async () => {
+    fetchWrapper.get.mockResolvedValueOnce([])
+    const store = useVideosStore()
+    await store.getAllByAccount(null)
+    expect(fetchWrapper.get).not.toHaveBeenCalled()
+  })
 })
