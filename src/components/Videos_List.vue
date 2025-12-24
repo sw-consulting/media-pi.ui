@@ -256,7 +256,7 @@ watch(videos, (current) => {
               :item="{}"
               icon="fa-solid fa-cloud-arrow-up"
               tooltip-text="Загрузить видеофайл"
-              :disabled="!canManageSelectedAccount || isBusy"
+              :disabled="!canManageSelectedAccount || isBusy || titleSaving"
               @click="triggerUpload"
             />
             <input ref="fileInput" class="d-none" type="file" accept="video/*" @change="onFileChange" />
@@ -311,7 +311,7 @@ watch(videos, (current) => {
                 :item="item"
                 icon="fa-solid fa-check-double"
                 tooltip-text="Сохранить"
-                :disabled="titleSaving"
+                :disabled="!canManageVideo(item) || titleSaving || isBusy"
                 @click="saveEdit(item)"
               />
               <ActionButton
@@ -319,7 +319,7 @@ watch(videos, (current) => {
                 :item="item"
                 icon="fa-solid fa-xmark"
                 tooltip-text="Отменить"
-                :disabled="titleSaving"
+                :disabled="titleSaving || isBusy"
                 @click="cancelEdit"
               />
             </div>
@@ -330,7 +330,7 @@ watch(videos, (current) => {
                 :item="item"
                 icon="fa-solid fa-pen"
                 tooltip-text="Редактировать название видео"
-                :disabled="!canManageVideo(item)"
+                :disabled="!canManageVideo(item) || isBusy || titleSaving"
                 @click="startEdit(item)"
               />
             </div>
@@ -343,7 +343,7 @@ watch(videos, (current) => {
               :item="item"
               icon="fa-solid fa-trash-can"
               tooltip-text="Удалить видеофайл"
-              :disabled="!canManageVideo(item)"
+              :disabled="!canManageVideo(item) || isBusy || titleSaving"
               @click="deleteVideo(item)"
             />
           </div>
