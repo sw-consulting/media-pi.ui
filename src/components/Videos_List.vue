@@ -94,7 +94,7 @@ const refreshVideos = async () => {
   try {
     await videosStore.getAllByAccount(selectedAccountId.value)
   } catch (err) {
-    alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+    alertStore.error('Не удалось загрузить видеофайл: ' + (err?.message || err))
   }
 }
 
@@ -122,14 +122,14 @@ function triggerUpload() {
 async function uploadVideo(file) {
   if (!file) return
   if (!canManageSelectedAccount.value) {
-    alertStore.error('Недостаточно прав для загрузки видеофайлов в выбранный раздел')
+    alertStore.error('Недостаточно прав для загрузки видеофайла в выбранный раздел')
     return
   }
   try {
     await videosStore.uploadFile(file, selectedAccountId.value, file.name)
     await refreshVideos()
   } catch (err) {
-    alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+    alertStore.error('Не удалось загрузить видеофайл: ' + (err?.message || err))
   }
 }
 
@@ -159,7 +159,7 @@ async function deleteVideo(item) {
     await videosStore.remove(item.id)
     await refreshVideos()
   } catch (err) {
-    alertStore.error('Не удалось удалить видеофайлы: ' + (err?.message || err))
+    alertStore.error('Не удалось удалить видеофайл: ' + (err?.message || err))
   }
 }
 
@@ -179,7 +179,7 @@ function filterVideos(value, query, item) {
 </script>
 
 <template>
-  <div class="settings table-2">
+  <div class="settings table-3">
     <div class="header-with-actions">
       <h1 class="primary-heading">Видеофайлы</h1>
       <div class="header-actions-container">
