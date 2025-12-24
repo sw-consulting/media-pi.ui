@@ -38,12 +38,12 @@ const accountOptions = computed(() => {
       return []
     }
 
-    const pre_accounts = (accounts.value || []).map(acc => ({
+    const preAccounts = (accounts.value || []).map(acc => ({
       value: acc.id,
       title: acc.name
     }))
     
-    const accountsList = [...pre_accounts, { title: 'Общие видеофайлы', value: 0 } ]
+    const accountsList = [...preAccounts, { title: 'Общие видеофайлы', value: 0 } ]
 
     if (isAdministrator(authStore.user)) {
       return accountsList
