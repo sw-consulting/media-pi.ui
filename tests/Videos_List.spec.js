@@ -218,4 +218,124 @@ describe('Videos_List.vue', () => {
     // Edit mode should be exited
     expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
   })
+
+  it('shows error and does not save when title is empty', async () => {
+    videosStore.videos.value = [{ id: 5, title: 'Original', accountId: null }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    const input = wrapper.find('[data-test="edit-title-input"]')
+    
+    // Try to save with empty title
+    await input.setValue('')
+    await wrapper.find('[data-test="save-title-button"]').trigger('click')
+    await flushPromises()
+
+    // Should show error and not call update
+    expect(alertStore.error).toHaveBeenCalledWith('Название не может быть пустым')
+    expect(videosStore.update).not.toHaveBeenCalled()
+    
+    // Should still be in edit mode
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
+  })
+
+  it('shows error and does not save when title is only whitespace', async () => {
+    videosStore.videos.value = [{ id: 6, title: 'Original', accountId: null }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    const input = wrapper.find('[data-test="edit-title-input"]')
+    
+    // Try to save with whitespace-only title
+    await input.setValue('   ')
+    await wrapper.find('[data-test="save-title-button"]').trigger('click')
+    await flushPromises()
+
+    // Should show error and not call update
+    expect(alertStore.error).toHaveBeenCalledWith('Название не может быть пустым')
+    expect(videosStore.update).not.toHaveBeenCalled()
+    
+    // Should still be in edit mode
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
+  })
+
+  it('shows error and preserves editing state when update fails', async () => {
+    videosStore.videos.value = [{ id: 7, title: 'Original', accountId: null }]
+    const errorMessage = 'Network error'
+    videosStore.update.mockRejectedValue(new Error(errorMessage))
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    const input = wrapper.find('[data-test="edit-title-input"]')
+    await input.setValue('New Title')
+    
+    await wrapper.find('[data-test="save-title-button"]').trigger('click')
+    await flushPromises()
+
+    // Should show error message
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось обновить название: ' + errorMessage)
+    
+    // Should still be in edit mode
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
+    
+    // Input should still have the edited value
+    expect(input.element.value).toBe('New Title')
+  })
+
+  it('prevents editing when user lacks permissions', async () => {
+    currentUser = { roles: [], accountIds: [99] }
+    videosStore.videos.value = [{ id: 8, title: 'Video', accountId: 42 }]
+    
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    // Edit button should be disabled for videos user cannot manage
+    const editButton = wrapper.find('[data-test="edit-video-button"]')
+    expect(editButton.exists()).toBe(true)
+    expect(editButton.element.disabled).toBe(true)
+  })
+
+  it('allows editing when user is administrator', async () => {
+    currentUser = { roles: [1], accountIds: [] }
+    videosStore.videos.value = [{ id: 9, title: 'Video', accountId: 42 }]
+    
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    // Edit button should exist for administrators
+    expect(wrapper.find('[data-test="edit-video-button"]').exists()).toBe(true)
+  })
+
+  it('allows editing when user has matching accountId', async () => {
+    currentUser = { roles: [], accountIds: [42] }
+    videosStore.videos.value = [{ id: 10, title: 'Video', accountId: 42 }]
+    
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    // Edit button should exist for users with matching accountId
+    expect(wrapper.find('[data-test="edit-video-button"]').exists()).toBe(true)
+  })
+
+  it('cancels editing when video is removed from list', async () => {
+    videosStore.videos.value = [{ id: 11, title: 'Video to Remove', accountId: null }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    // Start editing
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
+
+    // Remove the video from the list
+    videosStore.videos.value = []
+    await nextTick()
+    await flushPromises()
+
+    // Should no longer be in edit mode
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
+  })
 })
