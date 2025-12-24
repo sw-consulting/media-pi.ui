@@ -21,8 +21,8 @@ const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 
-const { videos, loading, error } = storeToRefs(videosStore)
-const { loading: accountsLoading, error: accountsError, accounts } = storeToRefs(accountsStore)
+const { videos, loading } = storeToRefs(videosStore)
+const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
 const { alert } = storeToRefs(alertStore)
 
 const selectedAccountId = ref(null)
@@ -44,7 +44,7 @@ const accountOptions = computed(() => {
       title: acc.name
     }))
     
-    const accountsList = [{ title: 'Общие видео файлы', value: 0 }, ...pre_accounts]
+    const accountsList = [...pre_accounts, { title: 'Общие видеофайлы', value: 0 } ]
 
     if (isAdministrator(authStore.user)) {
       return accountsList
@@ -54,7 +54,7 @@ const accountOptions = computed(() => {
       ? authStore.user.accountIds
       : []
 
-      return accountsList.filter(account => managedAccountIds.includes(account.value))
+      return accountsList.filter(account => managedAccountIds.includes(account.value) || account.value === 0)
 })
 
 
@@ -76,7 +76,8 @@ const selectWidth = computed(() => {
 })
 
 const canManageSelectedAccount = computed(() => {
-  if (selectedAccountId.value === null) {
+  if (selectedAccountId.value === 0) {
+    // console.warn(authStore.user)
     return isAdministrator(authStore.user)
   }
   return canManageAccountById(authStore.user, selectedAccountId.value)
@@ -184,8 +185,10 @@ function filterVideos(value, query, item) {
     <div class="header-with-actions">
       <h1 class="primary-heading">Видеофайлы</h1>
       <div class="header-actions-container">
+        <div v-if="loading" class="header-actions header-actions-group">
+          <span class="spinner-border spinner-border-m"></span>
+        </div>
         <div class="header-actions header-actions-group">
-
           <v-select
             v-model="selectedAccountId"
             :items="accountOptions"
@@ -198,27 +201,36 @@ function filterVideos(value, query, item) {
             :disabled="isBusy"
             :style="{ width: selectWidth, marginRight: '12px' }"
           />
-        <div class="header-actions header-actions-group">
-          <ActionButton
-            data-test="upload-video-button"
-            :item="{}"
-            icon="fa-solid fa-cloud-arrow-up"
-            tooltip-text="Загрузить видеофайл"
-            :disabled="!canManageSelectedAccount || isBusy"
-            @click="triggerUpload"
-          />
-          <input ref="fileInput" class="d-none" type="file" accept="video/*" @change="onFileChange" />
-        </div>
+          <div class="header-actions header-actions-group">
+            <ActionButton
+              data-test="upload-video-button"
+              :item="{}"
+              icon="fa-solid fa-cloud-arrow-up"
+              tooltip-text="Загрузить видеофайл"
+              :disabled="!canManageSelectedAccount || isBusy"
+              @click="triggerUpload"
+            />
+            <input ref="fileInput" class="d-none" type="file" accept="video/*" @change="onFileChange" />
+          </div>
         </div>
       </div>
     </div>
     <hr class="hr" />
 
     <v-card>
+      <div v-if="videos?.length">
+        <v-text-field
+          v-model="search"
+          :append-inner-icon="mdiMagnify"
+          label="Поиск по любой информации о видеофайлах"
+          variant="solo"
+          hide-details
+        />
+      </div>
       <v-data-table
         v-if="videos?.length"
         v-model:items-per-page="itemsPerPage"
-        items-per-page-text="Видео на странице"
+        items-per-page-text="Видеофайлов на странице"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
         v-model:page="page"
@@ -255,21 +267,9 @@ function filterVideos(value, query, item) {
         </template>
       </v-data-table>
       <div v-if="!videos?.length" class="text-center m-5">
-        {{ isBusy ? 'Загрузка...' : 'Список видео пуст' }}
-      </div>
-      <div v-if="videos?.length">
-        <v-text-field
-          v-model="search"
-          :append-inner-icon="mdiMagnify"
-          label="Поиск любой информации о видео файле"
-          variant="solo"
-          hide-details
-        />
+        {{ isBusy ? 'Загрузка...' : 'Нет видеофайлов' }}
       </div>
     </v-card>
-    <div v-if="error || accountsError" class="text-center m-5">
-      <div class="text-danger">Ошибка при загрузке списка видео: {{ error || accountsError }}</div>
-    </div>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}

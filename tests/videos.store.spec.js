@@ -180,6 +180,6 @@ describe('videos.store', () => {
     fetchWrapper.get.mockResolvedValueOnce([])
     const store = useVideosStore()
     await store.getAllByAccount(null)
-    expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/videos/by-account'))
+    expect(fetchWrapper.get).not.toHaveBeenCalled()
   })
 })

@@ -81,12 +81,12 @@ describe('Videos_List.vue', () => {
 
     await flushPromises()
     expect(accountsStore.getAll).toHaveBeenCalled()
-    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0)
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(5)
 
-    wrapper.vm.selectedAccountId = 5
+    wrapper.vm.selectedAccountId = 0
     await nextTick()
     await flushPromises()
-    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(5)
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0)
   })
 
   it('blocks upload when user lacks permissions', async () => {

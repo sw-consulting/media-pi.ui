@@ -182,6 +182,15 @@ const headers = [
     <hr class="hr" />
 
     <v-card>
+      <div v-if="enhancedUsers?.length">
+        <v-text-field
+          v-model="authStore.users_search"
+          :append-inner-icon="mdiMagnify"
+          label="Поиск по любой информации о пользователе"
+          variant="solo"
+          hide-details
+        />
+      </div>
       <v-data-table
         v-if="enhancedUsers?.length"
         v-model:items-per-page="authStore.users_per_page"
@@ -225,19 +234,7 @@ const headers = [
         </template>
       </v-data-table>
       <div v-if="!enhancedUsers?.length" class="text-center m-5">Список пользователей пуст</div>
-      <div v-if="enhancedUsers?.length">
-        <v-text-field
-          v-model="authStore.users_search"
-          :append-inner-icon="mdiMagnify"
-          label="Поиск по любой информации о пользователе"
-          variant="solo"
-          hide-details
-        />
-      </div>
     </v-card>
-    <div v-if="loading" class="text-center m-5">
-      <span class="spinner-border spinner-border-lg align-center"></span>
-    </div>
     <div v-if="error" class="text-center m-5">
       <div class="text-danger">Ошибка при загрузке списка пользователей: {{ error }}</div>
     </div>
