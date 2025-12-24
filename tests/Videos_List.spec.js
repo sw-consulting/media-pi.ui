@@ -155,4 +155,67 @@ describe('Videos_List.vue', () => {
     expect(videosStore.update).not.toHaveBeenCalled()
     expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
   })
+
+  it('does not cancel on Escape while saving', async () => {
+    videosStore.videos.value = [{ id: 3, title: 'Original', accountId: null }]
+    let resolveUpdate
+    videosStore.update.mockImplementation(() => new Promise(resolve => { resolveUpdate = resolve }))
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    const input = wrapper.find('[data-test="edit-title-input"]')
+    await input.setValue('Modified')
+    
+    // Start save operation (Enter key)
+    await input.trigger('keydown', { key: 'Enter' })
+    await nextTick()
+    
+    // Attempt to cancel while saving (Escape key)
+    await input.trigger('keydown', { key: 'Escape' })
+    await nextTick()
+    
+    // Should still be in edit mode
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
+    
+    // Complete the save
+    resolveUpdate()
+    await flushPromises()
+    
+    // Now should exit edit mode
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
+  })
+
+  it('disables cancel button while saving', async () => {
+    videosStore.videos.value = [{ id: 4, title: 'Test', accountId: null }]
+    let resolveUpdate
+    videosStore.update.mockImplementation(() => new Promise(resolve => { resolveUpdate = resolve }))
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    const input = wrapper.find('[data-test="edit-title-input"]')
+    await input.setValue('New Value')
+    
+    // Cancel button should be enabled before save
+    let cancelButton = wrapper.find('[data-test="cancel-title-button"]')
+    expect(cancelButton.element.disabled).toBe(false)
+    
+    // Start save operation
+    await wrapper.find('[data-test="save-title-button"]').trigger('click')
+    await nextTick()
+    
+    // Cancel button should be disabled during save
+    cancelButton = wrapper.find('[data-test="cancel-title-button"]')
+    expect(cancelButton.element.disabled).toBe(true)
+    
+    // Complete the save
+    resolveUpdate()
+    await flushPromises()
+    
+    // Edit mode should be exited
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
+  })
 })
