@@ -155,7 +155,7 @@ function canManageVideo(item) {
 
 async function deleteVideo(item) {
   if (!canManageVideo(item)) return
-  const confirmed = await confirmDelete(item.title || item.originalFilename || 'видеофайлы', 'видеофайлы')
+  const confirmed = await confirmDelete(item.title || item.originalFilename || 'видеофайл', 'видеофайл')
   if (!confirmed) return
   try {
     await videosStore.remove(item.id)
