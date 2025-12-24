@@ -172,6 +172,11 @@ async function saveEdit(item) {
     alertStore.error('Название не может быть пустым')
     return
   }
+  // Skip API call if title hasn't changed
+  if (newTitle === item.title) {
+    cancelEdit()
+    return
+  }
   titleSaving.value = true
   try {
     await videosStore.update(item.id, { title: newTitle })
