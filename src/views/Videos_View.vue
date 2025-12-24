@@ -2,11 +2,9 @@
 // This file is a part of Media Pi  frontend application
 
 <script setup>
-import VideosTree from '@/components/Videos_Tree.vue'
+import VideosList from '@/components/Videos_List.vue'
 </script>
 
 <template>
-  <Suspense>
-    <VideosTree />
-  </Suspense>
+  <VideosList />
 </template>
