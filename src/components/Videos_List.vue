@@ -299,7 +299,7 @@ watch(videos, (current) => {
                 class="title-input"
                 type="text"
                 data-test="edit-title-input"
-                aria-label="Редактировать название видео"
+                aria-label="Редактировать название"
                 @keydown="handleTitleKeydown($event, item)"
               />
               <ActionButton
