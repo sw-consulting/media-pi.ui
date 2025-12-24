@@ -77,7 +77,6 @@ const selectWidth = computed(() => {
 
 const canManageSelectedAccount = computed(() => {
   if (selectedAccountId.value === 0) {
-    // console.warn(authStore.user)
     return isAdministrator(authStore.user)
   }
   return canManageAccountById(authStore.user, selectedAccountId.value)
