@@ -54,7 +54,7 @@ const accountOptions = computed(() => {
       ? authStore.user.accountIds
       : []
 
-      return accountsList.filter(account => managedAccountIds.includes(account.value) || account.value === 0)
+    return accountsList.filter(account => managedAccountIds.includes(account.value) || account.value === 0)
 })
 
 
