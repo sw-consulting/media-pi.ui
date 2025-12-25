@@ -40,7 +40,7 @@ const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя')
 })
 
-let group = ref({ name: '' })
+const group = ref({ name: '' })
 const initialLoading = ref(false)
 const groupAccountId = ref(props.accountId ?? null)
 const selectedUploadIds = ref([])
