@@ -14,6 +14,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
+import { createAccountOptions, estimateSelectWidth } from '@/helpers/account.options.js'
 
 const videosStore = useVideosStore()
 const accountsStore = useAccountsStore()
@@ -36,29 +37,7 @@ const editingVideoId = ref(null)
 const editingTitle = ref('')
 const titleSaving = ref(false)
 
-const accountOptions = computed(() => {
-
-    if (!authStore.user) {
-      return []
-    }
-
-    const preAccounts = (accounts.value || []).map(acc => ({
-      value: acc.id,
-      title: acc.name
-    }))
-    
-    const accountsList = [...preAccounts, { title: 'Общие видеофайлы', value: 0 } ]
-
-    if (isAdministrator(authStore.user)) {
-      return accountsList
-    }
-
-    const managedAccountIds = Array.isArray(authStore.user.accountIds)
-      ? authStore.user.accountIds
-      : []
-
-    return accountsList.filter(account => managedAccountIds.includes(account.value) || account.value === 0)
-})
+const accountOptions = computed(() => createAccountOptions(accounts.value || [], authStore.user, { includeCommon: true }))
 
 
 const headers = [
@@ -69,14 +48,7 @@ const headers = [
   { title: 'Длительность', align: 'start', key: 'duration', width: '13%' },
 ]
 
-const selectWidth = computed(() => {
-  if (!accountOptions.value.length) return 'auto'
-  const longestTitle = accountOptions.value.reduce((longest, option) => 
-    option.title.length > longest.length ? option.title : longest, ''
-  )
-  // Approximate width: 8px per character + padding + dropdown arrow
-  return `${Math.max(longestTitle.length * 9 + 65, 200)}px`
-})
+const selectWidth = computed(() => estimateSelectWidth(accountOptions.value))
 
 const canManageSelectedAccount = computed(() => {
   if (selectedAccountId.value === 0) {
