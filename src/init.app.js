@@ -44,7 +44,8 @@ import {
   faSpinner,
   faBookSkull,
   faStop,
-  faCloudArrowUp
+  faCloudArrowUp,
+  faFolderPlus
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -92,7 +93,8 @@ library.add(
   faSpinner,
   faBookSkull,
   faStop,
-  faCloudArrowUp
+  faCloudArrowUp,
+  faFolderPlus
 )
 
 import 'vuetify/styles'
