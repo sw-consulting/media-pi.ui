@@ -13,6 +13,8 @@ import { usePlaylistsStore } from '@/stores/playlists.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
+import { useAuthStore } from '@/stores/auth.store.js'
+import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 
 const props = defineProps({
   register: {
@@ -35,6 +37,9 @@ const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(deviceGroupsStore)
 const { playlists, loading: playlistsLoading, error: playlistsError } = storeToRefs(playlistsStore)
+const authStore = useAuthStore()
+const itemsPerPage = authStore.playlists_per_page
+const page = authStore.playlists_page
 
 const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя')
@@ -48,11 +53,11 @@ const selectedPlayId = ref(null)
 
 const playlistHeaders = computed(() => ([
   { title: 'Загружать', align: 'center', key: 'upload', sortable: false, width: '7%' },
-  { title: 'Играть', align: 'center', key: 'play', sortable: false, width: '7%' },
+  { title: 'Воспроизводить', align: 'center', key: 'play', sortable: false, width: '7%' },
   { title: 'Название', align: 'start', key: 'title', width: '50%' },
-  { title: 'Длительность', align: 'start', key: 'totalDurationSeconds', width: '12%' },
-  { title: 'Размер', align: 'start', key: 'totalFileSizeBytes', width: '12%' },
-  { title: 'Файлов', align: 'start', key: 'videoCount', width: '12%' }
+  { title: 'Длительность', align: 'center', key: 'totalDurationSeconds', width: '12%' },
+  { title: 'Размер', align: 'center', key: 'totalFileSizeBytes', width: '12%' },
+  { title: 'Файлов', align: 'center', key: 'videoCount', width: '12%' }
 ]))
 
 if (!isRegister()) {
@@ -107,6 +112,8 @@ const toggleUploadSelection = (playlistId, checked) => {
     current.add(playlistId)
   } else {
     current.delete(playlistId)
+    // if the unchecked playlist was set to play, clear it
+    if (selectedPlayId.value === playlistId) selectedPlayId.value = null
   }
   selectedUploadIds.value = Array.from(current)
 }
@@ -187,23 +194,32 @@ async function onSubmit (values) {
           v-model:page="page"
         >
           <template v-slot:[`item.upload`]="{ item }">
-            <input
-              :data-test="`playlist-upload-${item.id}`"
-              type="checkbox"
-              :checked="selectedUploadIds.includes(item.id)"
-              :disabled="playlistsLoading"
-              @change="toggleUploadSelection(item.id, $event.target.checked)"
-            />
+            <div class="checkbox-styled-wrapper">
+              <input
+                class="checkbox-styled"
+                :data-test="`playlist-upload-${item.id}`"
+                type="checkbox"
+                :checked="selectedUploadIds.includes(item.id)"
+                :disabled="playlistsLoading"
+                @change="toggleUploadSelection(item.id, $event.target.checked)"
+                :id="`playlist-upload-${item.id}`"
+              />
+              <label :for="`playlist-upload-${item.id}`"></label>
+            </div>
           </template>
           <template v-slot:[`item.play`]="{ item }">
-            <input
-              :data-test="`playlist-play-${item.id}`"
-              type="radio"
-              name="device-group-playlist"
-              :checked="selectedPlayId === item.id"
-              :disabled="playlistsLoading"
-              @click="togglePlaySelection(item.id, $event)"
-            />
+            <label class="radio-styled" :class="{ 'disabled': playlistsLoading || !selectedUploadIds.includes(item.id) }">
+              <input
+                type="radio"
+                class="radio-input"
+                :data-test="`playlist-play-${item.id}`"
+                name="device-group-playlist"
+                :checked="selectedPlayId === item.id"
+                :disabled="playlistsLoading || !selectedUploadIds.includes(item.id)"
+                @click="togglePlaySelection(item.id, $event)"
+              />
+              <span class="radio-mark"></span>
+            </label>
           </template>
           <template v-slot:[`item.totalFileSizeBytes`]="{ item }">
             {{ formatFileSize(item.totalFileSizeBytes) }}

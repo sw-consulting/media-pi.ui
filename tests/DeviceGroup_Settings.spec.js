@@ -522,6 +522,10 @@ describe('DeviceGroup_Settings.vue', () => {
     await uploadCheckbox.setValue(false)
     expect(uploadCheckbox.element.checked).toBe(false)
 
+  // Enable playlist 2 for upload so its play radio becomes active
+  const uploadCheckbox2 = wrapper.find('[data-test="playlist-upload-2"]')
+  await uploadCheckbox2.setValue(true)
+
     const playRadio = wrapper.find('[data-test="playlist-play-2"]')
     await playRadio.trigger('click')
     expect(playRadio.element.checked).toBe(true)
