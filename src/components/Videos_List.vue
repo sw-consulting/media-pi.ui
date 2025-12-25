@@ -27,12 +27,8 @@ const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
 const { alert } = storeToRefs(alertStore)
 
 const selectedAccountId = ref(null)
-const search = ref('')
 const fileInput = ref(null)
 const titleInputRef = ref(null)
-const itemsPerPage = ref(10)
-const sortBy = ref([])
-const page = ref(1)
 const editingVideoId = ref(null)
 const editingTitle = ref('')
 const titleSaving = ref(false)
@@ -251,7 +247,7 @@ watch(videos, (current) => {
     <v-card>
       <div v-if="videos?.length">
         <v-text-field
-          v-model="search"
+          v-model="authStore.videos_search"
           :append-inner-icon="mdiMagnify"
           label="Поиск по любой информации о видеофайлах"
           variant="solo"
@@ -260,15 +256,15 @@ watch(videos, (current) => {
       </div>
       <v-data-table
         v-if="videos?.length"
-        v-model:items-per-page="itemsPerPage"
+        v-model:items-per-page="authStore.videos_per_page"
         items-per-page-text="Видеофайлов на странице"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
-        v-model:page="page"
+        v-model:page="authStore.videos_page"
         :headers="headers"
         :items="videos"
-        :search="search"
-        v-model:sort-by="sortBy"
+        :search="authStore.videos_search"
+        v-model:sort-by="authStore.videos_sort_by"
         :custom-filter="filterVideos"
         item-value="id"
         class="elevation-1"

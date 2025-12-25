@@ -60,6 +60,14 @@ describe('auth store', () => {
       expect(store.users_search).toBe('')
       expect(store.users_sort_by).toEqual(['id'])
       expect(store.users_page).toBe(1)
+      expect(store.videos_per_page).toBe(10)
+      expect(store.videos_search).toBe('')
+      expect(store.videos_sort_by).toEqual([])
+      expect(store.videos_page).toBe(1)
+      expect(store.playlists_per_page).toBe(10)
+      expect(store.playlists_search).toBe('')
+      expect(store.playlists_sort_by).toEqual([])
+      expect(store.playlists_page).toBe(1)
       expect(store.returnUrl).toBeNull()
       expect(store.re_jwt).toBeNull()
       expect(store.re_tgt).toBeNull()
@@ -483,4 +491,3 @@ describe('auth store', () => {
   })
 
 })
-

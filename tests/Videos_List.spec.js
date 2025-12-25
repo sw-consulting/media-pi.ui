@@ -7,7 +7,13 @@ import VideosList from '@/components/Videos_List.vue'
 
 let currentUser
 
-const makeAuthStore = () => ({ user: currentUser })
+const makeAuthStore = () => ({
+  user: currentUser,
+  videos_per_page: 10,
+  videos_search: '',
+  videos_sort_by: [],
+  videos_page: 1
+})
 
 const accountsStore = {
   accounts: ref([]),
