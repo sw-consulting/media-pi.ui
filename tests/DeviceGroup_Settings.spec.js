@@ -5,6 +5,7 @@ import { library } from '@fortawesome/fontawesome-svg-core'
 import { faCheckDouble, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { ref } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import DeviceGroupSettings from '@/components/DeviceGroup_Settings.vue'
 
@@ -24,6 +25,12 @@ const alertStore = {
   error: vi.fn(),
   success: vi.fn(),
   clear: vi.fn()
+}
+const playlistsStore = {
+  playlists: ref([]),
+  loading: ref(false),
+  error: ref(null),
+  getAllByAccount: vi.fn()
 }
 
 vi.mock('pinia', async () => {
@@ -53,6 +60,10 @@ vi.mock('@/stores/alert.store.js', () => ({
   useAlertStore: () => alertStore
 }))
 
+vi.mock('@/stores/playlists.store.js', () => ({
+  usePlaylistsStore: () => playlistsStore
+}))
+
 vi.mock('@/helpers/default.route.js', () => ({
   redirectToDefaultRoute: vi.fn()
 }))
@@ -70,6 +81,20 @@ const mountSettings = (props = {}) => mount({
   },
   global: {
     stubs: {
+      'v-card': { template: '<div><slot /></div>' },
+      'v-data-table': {
+        props: ['items'],
+        template: `
+          <div class="data-table">
+            <div v-for="item in items" :key="item.id" class="data-table-row">
+              <slot name="item.upload" :item="item" />
+              <slot name="item.play" :item="item" />
+              <slot name="item.totalFileSizeBytes" :item="item" />
+              <slot name="item.totalDurationSeconds" :item="item" />
+            </div>
+          </div>
+        `
+      },
       Form: {
         template: `
           <div data-testid="form" @submit="onSubmit">
@@ -118,6 +143,10 @@ describe('DeviceGroup_Settings.vue', () => {
     deviceGroupsStore.getById = vi.fn().mockResolvedValue()
     deviceGroupsStore.add = vi.fn().mockResolvedValue()
     deviceGroupsStore.update = vi.fn().mockResolvedValue()
+    playlistsStore.playlists.value = []
+    playlistsStore.loading.value = false
+    playlistsStore.error.value = null
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue()
     alertStore.alert = null
     vi.clearAllMocks()
   })
@@ -128,12 +157,14 @@ describe('DeviceGroup_Settings.vue', () => {
 
     expect(wrapper.find('[data-testid="form"]').exists()).toBe(true)
     expect(deviceGroupsStore.getById).not.toHaveBeenCalled()
+    expect(playlistsStore.getAllByAccount).toHaveBeenCalledWith(5)
   })
 
   it('loads group data when editing', async () => {
     deviceGroupsStore.group = {
       id: 1,
-      name: 'Test Group'
+      name: 'Test Group',
+      accountId: 12
     }
 
     const wrapper = mountSettings({ register: false, id: 1 })
@@ -141,6 +172,7 @@ describe('DeviceGroup_Settings.vue', () => {
 
     expect(deviceGroupsStore.getById).toHaveBeenCalledWith(1)
     expect(wrapper.find('[data-testid="form"]').exists()).toBe(true)
+    expect(playlistsStore.getAllByAccount).toHaveBeenCalledWith(12)
   })
 
   it('handles form submission for creating group', async () => {
@@ -463,6 +495,40 @@ describe('DeviceGroup_Settings.vue', () => {
     expect(wrapper.find('.spinner-border-sm').exists()).toBe(true)
   })
 
+  it('formats playlist duration and size', async () => {
+    playlistsStore.playlists.value = [
+      { id: 10, totalFileSizeBytes: 1024, totalDurationSeconds: 65 }
+    ]
+
+    const wrapper = mountSettings({ register: true, accountId: 5 })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('1.0 КБ')
+    expect(wrapper.text()).toContain('1:05')
+  })
+
+  it('toggles upload and play selections', async () => {
+    playlistsStore.playlists.value = [
+      { id: 1, totalFileSizeBytes: 0, totalDurationSeconds: 0 },
+      { id: 2, totalFileSizeBytes: 0, totalDurationSeconds: 0 }
+    ]
+
+    const wrapper = mountSettings({ register: true, accountId: 5 })
+    await flushPromises()
+
+    const uploadCheckbox = wrapper.find('[data-test="playlist-upload-1"]')
+    await uploadCheckbox.setValue(true)
+    expect(uploadCheckbox.element.checked).toBe(true)
+    await uploadCheckbox.setValue(false)
+    expect(uploadCheckbox.element.checked).toBe(false)
+
+    const playRadio = wrapper.find('[data-test="playlist-play-2"]')
+    await playRadio.trigger('click')
+    expect(playRadio.element.checked).toBe(true)
+    await playRadio.trigger('click')
+    expect(playRadio.element.checked).toBe(false)
+  })
+
   it('handles error status 403 during initial load', async () => {
     const { redirectToDefaultRoute } = await import('@/helpers/default.route.js')
     deviceGroupsStore.getById = vi.fn().mockRejectedValue({ status: 403 })
@@ -487,5 +553,3 @@ describe('DeviceGroup_Settings.vue', () => {
     expect(redirectToDefaultRoute).toHaveBeenCalled()
   })
 })
-
-

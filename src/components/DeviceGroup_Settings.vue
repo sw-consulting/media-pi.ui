@@ -2,15 +2,17 @@
 // This file is a part of Media Pi  frontend application
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import router from '@/router'
 import { storeToRefs } from 'pinia'
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
 
 import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
+import { usePlaylistsStore } from '@/stores/playlists.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 
 const props = defineProps({
   register: {
@@ -28,9 +30,11 @@ const props = defineProps({
 })
 
 const deviceGroupsStore = useDeviceGroupsStore()
+const playlistsStore = usePlaylistsStore()
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(deviceGroupsStore)
+const { playlists, loading: playlistsLoading, error: playlistsError } = storeToRefs(playlistsStore)
 
 const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя')
@@ -38,6 +42,18 @@ const schema = Yup.object().shape({
 
 let group = ref({ name: '' })
 const initialLoading = ref(false)
+const groupAccountId = ref(props.accountId ?? null)
+const selectedUploadIds = ref([])
+const selectedPlayId = ref(null)
+
+const playlistHeaders = computed(() => ([
+  { title: 'Загружать', align: 'center', key: 'upload', sortable: false, width: '8%' },
+  { title: 'Играть', align: 'center', key: 'play', sortable: false, width: '8%' },
+  { title: 'Название', align: 'start', key: 'title', width: '24%' },
+  { title: 'Длительность', align: 'start', key: 'totalDurationSeconds', width: '15%' },
+  { title: 'Размер', align: 'start', key: 'totalFileSizeBytes', width: '15%' },
+  { title: 'Количество файлов', align: 'start', key: 'videoCount', width: '20%' }
+]))
 
 if (!isRegister()) {
   initialLoading.value = true
@@ -50,6 +66,7 @@ if (!isRegister()) {
     group.value = {
       name: loadedGroup.name || ''
     }
+    groupAccountId.value = loadedGroup.accountId ?? props.accountId ?? null
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
@@ -71,6 +88,43 @@ function isRegister () {
 function getButton () {
   return isRegister() ? 'Создать' : 'Сохранить'
 }
+
+const loadPlaylists = async (accountId) => {
+  if (accountId === null || accountId === undefined) {
+    playlists.value = []
+    return
+  }
+  try {
+    await playlistsStore.getAllByAccount(accountId)
+  } catch (err) {
+    alertStore.error('Не удалось загрузить плейлисты: ' + (err?.message || err))
+  }
+}
+
+const toggleUploadSelection = (playlistId, checked) => {
+  const current = new Set(selectedUploadIds.value)
+  if (checked) {
+    current.add(playlistId)
+  } else {
+    current.delete(playlistId)
+  }
+  selectedUploadIds.value = Array.from(current)
+}
+
+const togglePlaySelection = (playlistId, event) => {
+  if (selectedPlayId.value === playlistId) {
+    selectedPlayId.value = null
+    if (event) event.preventDefault()
+    return
+  }
+  selectedPlayId.value = playlistId
+}
+
+watch(groupAccountId, async (accountId) => {
+  selectedUploadIds.value = []
+  selectedPlayId.value = null
+  await loadPlaylists(accountId)
+}, { immediate: true })
 
 async function onSubmit (values) {
   try {
@@ -139,6 +193,50 @@ async function onSubmit (values) {
       <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
     </Form>
 
+    <div class="mt-8">
+      <h2 class="secondary-heading">Плейлисты</h2>
+      <v-card>
+        <v-data-table
+          :headers="playlistHeaders"
+          :items="playlists"
+          item-value="id"
+          class="elevation-1"
+        >
+          <template v-slot:[`item.upload`]="{ item }">
+            <input
+              :data-test="`playlist-upload-${item.id}`"
+              type="checkbox"
+              :checked="selectedUploadIds.includes(item.id)"
+              :disabled="playlistsLoading"
+              @change="toggleUploadSelection(item.id, $event.target.checked)"
+            />
+          </template>
+          <template v-slot:[`item.play`]="{ item }">
+            <input
+              :data-test="`playlist-play-${item.id}`"
+              type="radio"
+              name="device-group-playlist"
+              :checked="selectedPlayId === item.id"
+              :disabled="playlistsLoading"
+              @click="togglePlaySelection(item.id, $event)"
+            />
+          </template>
+          <template v-slot:[`item.totalFileSizeBytes`]="{ item }">
+            {{ formatFileSize(item.totalFileSizeBytes) }}
+          </template>
+          <template v-slot:[`item.totalDurationSeconds`]="{ item }">
+            {{ formatDuration(item.totalDurationSeconds) }}
+          </template>
+        </v-data-table>
+        <div v-if="!playlists?.length" class="text-center m-5">
+          {{ playlistsLoading ? 'Загрузка...' : 'Нет плейлистов' }}
+        </div>
+      </v-card>
+      <div v-if="playlistsError" class="text-center m-5">
+        <div class="text-danger">Ошибка при загрузке списка плейлистов: {{ playlistsError }}</div>
+      </div>
+    </div>
+
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
@@ -150,4 +248,3 @@ async function onSubmit (values) {
     </div>
   </div>
 </template>
-
