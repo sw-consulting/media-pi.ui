@@ -218,7 +218,7 @@ async function deletePlaylist(item) {
               icon="fa-solid fa-trash-can"
               tooltip-text="Удалить плейлист"
               :disabled="isBusy"
-              @click="deletePlaylist(item)"
+              @click="deletePlaylist"
             />
           </div>
         </template>
