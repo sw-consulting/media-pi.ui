@@ -7,6 +7,7 @@ import { storeToRefs } from 'pinia'
 import { mdiMagnify } from '@mdi/js'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
+import router from '@/router'
 import { usePlaylistsStore } from '@/stores/playlists.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
@@ -14,6 +15,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { createAccountOptions, estimateSelectWidth } from '@/helpers/account.options.js'
+import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 
 const playlistsStore = usePlaylistsStore()
 const accountsStore = useAccountsStore()
@@ -75,30 +77,6 @@ onMounted(async () => {
   }
 })
 
-function formatFileSize(bytes) {
-  if (bytes === null || bytes === undefined) return '—'
-  const size = Number(bytes)
-  if (Number.isNaN(size)) return '—'
-  const units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ']
-  if (size === 0) return '0 Б'
-  const index = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1)
-  const value = size / (1024 ** index)
-  const formatted = value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)
-  return `${formatted} ${units[index]}`
-}
-
-function formatDuration(seconds) {
-  if (seconds === null || seconds === undefined) return '—'
-  const total = Number(seconds)
-  if (Number.isNaN(total)) return '—'
-  const hrs = Math.floor(total / 3600)
-  const mins = Math.floor((total % 3600) / 60)
-  const secs = Math.floor(total % 60)
-  const paddedMins = hrs > 0 ? String(mins).padStart(2, '0') : String(mins)
-  const paddedSecs = String(secs).padStart(2, '0')
-  return hrs > 0 ? `${hrs}:${paddedMins}:${paddedSecs}` : `${paddedMins}:${paddedSecs}`
-}
-
 function filterPlaylists(value, query, item) {
   if (!query) return true
   const rawPlaylist = item?.raw
@@ -114,12 +92,12 @@ function filterPlaylists(value, query, item) {
 }
 
 function createPlaylist() {
-  alertStore.success('Создание плейлистов будет добавлено позже')
+  router.push({ path: '/playlist/create', query: { accountId: selectedAccountId.value ?? '' } })
 }
 
 function editPlaylist(item) {
   if (!item) return
-  alertStore.success('Редактирование плейлистов будет добавлено позже')
+  router.push(`/playlist/edit/${item.id}`)
 }
 
 async function deletePlaylist(item) {

@@ -70,7 +70,7 @@ const refreshVideos = async () => {
   try {
     await videosStore.getAllByAccount(selectedAccountId.value)
   } catch (err) {
-    alertStore.error('Не удалось загрузить видеофайл: ' + (err?.message || err))
+    alertStore.error('Не удалось загрузить информацию о видеофайлах: ' + (err?.message || err))
   }
 }
 
@@ -102,7 +102,10 @@ async function uploadVideo(file) {
     return
   }
   try {
-    await videosStore.uploadFile(file, selectedAccountId.value, file.name)
+    const originalFilename = file.name || ''
+    // Keep original filename (including extension) when uploading.
+    // The store can derive a title if needed from the filename.
+    await videosStore.uploadFile(file, selectedAccountId.value, originalFilename)
     await refreshVideos()
   } catch (err) {
     alertStore.error('Не удалось загрузить видеофайл: ' + (err?.message || err))

@@ -38,7 +38,7 @@ export default defineConfig({
     }
   },
   server: {
-    // Support large file uploads (2GB) in development
+    // Support large file uploads (4GB) in development
     host: true,
     cors: true,
     proxy: {

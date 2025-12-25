@@ -705,7 +705,7 @@ onBeforeUnmount(() => {
 
     <!-- Device Information Section -->
     <div class="form-group mt-4 form-group-add">
-      <h2 class="secondary-header">Об устройстве</h2>
+      <h2 class="secondary-heading">Об устройстве</h2>
       <div class="device-info-grid">
         <div class="label service-label">Название</div>
         <div class="value">{{ deviceInfo.name }}</div>
@@ -733,7 +733,7 @@ onBeforeUnmount(() => {
 
     <!-- Service Management Section -->
     <div class="form-group mt-4 form-group-add">
-      <h2 class="secondary-header">Управление сервисами</h2>
+      <h2 class="secondary-heading">Управление сервисами</h2>
       <div class="service-grid">
         <template v-for="row in serviceRows" :key="row.key">
           <div class="service-cell label service-label">{{ row.label }}</div>
@@ -775,7 +775,7 @@ onBeforeUnmount(() => {
 
     <!-- Schedule Settings Section -->
     <div class="form-group mt-4 form-group-add">
-      <h2 class="secondary-header">Настройки таймеров</h2>
+      <h2 class="secondary-heading">Настройки таймеров</h2>
       <Form
         ref="scheduleFormRef"
         :initial-values="scheduleFormValues"
@@ -852,7 +852,7 @@ onBeforeUnmount(() => {
 
     <!-- Playlist Settings Section -->
     <div class="form-group mt-4 form-group-add">
-      <h2 class="secondary-header">Настройки плей-листа</h2>
+      <h2 class="secondary-heading">Настройки плей-листа</h2>
       <div class="playlist-grid">
         <div class="form-group">
         <label class="label" for="playlist-source">Яндекс диск:</label>
@@ -881,7 +881,7 @@ onBeforeUnmount(() => {
 
     <!-- Audio Settings Section -->
     <div class="form-group mt-4 form-group-add">
-      <h2 class="secondary-header">Настройки аудио</h2>
+      <h2 class="secondary-heading">Настройки аудио</h2>
       <div class="form-group">
         <label for="audio-output" class="label">Аудиовыход:</label>
         <select
@@ -898,7 +898,7 @@ onBeforeUnmount(() => {
 
     <!-- System Management Section -->
     <div class="form-group mt-4 form-group-add">
-      <h2 class="secondary-header">Управление системой</h2>
+      <h2 class="secondary-heading">Управление системой</h2>
       <div class="system-actions">
         <ActionButton
           :icon="operationInProgress.readAll ? 'fa-solid fa-spinner' : 'fa-solid fa-rotate-right'"
@@ -962,18 +962,8 @@ onBeforeUnmount(() => {
   margin-right: 0.5rem;
 }
 
-.secondary-header {
-  font-size: 1.5rem;
-  font-weight: 500;
-  width: 25%;
-  min-width: 150px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
-  flex-shrink: 0;
-  color: #1976d2;
-  transition: 0.4s;
+.secondary-heading {
+  width: 25%; /* moved to global stylesheet as .secondary-heading */
 }
 
 .form-group-add {
