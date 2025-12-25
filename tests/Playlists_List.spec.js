@@ -7,6 +7,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref, nextTick } from 'vue'
 import PlaylistsList from '@/components/Playlists_List.vue'
 
+const routerPush = vi.hoisted(() => vi.fn())
+
 let currentUser
 
 const makeAuthStore = () => ({ user: currentUser })
@@ -40,6 +42,7 @@ vi.mock('@/stores/playlists.store.js', () => ({ usePlaylistsStore: () => playlis
 vi.mock('@/stores/auth.store.js', () => ({ useAuthStore: () => makeAuthStore() }))
 vi.mock('@/stores/alert.store.js', () => ({ useAlertStore: () => alertStore }))
 vi.mock('@/helpers/confirmation.js', () => ({ useConfirmation: () => confirmation }))
+vi.mock('@/router', () => ({ default: { push: routerPush } }))
 vi.mock('@sw-consulting/tooling.ui.kit', () => ({
   ActionButton: { name: 'ActionButton', props: ['item', 'icon', 'tooltipText', 'disabled'], emits: ['click'], template: '<button :disabled="disabled" @click="$emit(\'click\', item)"></button>' }
 }))
@@ -97,19 +100,19 @@ describe('Playlists_List.vue', () => {
     expect(playlistsStore.getAllByAccount).toHaveBeenCalledWith(6)
   })
 
-  it('shows stubbed create action', async () => {
+  it('routes to create playlist', async () => {
     const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
     await flushPromises()
     await wrapper.find('[data-test="create-playlist-button"]').trigger('click')
-    expect(alertStore.success).toHaveBeenCalledWith('Создание плейлистов будет добавлено позже')
+    expect(routerPush).toHaveBeenCalledWith({ path: '/playlist/create', query: { accountId: '' } })
   })
 
-  it('shows stubbed edit action', async () => {
+  it('routes to edit playlist', async () => {
     playlistsStore.playlists.value = [{ id: 1, title: 'Playlist', filename: 'list.json' }]
     const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
     await flushPromises()
     await wrapper.find('[data-test="edit-playlist-button"]').trigger('click')
-    expect(alertStore.success).toHaveBeenCalledWith('Редактирование плейлистов будет добавлено позже')
+    expect(routerPush).toHaveBeenCalledWith('/playlist/edit/1')
   })
 
   it('deletes playlist after confirmation', async () => {

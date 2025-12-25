@@ -119,6 +119,17 @@ const router = createRouter({
       name: 'Плейлисты',
       component: () => import('@/views/Playlists_View.vue')
     },
+    {
+      path: '/playlist/create',
+      name: 'Создание плейлиста',
+      component: () => import('@/views/Playlist_CreateView.vue')
+    },
+    {
+      path: '/playlist/edit/:id',
+      name: 'Настройки плейлиста',
+      component: () => import('@/views/Playlist_EditView.vue'),
+      props: true
+    },
 
   ]
 })

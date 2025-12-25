@@ -726,7 +726,7 @@ describe('Device_Management.vue', () => {
 
     await flushPromises()
 
-    const headers = wrapper.findAll('h2.secondary-header')
+    const headers = wrapper.findAll('h2.secondary-heading')
     expect(headers[0].text()).toBe('Об устройстве')
   })
 
