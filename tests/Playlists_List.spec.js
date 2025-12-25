@@ -11,7 +11,13 @@ const routerPush = vi.hoisted(() => vi.fn())
 
 let currentUser
 
-const makeAuthStore = () => ({ user: currentUser })
+const makeAuthStore = () => ({
+  user: currentUser,
+  playlists_per_page: 10,
+  playlists_search: '',
+  playlists_sort_by: [],
+  playlists_page: 1
+})
 
 const accountsStore = {
   accounts: ref([]),
@@ -101,10 +107,11 @@ describe('Playlists_List.vue', () => {
   })
 
   it('routes to create playlist', async () => {
+    accountsStore.accounts.value = [ { id: 5, name: 'Five' } ]
     const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
     await flushPromises()
     await wrapper.find('[data-test="create-playlist-button"]').trigger('click')
-    expect(routerPush).toHaveBeenCalledWith({ path: '/playlist/create', query: { accountId: '' } })
+    expect(routerPush).toHaveBeenCalledWith({ path: '/playlist/create', query: { accountId: 5 } })
   })
 
   it('routes to edit playlist', async () => {
@@ -129,5 +136,13 @@ describe('Playlists_List.vue', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('1.0 КБ')
     expect(wrapper.text()).toContain('1:05')
+  })
+
+  it('disables create-playlist-button when account list is empty', async () => {
+    // accountsStore.accounts.value is already [] from beforeEach
+    const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const btn = wrapper.find('[data-test="create-playlist-button"]')
+    expect(btn.attributes('disabled')).toBeDefined()
   })
 })

@@ -29,6 +29,14 @@ export const useAuthStore = defineStore('auth', () => {
   const users_search = ref('')
   const users_sort_by = ref(['id'])
   const users_page = ref(1)
+  const videos_per_page = ref(10)
+  const videos_search = ref('')
+  const videos_sort_by = ref([])
+  const videos_page = ref(1)
+  const playlists_per_page = ref(10)
+  const playlists_search = ref('')
+  const playlists_sort_by = ref([])
+  const playlists_page = ref(1)
   const returnUrl = ref(null)
   const re_jwt = ref(null)
   const re_tgt = ref(null)
@@ -204,6 +212,14 @@ export const useAuthStore = defineStore('auth', () => {
     users_search,
     users_sort_by,
     users_page,
+    videos_per_page,
+    videos_search,
+    videos_sort_by,
+    videos_page,
+    playlists_per_page,
+    playlists_search,
+    playlists_sort_by,
+    playlists_page,
     returnUrl,
     re_jwt,
     re_tgt,

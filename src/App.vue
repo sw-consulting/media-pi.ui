@@ -85,10 +85,10 @@ function getUserRole() {
         <v-list-item v-if="accountsCaption">
           <RouterLink to="/accounts" class="link">{{ accountsCaption }}</RouterLink>
         </v-list-item>
-        <v-list-item>
+        <v-list-item v-if="authStore.isAdministrator || authStore.isManager">
           <RouterLink to="/videos" class="link">Видеофайлы</RouterLink>
         </v-list-item>
-        <v-list-item>
+        <v-list-item v-if="authStore.isAdministrator || authStore.isManager">
           <RouterLink to="/playlists" class="link">Плейлисты</RouterLink>
         </v-list-item>
         <v-list-item v-if="!authStore.isAdministrator">

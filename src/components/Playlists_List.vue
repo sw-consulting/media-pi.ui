@@ -28,10 +28,6 @@ const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
 const { alert } = storeToRefs(alertStore)
 
 const selectedAccountId = ref(null)
-const search = ref('')
-const itemsPerPage = ref(10)
-const sortBy = ref([])
-const page = ref(1)
 
 const accountOptions = computed(() => createAccountOptions(accounts.value || [], authStore.user, { includeCommon: false }))
 
@@ -56,6 +52,7 @@ function ensureSelection(options) {
 
 const refreshPlaylists = async () => {
   try {
+    if (selectedAccountId.value == null) return
     await playlistsStore.getAllByAccount(selectedAccountId.value)
   } catch (err) {
     alertStore.error('Не удалось загрузить плейлисты: ' + (err?.message || err))
@@ -140,7 +137,7 @@ async function deletePlaylist(item) {
               :item="{}"
               icon="fa-solid fa-folder-plus"
               tooltip-text="Создать плейлист"
-              :disabled="isBusy"
+              :disabled="isBusy || !(accountOptions && accountOptions.length)"
               @click="createPlaylist"
             />
           </div>
@@ -152,7 +149,7 @@ async function deletePlaylist(item) {
     <v-card>
       <div v-if="playlists?.length">
         <v-text-field
-          v-model="search"
+          v-model="authStore.playlists_search"
           :append-inner-icon="mdiMagnify"
           label="Поиск по любой информации о плейлистах"
           variant="solo"
@@ -161,15 +158,15 @@ async function deletePlaylist(item) {
       </div>
       <v-data-table
         v-if="playlists?.length"
-        v-model:items-per-page="itemsPerPage"
+        v-model:items-per-page="authStore.playlists_per_page"
         items-per-page-text="Плейлистов на странице"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
-        v-model:page="page"
+        v-model:page="authStore.playlists_page"
         :headers="headers"
         :items="playlists"
-        :search="search"
-        v-model:sort-by="sortBy"
+        :search="authStore.playlists_search"
+        v-model:sort-by="authStore.playlists_sort_by"
         :custom-filter="filterPlaylists"
         item-value="id"
         class="elevation-1"
