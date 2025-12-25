@@ -11,7 +11,13 @@ const routerPush = vi.hoisted(() => vi.fn())
 
 let currentUser
 
-const makeAuthStore = () => ({ user: currentUser })
+const makeAuthStore = () => ({
+  user: currentUser,
+  playlists_per_page: 10,
+  playlists_search: '',
+  playlists_sort_by: [],
+  playlists_page: 1
+})
 
 const accountsStore = {
   accounts: ref([]),
