@@ -141,7 +141,7 @@ async function deletePlaylist(item) {
               :item="{}"
               icon="fa-solid fa-folder-plus"
               tooltip-text="Создать плейлист"
-              :disabled="isBusy"
+              :disabled="isBusy || !(accountOptions && accountOptions.length)"
               @click="createPlaylist"
             />
           </div>
