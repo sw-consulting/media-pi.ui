@@ -96,7 +96,6 @@ function getButton () {
 
 const loadPlaylists = async (accountId) => {
   if (accountId === null || accountId === undefined) {
-    playlists.value = []
     return
   }
   try {
