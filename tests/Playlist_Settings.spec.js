@@ -108,11 +108,6 @@ const mountSettings = (props = {}) => mount({
         },
         template: '<div><slot v-if="$slots.default" :field="{ value, onChange }" /><input v-else data-test="field-input" /></div>'
       },
-      'v-select': {
-        props: ['items', 'modelValue', 'disabled'],
-        emits: ['update:modelValue'],
-        template: '<select :disabled="disabled" @change="$emit(\'update:modelValue\', Number($event.target.value))"><option v-for="item in items" :key="item.value" :value="item.value">{{ item.title }}</option></select>'
-      },
       'v-text-field': { template: '<input />', props: ['modelValue'] }
     },
     mocks: {
@@ -146,7 +141,8 @@ describe('Playlist_Settings.vue', () => {
 
   it('creates playlist with selected videos', async () => {
     const wrapper = mountSettings({
-      submitValues: { title: 'My Playlist', filename: 'playlist.json', accountId: 1 }
+      accountId: 1,
+      submitValues: { title: 'My Playlist', filename: 'playlist.json' }
     })
 
     await flushPromises()
@@ -170,7 +166,8 @@ describe('Playlist_Settings.vue', () => {
     playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([{ id: 2, filename: 'playlist.json' }])
 
     const wrapper = mountSettings({
-      submitValues: { title: 'My Playlist', filename: 'playlist.json', accountId: 1 }
+      accountId: 1,
+      submitValues: { title: 'My Playlist', filename: 'playlist.json' }
     })
     await flushPromises()
 
@@ -214,7 +211,8 @@ describe('Playlist_Settings.vue', () => {
 
   it('requires playlist items before submit', async () => {
     const wrapper = mountSettings({
-      submitValues: { title: 'Empty', filename: 'empty.json', accountId: 1 }
+      accountId: 1,
+      submitValues: { title: 'Empty', filename: 'empty.json' }
     })
     await flushPromises()
 

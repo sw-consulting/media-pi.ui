@@ -61,7 +61,6 @@ const schema = Yup.object().shape({
   accountId: Yup.number().required('Необходимо выбрать лицевой счёт')
 })
 
-const accountOptions = computed(() => createAccountOptions(accountsStore.accounts || [], authStore.user, { includeCommon: false }))
 const videoAccountOptions = computed(() => createAccountOptions(accountsStore.accounts || [], authStore.user, { includeCommon: true }))
 
 const accountNameById = computed(() => {
@@ -71,6 +70,10 @@ const accountNameById = computed(() => {
     map.set(account.id, account.name || `Лицевой счёт ${account.id}`)
   }
   return map
+})
+const accountLabel = computed(() => {
+  if (playlist.value.accountId === null || playlist.value.accountId === undefined) return '—'
+  return accountNameById.value.get(playlist.value.accountId) || `Лицевой счёт ${playlist.value.accountId}`
 })
 
 const availableVideoMap = computed(() => {
@@ -111,14 +114,6 @@ const totalDuration = computed(() => playlistVideoDetails.value.reduce((sum, ite
 const playlistButtonText = computed(() => (props.register ? 'Создать' : 'Сохранить'))
 const playlistTitleText = computed(() => (props.register ? 'Новый плейлист' : 'Настройки плейлиста'))
 const formKey = computed(() => `${props.register ? 'create' : 'edit'}-${playlist.value.accountId ?? 'none'}`)
-
-watch(accountOptions, (options) => {
-  if (!props.register) return
-  const availableValues = options.map(option => option.value)
-  if (!availableValues.includes(playlist.value.accountId)) {
-    playlist.value.accountId = availableValues.length ? availableValues[0] : null
-  }
-}, { immediate: true })
 
 watch(videoAccountOptions, async (options) => {
   if (!options.length) {
@@ -256,7 +251,7 @@ async function onSubmit(values) {
 
   const trimmedTitle = values.title.trim()
   const trimmedFilename = values.filename.trim()
-  const accountId = values.accountId
+  const accountId = values.accountId ?? playlist.value.accountId ?? props.accountId ?? null
 
   try {
     const isUnique = await checkFilenameUnique(trimmedFilename, accountId)
@@ -334,21 +329,9 @@ async function onSubmit(values) {
       </div>
 
       <div class="form-group">
-        <label class="label" for="accountId">Лицевой счёт:</label>
-        <Field name="accountId" v-slot="{ field }">
-          <v-select
-            id="accountId"
-            :items="accountOptions"
-            item-title="title"
-            item-value="value"
-            density="compact"
-            variant="outlined"
-            hide-details
-            :model-value="field.value"
-            :disabled="isSubmitting || !props.register"
-            @update:model-value="field.onChange"
-          />
-        </Field>
+        <label class="label">Лицевой счёт:</label>
+        <div class="form-control input">{{ accountLabel }}</div>
+        <Field name="accountId" type="hidden" />
       </div>
 
       <div class="playlist-columns">
