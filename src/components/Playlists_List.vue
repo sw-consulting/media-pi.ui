@@ -56,6 +56,7 @@ function ensureSelection(options) {
 
 const refreshPlaylists = async () => {
   try {
+    if (selectedAccountId?.value == null || selectedAccountId.value === undefined) return
     await playlistsStore.getAllByAccount(selectedAccountId.value)
   } catch (err) {
     alertStore.error('Не удалось загрузить плейлисты: ' + (err?.message || err))

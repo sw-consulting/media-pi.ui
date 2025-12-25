@@ -47,12 +47,12 @@ const selectedUploadIds = ref([])
 const selectedPlayId = ref(null)
 
 const playlistHeaders = computed(() => ([
-  { title: 'Загружать', align: 'center', key: 'upload', sortable: false, width: '8%' },
-  { title: 'Играть', align: 'center', key: 'play', sortable: false, width: '8%' },
-  { title: 'Название', align: 'start', key: 'title', width: '24%' },
-  { title: 'Длительность', align: 'start', key: 'totalDurationSeconds', width: '15%' },
-  { title: 'Размер', align: 'start', key: 'totalFileSizeBytes', width: '15%' },
-  { title: 'Количество файлов', align: 'start', key: 'videoCount', width: '20%' }
+  { title: 'Загружать', align: 'center', key: 'upload', sortable: false, width: '7%' },
+  { title: 'Играть', align: 'center', key: 'play', sortable: false, width: '7%' },
+  { title: 'Название', align: 'start', key: 'title', width: '50%' },
+  { title: 'Длительность', align: 'start', key: 'totalDurationSeconds', width: '12%' },
+  { title: 'Размер', align: 'start', key: 'totalFileSizeBytes', width: '12%' },
+  { title: 'Файлов', align: 'start', key: 'videoCount', width: '12%' }
 ]))
 
 if (!isRegister()) {
@@ -156,8 +156,8 @@ async function onSubmit (values) {
 </script>
 
 <template>
-  <div class="settings form-2 form-compact">
-    <h1 class="primary-heading">{{ isRegister() ? 'Новая группа устройств' : 'Настройки группы устройств' }}</h1>
+  <div class="settings form-4 form-compact">
+    <h1 class="primary-heading">{{ isRegister() ? 'Новая группа устройств' : `Настройки группы устройств '${group.name}'` }}</h1>
     <hr class="hr" />
 
     <Form
@@ -167,40 +167,24 @@ async function onSubmit (values) {
       v-slot="{ errors, isSubmitting }"
     >
       <div class="form-group">
-        <label for="name" class="label">Название:</label>
+        <label for="name" class="label-1">Название:</label>
         <Field name="name" type="text" id="name" :disabled="isSubmitting"
-          class="form-control input" :class="{ 'is-invalid': errors.name }"
+          class="form-control input-1" :class="{ 'is-invalid': errors.name }"
           placeholder="Введите название группы"
         />
       </div>
 
-      <div class="form-group mt-8">
-        <button class="button primary" type="submit" :disabled="isSubmitting">
-          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
-          {{ getButton() }}
-        </button>
-        <button
-          class="button secondary"
-          type="button"
-          @click="$router.go(-1)"
-        >
-          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
-          Отменить
-        </button>
-      </div>
-
-      <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
-    </Form>
-
-    <div class="mt-8">
-      <h2 class="secondary-heading">Плейлисты</h2>
-      <v-card>
+      <v-card class="mt-8">
         <v-data-table
           :headers="playlistHeaders"
           :items="playlists"
           item-value="id"
           class="elevation-1"
+          v-model:items-per-page="itemsPerPage"
+          items-per-page-text="Плейлистов на странице"
+          :items-per-page-options="itemsPerPageOptions"
+          page-text="{0}-{1} из {2}"
+          v-model:page="page"
         >
           <template v-slot:[`item.upload`]="{ item }">
             <input
@@ -235,7 +219,25 @@ async function onSubmit (values) {
       <div v-if="playlistsError" class="text-center m-5">
         <div class="text-danger">Ошибка при загрузке списка плейлистов: {{ playlistsError }}</div>
       </div>
-    </div>
+
+      <div class="form-group mt-8">
+        <button class="button primary" type="submit" :disabled="isSubmitting">
+          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
+          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
+          {{ getButton() }}
+        </button>
+        <button
+          class="button secondary"
+          type="button"
+          @click="$router.go(-1)"
+        >
+          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
+          Отменить
+        </button>
+      </div>
+
+      <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
+    </Form>
 
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
