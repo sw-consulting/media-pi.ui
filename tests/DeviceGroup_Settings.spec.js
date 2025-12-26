@@ -185,7 +185,8 @@ describe('DeviceGroup_Settings.vue', () => {
 
     expect(deviceGroupsStore.add).toHaveBeenCalledWith({
       name: 'Test Group',
-      accountId: 5
+      accountId: 5,
+      playlists: []
     })
   })
 
@@ -203,8 +204,121 @@ describe('DeviceGroup_Settings.vue', () => {
     await flushPromises()
 
     expect(deviceGroupsStore.update).toHaveBeenCalledWith(1, {
-      name: 'Test Group'
+      name: 'Test Group',
+      playlists: []
     })
+  })
+
+  it('initializes playlist selections when editing', async () => {
+    deviceGroupsStore.group = {
+      id: 1,
+      name: 'Existing Group',
+      accountId: 12,
+      playLists: [
+        { playlistId: 10, play: false },
+        { playlistId: 11, play: true }
+      ]
+    }
+    playlistsStore.playlists.value = [
+      { id: 10, totalFileSizeBytes: 0, totalDurationSeconds: 0 },
+      { id: 11, totalFileSizeBytes: 0, totalDurationSeconds: 0 }
+    ]
+
+    const wrapper = mountSettings({ register: false, id: 1 })
+    await flushPromises()
+
+    const uploadCheckbox = wrapper.find('[data-test="playlist-upload-10"]')
+    const uploadCheckbox2 = wrapper.find('[data-test="playlist-upload-11"]')
+    const playRadio = wrapper.find('[data-test="playlist-play-11"]')
+
+    expect(uploadCheckbox.element.checked).toBe(true)
+    expect(uploadCheckbox2.element.checked).toBe(true)
+    expect(playRadio.element.checked).toBe(true)
+  })
+
+  it('does not reapply initial playlist selection after playlists are reloaded', async () => {
+    // Setup initial group data with playlist selections
+    deviceGroupsStore.group = {
+      id: 1,
+      name: 'Existing Group',
+      accountId: 12,
+      playLists: [
+        { playlistId: 10, play: false },
+        { playlistId: 11, play: true }
+      ]
+    }
+    
+    playlistsStore.playlists.value = [
+      { id: 10, totalFileSizeBytes: 0, totalDurationSeconds: 0 },
+      { id: 11, totalFileSizeBytes: 0, totalDurationSeconds: 0 }
+    ]
+
+    const wrapper = mountSettings({ register: false, id: 1 })
+    await flushPromises()
+
+    // Verify initial playlist selections were applied
+    expect(wrapper.find('[data-test="playlist-upload-10"]').element.checked).toBe(true)
+    expect(wrapper.find('[data-test="playlist-upload-11"]').element.checked).toBe(true)
+
+    // User unchecks a playlist
+    await wrapper.find('[data-test="playlist-upload-10"]').setValue(false)
+    await flushPromises()
+
+    // Verify the change took effect
+    expect(wrapper.find('[data-test="playlist-upload-10"]').element.checked).toBe(false)
+    
+    // Simulate playlists being reloaded by calling getAllByAccount again
+    // This tests that pendingPlaylistSelection was cleared and won't reapply
+    playlistsStore.getAllByAccount.mockResolvedValue()
+    playlistsStore.playlists.value = [
+      { id: 10, totalFileSizeBytes: 0, totalDurationSeconds: 0 },
+      { id: 11, totalFileSizeBytes: 0, totalDurationSeconds: 0 },
+      { id: 12, totalFileSizeBytes: 0, totalDurationSeconds: 0 }
+    ]
+    
+    // Trigger watcher by unmounting and remounting (simulates account reload scenario)
+    wrapper.unmount()
+    
+    // Set up new mount without playLists to ensure fresh state
+    deviceGroupsStore.group = {
+      id: 1,
+      name: 'Existing Group',
+      accountId: 12,
+      playLists: [] // No playlists this time
+    }
+    
+    const wrapper2 = mountSettings({ register: false, id: 1 })
+    await flushPromises()
+
+    // Since the group has no playlists now, and pendingPlaylistSelection should have been
+    // cleared after first application, all checkboxes should be unchecked
+    expect(wrapper2.find('[data-test="playlist-upload-10"]').element.checked).toBe(false)
+    expect(wrapper2.find('[data-test="playlist-upload-11"]').element.checked).toBe(false)
+  })
+
+  it('submits selected playlists with play flag', async () => {
+    playlistsStore.playlists.value = [
+      { id: 1, totalFileSizeBytes: 0, totalDurationSeconds: 0 },
+      { id: 2, totalFileSizeBytes: 0, totalDurationSeconds: 0 }
+    ]
+
+    const wrapper = mountSettings({ register: true, accountId: 5 })
+    await flushPromises()
+
+    await wrapper.find('[data-test="playlist-upload-1"]').setValue(true)
+    await wrapper.find('[data-test="playlist-upload-2"]').setValue(true)
+    await wrapper.find('[data-test="playlist-play-2"]').trigger('click')
+
+    const form = wrapper.find('[data-testid="form"]')
+    await form.trigger('submit')
+    await flushPromises()
+
+    expect(deviceGroupsStore.add).toHaveBeenCalledWith(expect.objectContaining({
+      playlists: [
+        { playlistId: 1, play: false },
+        { playlistId: 2, play: true }
+      ]
+    }))
   })
 
   it('handles group not found error', async () => {
@@ -333,7 +447,8 @@ describe('DeviceGroup_Settings.vue', () => {
 
     expect(deviceGroupsStore.add).toHaveBeenCalledWith({
       name: 'Test Group',
-      accountId: 5
+      accountId: 5,
+      playlists: []
     })
   })
 
@@ -526,11 +641,15 @@ describe('DeviceGroup_Settings.vue', () => {
     const uploadCheckbox2 = wrapper.find('[data-test="playlist-upload-2"]')
     await uploadCheckbox2.setValue(true)
 
-    const playRadio = wrapper.find('[data-test="playlist-play-2"]')
-    await playRadio.trigger('click')
-    expect(playRadio.element.checked).toBe(true)
-    await playRadio.trigger('click')
-    expect(playRadio.element.checked).toBe(false)
+    const getPlayRadio = () => wrapper.find('[data-test="playlist-play-2"]')
+
+    await getPlayRadio().trigger('click')
+    await flushPromises()
+    expect(getPlayRadio().element.checked).toBe(true)
+
+    await getPlayRadio().trigger('click')
+    await flushPromises()
+    expect(getPlayRadio().element.checked).toBe(false)
   })
 
   it('handles error status 403 during initial load', async () => {

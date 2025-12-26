@@ -49,6 +49,8 @@ const initialLoading = ref(false)
 const groupAccountId = ref(props.accountId ?? null)
 const selectedUploadIds = ref([])
 const selectedPlayId = ref(null)
+const playRenderKey = ref(0)
+const pendingPlaylistSelection = ref(null)
 
 const playlistHeaders = computed(() => ([
   { title: 'Загрузить', align: 'center', key: 'upload', sortable: false, width: '7%' },
@@ -71,6 +73,7 @@ if (!isRegister()) {
       name: loadedGroup.name || ''
     }
     groupAccountId.value = loadedGroup.accountId ?? props.accountId ?? null
+    pendingPlaylistSelection.value = loadedGroup.playLists ?? []
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
@@ -99,9 +102,29 @@ const loadPlaylists = async (accountId) => {
   }
   try {
     await playlistsStore.getAllByAccount(accountId)
+    if (pendingPlaylistSelection.value) {
+      applyPlaylistSelection(pendingPlaylistSelection.value)
+      pendingPlaylistSelection.value = null
+    }
   } catch (err) {
     alertStore.error('Не удалось загрузить плейлисты: ' + (err?.message || err))
   }
+}
+
+const applyPlaylistSelection = (playlistItems) => {
+  const uploadIds = []
+  let playId = null
+  playlistItems.forEach((playlist) => {
+    if (!playlist || playlist.playlistId === undefined || playlist.playlistId === null) {
+      return
+    }
+    uploadIds.push(playlist.playlistId)
+    if (playlist.play) {
+      playId = playlist.playlistId
+    }
+  })
+  selectedUploadIds.value = uploadIds
+  selectedPlayId.value = playId
 }
 
 const toggleUploadSelection = (playlistId, checked) => {
@@ -119,7 +142,14 @@ const toggleUploadSelection = (playlistId, checked) => {
 const togglePlaySelection = (playlistId, event) => {
   if (selectedPlayId.value === playlistId) {
     selectedPlayId.value = null
-    if (event) event.preventDefault()
+    if (event) {
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.target) {
+        event.target.checked = false
+      }
+    }
+    playRenderKey.value += 1
     return
   }
   selectedPlayId.value = playlistId
@@ -133,8 +163,16 @@ watch(groupAccountId, async (accountId) => {
 
 async function onSubmit (values) {
   try {
+    const selectedSet = new Set(selectedUploadIds.value)
+    const playlistsPayload = Array.from(selectedSet)
+      .sort((a, b) => a - b)
+      .map((playlistId) => ({
+        playlistId,
+        play: playlistId === selectedPlayId.value
+      }))
     const payload = {
-      name: values.name.trim()
+      name: values.name.trim(),
+      playlists: playlistsPayload
     }
     if (isRegister()) {
       payload.accountId = props.accountId
@@ -212,6 +250,7 @@ async function onSubmit (values) {
                 class="radio-input"
                 :data-test="`playlist-play-${item.id}`"
                 name="device-group-playlist"
+                :key="`playlist-play-${item.id}-${playRenderKey}`"
                 :checked="selectedPlayId === item.id"
                 :disabled="playlistsLoading || !selectedUploadIds.includes(item.id)"
                 @click="togglePlaySelection(item.id, $event)"
