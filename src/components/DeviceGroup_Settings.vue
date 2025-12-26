@@ -72,7 +72,7 @@ if (!isRegister()) {
       name: loadedGroup.name || ''
     }
     groupAccountId.value = loadedGroup.accountId ?? props.accountId ?? null
-    pendingPlaylistSelection.value = loadedGroup.playLists ?? loadedGroup.PlayLists ?? []
+    pendingPlaylistSelection.value = loadedGroup.playLists ?? []
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
