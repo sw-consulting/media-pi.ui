@@ -185,7 +185,8 @@ describe('DeviceGroup_Settings.vue', () => {
 
     expect(deviceGroupsStore.add).toHaveBeenCalledWith({
       name: 'Test Group',
-      accountId: 5
+      accountId: 5,
+      playlists: []
     })
   })
 
@@ -203,8 +204,61 @@ describe('DeviceGroup_Settings.vue', () => {
     await flushPromises()
 
     expect(deviceGroupsStore.update).toHaveBeenCalledWith(1, {
-      name: 'Test Group'
+      name: 'Test Group',
+      playlists: []
     })
+  })
+
+  it('initializes playlist selections when editing', async () => {
+    deviceGroupsStore.group = {
+      id: 1,
+      name: 'Existing Group',
+      accountId: 12,
+      playLists: [
+        { playlistId: 10, play: false },
+        { playlistId: 11, play: true }
+      ]
+    }
+    playlistsStore.playlists.value = [
+      { id: 10, totalFileSizeBytes: 0, totalDurationSeconds: 0 },
+      { id: 11, totalFileSizeBytes: 0, totalDurationSeconds: 0 }
+    ]
+
+    const wrapper = mountSettings({ register: false, id: 1 })
+    await flushPromises()
+
+    const uploadCheckbox = wrapper.find('[data-test="playlist-upload-10"]')
+    const uploadCheckbox2 = wrapper.find('[data-test="playlist-upload-11"]')
+    const playRadio = wrapper.find('[data-test="playlist-play-11"]')
+
+    expect(uploadCheckbox.element.checked).toBe(true)
+    expect(uploadCheckbox2.element.checked).toBe(true)
+    expect(playRadio.element.checked).toBe(true)
+  })
+
+  it('submits selected playlists with play flag', async () => {
+    playlistsStore.playlists.value = [
+      { id: 1, totalFileSizeBytes: 0, totalDurationSeconds: 0 },
+      { id: 2, totalFileSizeBytes: 0, totalDurationSeconds: 0 }
+    ]
+
+    const wrapper = mountSettings({ register: true, accountId: 5 })
+    await flushPromises()
+
+    await wrapper.find('[data-test="playlist-upload-1"]').setValue(true)
+    await wrapper.find('[data-test="playlist-upload-2"]').setValue(true)
+    await wrapper.find('[data-test="playlist-play-2"]').trigger('click')
+
+    const form = wrapper.find('[data-testid="form"]')
+    await form.trigger('submit')
+    await flushPromises()
+
+    expect(deviceGroupsStore.add).toHaveBeenCalledWith(expect.objectContaining({
+      playlists: [
+        { playlistId: 1, play: false },
+        { playlistId: 2, play: true }
+      ]
+    }))
   })
 
   it('handles group not found error', async () => {
@@ -333,7 +387,8 @@ describe('DeviceGroup_Settings.vue', () => {
 
     expect(deviceGroupsStore.add).toHaveBeenCalledWith({
       name: 'Test Group',
-      accountId: 5
+      accountId: 5,
+      playlists: []
     })
   })
 

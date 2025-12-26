@@ -49,6 +49,7 @@ const initialLoading = ref(false)
 const groupAccountId = ref(props.accountId ?? null)
 const selectedUploadIds = ref([])
 const selectedPlayId = ref(null)
+const pendingPlaylistSelection = ref(null)
 
 const playlistHeaders = computed(() => ([
   { title: 'Загрузить', align: 'center', key: 'upload', sortable: false, width: '7%' },
@@ -71,6 +72,7 @@ if (!isRegister()) {
       name: loadedGroup.name || ''
     }
     groupAccountId.value = loadedGroup.accountId ?? props.accountId ?? null
+    pendingPlaylistSelection.value = loadedGroup.playLists ?? loadedGroup.PlayLists ?? []
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
@@ -99,9 +101,29 @@ const loadPlaylists = async (accountId) => {
   }
   try {
     await playlistsStore.getAllByAccount(accountId)
+    if (pendingPlaylistSelection.value) {
+      applyPlaylistSelection(pendingPlaylistSelection.value)
+      pendingPlaylistSelection.value = null
+    }
   } catch (err) {
     alertStore.error('Не удалось загрузить плейлисты: ' + (err?.message || err))
   }
+}
+
+const applyPlaylistSelection = (playlistItems) => {
+  const uploadIds = []
+  let playId = null
+  playlistItems.forEach((playlist) => {
+    if (!playlist || playlist.playlistId === undefined || playlist.playlistId === null) {
+      return
+    }
+    uploadIds.push(playlist.playlistId)
+    if (playlist.play) {
+      playId = playlist.playlistId
+    }
+  })
+  selectedUploadIds.value = uploadIds
+  selectedPlayId.value = playId
 }
 
 const toggleUploadSelection = (playlistId, checked) => {
@@ -133,8 +155,14 @@ watch(groupAccountId, async (accountId) => {
 
 async function onSubmit (values) {
   try {
+    const selectedSet = new Set(selectedUploadIds.value)
+    const playlistsPayload = Array.from(selectedSet).map((playlistId) => ({
+      playlistId,
+      play: playlistId === selectedPlayId.value
+    }))
     const payload = {
-      name: values.name.trim()
+      name: values.name.trim(),
+      playlists: playlistsPayload
     }
     if (isRegister()) {
       payload.accountId = props.accountId
