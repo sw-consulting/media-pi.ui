@@ -156,10 +156,12 @@ watch(groupAccountId, async (accountId) => {
 async function onSubmit (values) {
   try {
     const selectedSet = new Set(selectedUploadIds.value)
-    const playlistsPayload = Array.from(selectedSet).map((playlistId) => ({
-      playlistId,
-      play: playlistId === selectedPlayId.value
-    }))
+    const playlistsPayload = Array.from(selectedSet)
+      .sort((a, b) => a - b)
+      .map((playlistId) => ({
+        playlistId,
+        play: playlistId === selectedPlayId.value
+      }))
     const payload = {
       name: values.name.trim(),
       playlists: playlistsPayload
