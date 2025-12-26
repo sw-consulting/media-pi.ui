@@ -49,7 +49,6 @@ const initialLoading = ref(false)
 const groupAccountId = ref(props.accountId ?? null)
 const selectedUploadIds = ref([])
 const selectedPlayId = ref(null)
-const playRenderKey = ref(0)
 const pendingPlaylistSelection = ref(null)
 
 const playlistHeaders = computed(() => ([
@@ -140,19 +139,14 @@ const toggleUploadSelection = (playlistId, checked) => {
 }
 
 const togglePlaySelection = (playlistId, event) => {
+  if (event) {
+    event.preventDefault()
+  }
   if (selectedPlayId.value === playlistId) {
     selectedPlayId.value = null
-    if (event) {
-      event.preventDefault()
-      event.stopPropagation()
-      if (event.target) {
-        event.target.checked = false
-      }
-    }
-    playRenderKey.value += 1
-    return
+  } else {
+    selectedPlayId.value = playlistId
   }
-  selectedPlayId.value = playlistId
 }
 
 watch(groupAccountId, async (accountId) => {
@@ -250,7 +244,6 @@ async function onSubmit (values) {
                 class="radio-input"
                 :data-test="`playlist-play-${item.id}`"
                 name="device-group-playlist"
-                :key="`playlist-play-${item.id}-${playRenderKey}`"
                 :checked="selectedPlayId === item.id"
                 :disabled="playlistsLoading || !selectedUploadIds.includes(item.id)"
                 @click="togglePlaySelection(item.id, $event)"
