@@ -138,9 +138,10 @@ const toggleUploadSelection = (playlistId, checked) => {
   selectedUploadIds.value = Array.from(current)
 }
 
-const togglePlaySelection = (playlistId, event) => {
-  if (event) {
-    event.preventDefault()
+const togglePlaySelection = (playlistId) => {
+  // Only allow selection if playlist is in upload list and not loading
+  if (playlistsLoading.value || !selectedUploadIds.value.includes(playlistId)) {
+    return
   }
   if (selectedPlayId.value === playlistId) {
     selectedPlayId.value = null
@@ -238,7 +239,11 @@ async function onSubmit (values) {
             </div>
           </template>
           <template v-slot:[`item.play`]="{ item }">
-            <label class="radio-styled" :class="{ 'disabled': playlistsLoading || !selectedUploadIds.includes(item.id) }">
+            <label 
+              class="radio-styled" 
+              :class="{ 'disabled': playlistsLoading || !selectedUploadIds.includes(item.id) }"
+              @click.prevent="togglePlaySelection(item.id)"
+            >
               <input
                 type="radio"
                 class="radio-input"
@@ -246,7 +251,6 @@ async function onSubmit (values) {
                 name="device-group-playlist"
                 :checked="selectedPlayId === item.id"
                 :disabled="playlistsLoading || !selectedUploadIds.includes(item.id)"
-                @click="togglePlaySelection(item.id, $event)"
               />
               <span class="radio-mark"></span>
             </label>
