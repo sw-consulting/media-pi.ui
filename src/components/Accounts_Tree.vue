@@ -58,6 +58,7 @@ import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpe
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 import DeviceStatusDialog from '@/components/Device_Status_Dialog.vue'
 import InlineAssignment from '@/components/InlineAssignment.vue'
+import { CREATOR_ID } from '@/stores/users.store.js'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -521,7 +522,7 @@ onBeforeUnmount(() => {
             <!-- Action buttons for individual device nodes -->
             <div v-else-if="item.id.startsWith('device-')" class="tree-actions">
               <!-- Always allow viewing device status -->
-              <ActionButton :item="item" icon="fa-solid fa-book-skull" tooltip-text="Системная информация" 
+              <ActionButton v-if="authStore.user?.id === CREATOR_ID" :item="item" icon="fa-solid fa-book-skull" tooltip-text="Системная информация" 
                 :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                 @click="openDeviceStatus" 
               />

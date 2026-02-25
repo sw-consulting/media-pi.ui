@@ -9,6 +9,9 @@ import { apiUrl } from '@/helpers/config.js'
 
 const baseUrl = `${apiUrl}/users`
 
+// Magic constant for the system creator user
+export const CREATOR_ID = 1
+
 export const useUsersStore = defineStore('users', () => {
   const users = ref([])
   const user = ref(null)
