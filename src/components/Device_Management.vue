@@ -34,33 +34,15 @@ const { statuses } = storeToRefs(deviceStatusesStore)
 // Manual refresh override removed here; other components may still use it.
 
 const defaultServiceStatus = Object.freeze({
-  playbackServiceStatus: false,
-  playlistUploadServiceStatus: false,
   videoUploadServiceStatus: false,
-  yaDiskMountStatus: false
+  playlistUploadServiceStatus: false,
+  playbackServiceStatus: false,
 })
 const serviceStatus = ref({ ...defaultServiceStatus })
 
 const defaultServiceOperationTimeout = 3000
 
 const serviceDescriptors = Object.freeze([
-  {
-    key: 'playback',
-    label: 'Воспроизведение',
-    statusKey: 'playbackServiceStatus',
-    activeLabel: 'Запущено',
-    inactiveLabel: 'Остановлено',
-    startLabel: 'Запустить',
-    stopLabel: 'Остановить',
-    startOperationKey: 'startPlaybackService',
-    stopOperationKey: 'stopPlaybackService',
-    startHandler: devicesStore.startPlayback,
-    stopHandler: devicesStore.stopPlayback,
-    successMessages: {
-      start: 'Выполнен запуск службы воспроизведения',
-      stop: 'Выполнена остановка службы воспроизведения'
-    }
-  },
   {
     key: 'playlistUpload',
     label: 'Загрузка плейлистов',
@@ -76,6 +58,23 @@ const serviceDescriptors = Object.freeze([
     successMessages: {
       start: 'Выполнен запуск службы загрузки плейлистов',
       stop: 'Выполнена остановка службы загрузки плейлистов'
+    }
+  },
+  {
+    key: 'playback',
+    label: 'Воспроизведение',
+    statusKey: 'playbackServiceStatus',
+    activeLabel: 'Запущено',
+    inactiveLabel: 'Остановлено',
+    startLabel: 'Запустить',
+    stopLabel: 'Остановить',
+    startOperationKey: 'startPlaybackService',
+    stopOperationKey: 'stopPlaybackService',
+    startHandler: devicesStore.startPlayback,
+    stopHandler: devicesStore.stopPlayback,
+    successMessages: {
+      start: 'Выполнен запуск службы воспроизведения',
+      stop: 'Выполнена остановка службы воспроизведения'
     }
   },
   {
@@ -95,13 +94,7 @@ const serviceDescriptors = Object.freeze([
       stop: 'Выполнена остановка службы загрузки видео'
     }
   },
-  {
-    key: 'yadisk',
-    label: 'Яндекс диск',
-    statusKey: 'yaDiskMountStatus',
-    activeLabel: 'Смонтирован',
-    inactiveLabel: 'Не смонтирован'
-  }
+
 ])
 
 // Track ongoing operations to disable controls
@@ -400,7 +393,7 @@ const deviceInfo = computed(() => {
     name: dev?.name || '—',
     ipAddress: dev?.ipAddress || '—',
     softwareVersion: status?.softwareVersion || '—',
-    isOnline: status?.isOnline ? 'Да' : 'Нет',
+    isOnline: status?.isOnline ? `Да (${status?.connectLatencyMs ?? '—'} мс)` : 'Нет',
     lastChecked: fmtDate(status?.lastChecked),
     connectLatencyMs: status?.connectLatencyMs ?? '—'
   }
@@ -707,8 +700,6 @@ onBeforeUnmount(() => {
     <div class="form-group mt-4 form-group-add">
       <h2 class="secondary-heading">Об устройстве</h2>
       <div class="device-info-grid">
-        <div class="label service-label">Название</div>
-        <div class="value">{{ deviceInfo.name }}</div>
 
         <div class="label service-label">IP адрес</div>
         <div class="value">{{ deviceInfo.ipAddress }}</div>
@@ -716,7 +707,7 @@ onBeforeUnmount(() => {
         <div class="label service-label">Версия агента</div>
         <div class="value">{{ deviceInfo.softwareVersion }}</div>
 
-        <div class="label service-label">Онлайн</div>
+        <div class="label service-label">Онлайн (задержка)</div>
         <div class="value">
           <span :class="onlineClass">
             {{ deviceInfo.isOnline }}
@@ -726,8 +717,6 @@ onBeforeUnmount(() => {
         <div class="label service-label">Последняя проверка</div>
         <div class="value">{{ deviceInfo.lastChecked }}</div>
 
-        <div class="label service-label">Задержка</div>
-        <div class="value">{{ deviceInfo.connectLatencyMs }}{{ deviceInfo.connectLatencyMs !== '—' ? ' мс' : '' }}</div>
       </div>
     </div>
 
@@ -852,47 +841,31 @@ onBeforeUnmount(() => {
 
     <!-- Playlist Settings Section -->
     <div class="form-group mt-4 form-group-add">
-      <h2 class="secondary-heading">Настройки плей-листа</h2>
+      <h2 class="secondary-heading">Другие настройки</h2>
       <div class="playlist-grid">
-        <div class="form-group">
-        <label class="label" for="playlist-source">Яндекс диск:</label>
-        <input
-          id="playlist-source"
-          v-model="playlistSettings.source"
-          type="text"
-          class="form-control input"
-          :disabled="isDisabled || hasAnyOperationInProgress"
-          placeholder="Путь к источнику на Яндекс диске"
-        />
+        <div class="playlist-cell label playlist-label">Расположение</div>
+        <div class="playlist-cell">
+          <input
+            id="playlist-destination"
+            v-model="playlistSettings.destination"
+            type="text"
+            class="form-control input"
+            :disabled="isDisabled || hasAnyOperationInProgress"
+            placeholder="Путь к локальному диске"
+          />
         </div>
-        <div class="form-group">
-        <label class="label" for="playlist-destination">Локальный диск:</label>
-        <input
-          id="playlist-destination"
-          v-model="playlistSettings.destination"
-          type="text"
-          class="form-control input"
-          :disabled="isDisabled || hasAnyOperationInProgress"
-          placeholder="Путь к локальному диске"
-        />
+        <div class="playlist-cell label playlist-label">Аудиовыход</div>
+        <div class="playlist-cell">
+          <select
+            id="audio-output"
+            v-model="audioSettings.output"
+            class="form-control input"
+            :disabled="isDisabled || hasAnyOperationInProgress"
+          >
+            <option value="hdmi">HDMI audio</option>
+            <option value="jack">3.5" jack audio</option>
+          </select>
         </div>
-      </div>
-    </div>
-
-    <!-- Audio Settings Section -->
-    <div class="form-group mt-4 form-group-add">
-      <h2 class="secondary-heading">Настройки аудио</h2>
-      <div class="form-group">
-        <label for="audio-output" class="label">Аудиовыход:</label>
-        <select
-          id="audio-output"
-          v-model="audioSettings.output"
-          class="form-control input"
-          :disabled="isDisabled || hasAnyOperationInProgress"
-        >
-          <option value="hdmi">HDMI audio</option>
-          <option value="jack">3.5" jack audio</option>
-        </select>
       </div>
     </div>
 
@@ -963,7 +936,7 @@ onBeforeUnmount(() => {
 }
 
 .secondary-heading {
-  width: 25%; /* moved to global stylesheet as .secondary-heading */
+  width: 25%;
 }
 
 .form-group-add {
@@ -976,25 +949,30 @@ onBeforeUnmount(() => {
 
 .device-info-grid {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: repeat(2, 200px 1fr);
   gap: 0.5rem 1rem;
   align-items: center;
-  padding: 1rem 0;
 }
 
 .service-grid {
   display: grid;
-  grid-template-columns:200px 1fr auto;
-  gap: 0.7rem;
+  grid-template-columns: repeat(2, 200px 1fr auto);
+  gap: 0.7rem 0.5rem;
 }
 
 .service-cell {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+}
+
+/* Add left margin to the first cell of the second column group */
+.service-cell:nth-child(6n + 4) {
+  margin-left: 2rem;
 }
 
 .service-label {
-  width:  140px;
+  width: 140px;
 }
 
 .service-action {
@@ -1007,6 +985,22 @@ onBeforeUnmount(() => {
   gap: 1rem;
 }
 
+.playlist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 160px 1fr);
+  gap: 1rem;
+}
+
+.playlist-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.playlist-label {
+  width: 120px;
+}
+
 .timers-column {
   border: 1px solid  #536373;
   border-radius: 8px;
@@ -1014,34 +1008,39 @@ onBeforeUnmount(() => {
   background-color: rgba(0, 0, 0, 0.02);
 }
 
-.playlist-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  width: 100%;
-}
-
-.playlist-grid .form-group {
-  margin-bottom: 0;
-}
-
-.playlist-grid .label {
-  width: 30%;
-  min-width: auto;
-} 
-
-.playlist-grid .input {
-  width: 70%;
-  min-width: auto;
-} 
-
 @media (max-width: 1000px) {
+  .secondary-heading {
+    width: 100%;
+  }
+
+  .service-grid {
+    grid-template-columns: 200px 1fr auto;
+  }
+
+  .service-cell:nth-child(6n + 4) {
+    margin-left: 0;
+  }
+
+  .device-info-grid {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 0.5rem 1rem;
+    align-items: center;
+    padding: 1rem 0;
+  }
+
+  .playlist-grid {
+    display: grid;
+    grid-template-columns: 0.8fr 1.5fr;
+    gap: 0.5rem 1rem;
+    align-items: center;
+    padding: 1rem 0;
+  }
+
   .timers-grid {
     grid-template-columns: 0.7fr;
   }
-  .playlist-grid {
-    grid-template-columns: 0.7fr;
-  }
+
   .form-group-add {
     min-width: auto;
     width: auto;
