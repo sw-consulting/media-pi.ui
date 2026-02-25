@@ -73,8 +73,7 @@ const updateConfiguration = vi.fn(() => Promise.resolve())
 const getServiceStatus = vi.fn(() => Promise.resolve({
   playbackServiceStatus: false,
   playlistUploadServiceStatus: false,
-  videoUploadServiceStatus: false,
-  yaDiskMountStatus: false
+  videoUploadServiceStatus: false
 }))
 const startPlayback = vi.fn(() => Promise.resolve())
 const stopPlayback = vi.fn(() => Promise.resolve())
@@ -377,7 +376,7 @@ describe('Device_Management.vue', () => {
     getServiceStatus.mockResolvedValue({
       playbackServiceStatus: true,
       playlistUploadServiceStatus: false,
-      yaDiskMountStatus: false
+      videoUploadServiceStatus: false
     })
 
     const wrapper = mount(DeviceManagement, {
@@ -435,8 +434,7 @@ describe('Device_Management.vue', () => {
     getServiceStatus.mockResolvedValue({
       playbackServiceStatus: false,
       playlistUploadServiceStatus: true,
-      videoUploadServiceStatus: false,
-      yaDiskMountStatus: false
+      videoUploadServiceStatus: false
     })
 
     const wrapper = mount(DeviceManagement, {
@@ -492,8 +490,7 @@ describe('Device_Management.vue', () => {
     getServiceStatus.mockResolvedValue({
       playbackServiceStatus: false,
       playlistUploadServiceStatus: false,
-      videoUploadServiceStatus: true,
-      yaDiskMountStatus: false
+      videoUploadServiceStatus: true
     })
 
     const wrapper = mount(DeviceManagement, {

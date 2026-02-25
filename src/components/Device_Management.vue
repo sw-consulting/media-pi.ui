@@ -36,8 +36,7 @@ const { statuses } = storeToRefs(deviceStatusesStore)
 const defaultServiceStatus = Object.freeze({
   playbackServiceStatus: false,
   playlistUploadServiceStatus: false,
-  videoUploadServiceStatus: false,
-  yaDiskMountStatus: false
+  videoUploadServiceStatus: false
 })
 const serviceStatus = ref({ ...defaultServiceStatus })
 
@@ -94,13 +93,6 @@ const serviceDescriptors = Object.freeze([
       start: 'Выполнен запуск службы загрузки видео',
       stop: 'Выполнена остановка службы загрузки видео'
     }
-  },
-  {
-    key: 'yadisk',
-    label: 'Яндекс диск',
-    statusKey: 'yaDiskMountStatus',
-    activeLabel: 'Смонтирован',
-    inactiveLabel: 'Не смонтирован'
   }
 ])
 
