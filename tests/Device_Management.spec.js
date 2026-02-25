@@ -537,28 +537,22 @@ describe('Device_Management.vue', () => {
     const labels = deviceInfoGrid.findAll('.label')
     const values = deviceInfoGrid.findAll('.value')
 
-    expect(labels).toHaveLength(6)
-    expect(values).toHaveLength(6)
+    expect(labels).toHaveLength(4)
+    expect(values).toHaveLength(4)
 
     // Check each field
-    expect(labels[0].text()).toBe('Название')
-    expect(values[0].text()).toBe('Device 1')
+    expect(labels[0].text()).toBe('IP адрес')
+    expect(values[0].text()).toBe('192.168.1.100')
 
-    expect(labels[1].text()).toBe('IP адрес')
-    expect(values[1].text()).toBe('192.168.1.100')
+    expect(labels[1].text()).toBe('Версия агента')
+    expect(values[1].text()).toBe('1.2.3')
 
-    expect(labels[2].text()).toBe('Версия агента')
-    expect(values[2].text()).toBe('1.2.3')
-
-    expect(labels[3].text()).toBe('Онлайн')
-    expect(values[3].text()).toBe('Да')
-    expect(values[3].find('.text-success').exists()).toBe(true)
-
-    expect(labels[4].text()).toBe('Последняя проверка')
-    expect(values[4].text()).toContain('13.12.2025')
-
-    expect(labels[5].text()).toBe('Задержка')
-    expect(values[5].text()).toBe('25 мс')
+    expect(labels[2].text()).toBe('Онлайн (задержка)')
+    expect(values[2].text()).toBe('Да (25 мс)')
+    expect(values[2].find('.text-success').exists()).toBe(true)
+    
+    expect(labels[3].text()).toBe('Последняя проверка')
+    expect(values[3].text()).toContain('13.12.2025')
   })
 
   it('allows readAllSettings button to be clicked when device is offline', async () => {
@@ -708,10 +702,9 @@ describe('Device_Management.vue', () => {
     await wrapper.vm.$nextTick()
 
     const values = wrapper.find('.device-info-grid').findAll('.value')
-    expect(values[0].text()).toBe('Updated Device')
-    expect(values[1].text()).toBe('192.168.1.200')
-    expect(values[2].text()).toBe('2.0.0')
-    expect(values[5].text()).toBe('50 мс')
+    expect(values[0].text()).toBe('192.168.1.200')
+    expect(values[1].text()).toBe('2.0.0')
+    expect(values[2].text()).toBe('Да (50 мс)')
   })
 
   it('displays device info section header correctly', async () => {

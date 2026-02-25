@@ -400,7 +400,7 @@ const deviceInfo = computed(() => {
     name: dev?.name || '—',
     ipAddress: dev?.ipAddress || '—',
     softwareVersion: status?.softwareVersion || '—',
-    isOnline: status?.isOnline ? 'Да' : 'Нет',
+    isOnline: status?.isOnline ? `Да (${status?.connectLatencyMs ?? '—'} мс)` : 'Нет',
     lastChecked: fmtDate(status?.lastChecked),
     connectLatencyMs: status?.connectLatencyMs ?? '—'
   }
@@ -707,8 +707,6 @@ onBeforeUnmount(() => {
     <div class="form-group mt-4 form-group-add">
       <h2 class="secondary-heading">Об устройстве</h2>
       <div class="device-info-grid">
-        <div class="label service-label">Название</div>
-        <div class="value">{{ deviceInfo.name }}</div>
 
         <div class="label service-label">IP адрес</div>
         <div class="value">{{ deviceInfo.ipAddress }}</div>
@@ -716,7 +714,7 @@ onBeforeUnmount(() => {
         <div class="label service-label">Версия агента</div>
         <div class="value">{{ deviceInfo.softwareVersion }}</div>
 
-        <div class="label service-label">Онлайн</div>
+        <div class="label service-label">Онлайн (задержка)</div>
         <div class="value">
           <span :class="onlineClass">
             {{ deviceInfo.isOnline }}
@@ -726,8 +724,6 @@ onBeforeUnmount(() => {
         <div class="label service-label">Последняя проверка</div>
         <div class="value">{{ deviceInfo.lastChecked }}</div>
 
-        <div class="label service-label">Задержка</div>
-        <div class="value">{{ deviceInfo.connectLatencyMs }}{{ deviceInfo.connectLatencyMs !== '—' ? ' мс' : '' }}</div>
       </div>
     </div>
 
@@ -963,7 +959,7 @@ onBeforeUnmount(() => {
 }
 
 .secondary-heading {
-  width: 25%; /* moved to global stylesheet as .secondary-heading */
+  width: 25%;
 }
 
 .form-group-add {
@@ -976,7 +972,7 @@ onBeforeUnmount(() => {
 
 .device-info-grid {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: repeat(2, 200px 1fr);
   gap: 0.5rem 1rem;
   align-items: center;
   padding: 1rem 0;
@@ -1036,7 +1032,20 @@ onBeforeUnmount(() => {
 } 
 
 @media (max-width: 1000px) {
-  .timers-grid {
+
+.secondary-heading {
+  width: 100%;
+}
+
+.device-info-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 1rem 0;
+}
+
+.timers-grid {
     grid-template-columns: 0.7fr;
   }
   .playlist-grid {
