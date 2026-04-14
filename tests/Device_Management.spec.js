@@ -66,7 +66,8 @@ const configurationResponse = {
     video: ['00:00'],
     rest: [{ start: '00:00', stop: '00:00' }]
   },
-  audio: { output: 'hdmi' }
+  audio: { output: 'hdmi' },
+  screenshot: { intervalMinutes: 15 }
 }
 const getConfiguration = vi.fn(() => Promise.resolve(configurationResponse))
 const updateConfiguration = vi.fn(() => Promise.resolve())
@@ -277,8 +278,71 @@ describe('Device_Management.vue', () => {
     await flushPromises()
 
     expect(updateConfiguration).toHaveBeenCalledTimes(1)
-    expect(updateConfiguration).toHaveBeenCalledWith(1, expect.objectContaining({ audio: { output: 'hdmi' } }))
+    expect(updateConfiguration).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        audio: { output: 'hdmi' },
+        screenshot: { intervalMinutes: 15 }
+      })
+    )
     expect(alertSuccess).toHaveBeenCalledWith('Все настройки сохранены')
+  })
+
+  it('renders screenshot interval field in other settings', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    const labels = wrapper.findAll('.playlist-grid .playlist-label').map((label) => label.text())
+    const screenshotInput = wrapper.find('#screenshot-interval-minutes')
+
+    expect(labels).toContain('Частота снимков (мин)')
+    expect(screenshotInput.exists()).toBe(true)
+    expect(screenshotInput.element.value).toBe('15')
+  })
+
+  it('normalizes invalid screenshot interval to 0 before save', async () => {
+    vi.useRealTimers()
+    getConfiguration.mockResolvedValueOnce({
+      ...configurationResponse,
+      screenshot: { intervalMinutes: -5 }
+    })
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    wrapper.vm.scheduleFormRef.value = {
+      validate: vi.fn().mockResolvedValue({ valid: true }),
+      values: configurationResponse.schedule
+    }
+
+    await wrapper.vm.persistConfiguration({
+      errorPrefix: 'Не удалось сохранить настройки',
+      successMessage: 'Все настройки сохранены'
+    })
+    await flushPromises()
+
+    expect(updateConfiguration).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        screenshot: { intervalMinutes: 0 }
+      })
+    )
   })
 
   it('handles configuration load error on readAll', async () => {

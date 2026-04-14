@@ -140,6 +140,11 @@ const playlistSettings = ref({
   destination: ''
 })
 
+// Screenshot settings state
+const screenshotSettings = ref({
+  intervalMinutes: 0
+})
+
 const defaultTimeValue = '00:00'
 const createDefaultRestPair = () => ({ start: defaultTimeValue, stop: defaultTimeValue })
 const createDefaultScheduleValues = () => ({
@@ -221,7 +226,8 @@ const applyScheduleValues = (values) => {
 const createDefaultConfiguration = () => ({
   playlist: { source: '', destination: '' },
   schedule: createDefaultScheduleValues(),
-  audio: { output: 'hdmi' }
+  audio: { output: 'hdmi' },
+  screenshot: { intervalMinutes: 0 }
 })
 
 const normalizeConfiguration = (config = {}) => {
@@ -230,6 +236,10 @@ const normalizeConfiguration = (config = {}) => {
     ? config.audio.output.trim().toLowerCase()
     : ''
   const audioFallback = !allowedOutputs.includes(rawAudioOutput)
+  const screenshotIntervalRaw = Number(config?.screenshot?.intervalMinutes)
+  const screenshotIntervalMinutes = Number.isInteger(screenshotIntervalRaw) && screenshotIntervalRaw >= 0
+    ? screenshotIntervalRaw
+    : 0
 
   return {
     playlist: {
@@ -243,6 +253,9 @@ const normalizeConfiguration = (config = {}) => {
     },
     audio: {
       output: audioFallback ? 'hdmi' : rawAudioOutput
+    },
+    screenshot: {
+      intervalMinutes: screenshotIntervalMinutes
     },
     audioFallback
   }
@@ -258,6 +271,7 @@ const applyConfiguration = (configuration, originalConfig = {}) => {
     alertStore.error('Неизвестный тип аудио выхода. Установлено значение по умолчанию: HDMI')
   }
   audioSettings.value.output = normalized.audio.output
+  screenshotSettings.value.intervalMinutes = normalized.screenshot.intervalMinutes
 }
 
 const buildSchedulePayload = (values) => ({
@@ -274,6 +288,11 @@ const buildConfigurationPayload = (scheduleValuesOverride) => ({
   schedule: buildSchedulePayload(scheduleValuesOverride ?? scheduleFormValues.value),
   audio: {
     output: ['hdmi', 'jack'].includes(audioSettings.value.output) ? audioSettings.value.output : 'hdmi'
+  },
+  screenshot: {
+    intervalMinutes: Number.isInteger(Number(screenshotSettings.value.intervalMinutes))
+      ? Math.max(0, Number(screenshotSettings.value.intervalMinutes))
+      : 0
   }
 })
 
@@ -353,6 +372,7 @@ async function initializeDevice() {
     resetServiceStatus()
     // Set default audio value silently when device is offline
     audioSettings.value.output = 'hdmi'
+    screenshotSettings.value.intervalMinutes = 0
     playlistSettings.value.source = ''
     playlistSettings.value.destination = ''
     applyScheduleValues(createDefaultScheduleValues())
@@ -851,7 +871,7 @@ onBeforeUnmount(() => {
             type="text"
             class="form-control input"
             :disabled="isDisabled || hasAnyOperationInProgress"
-            placeholder="Путь к локальному диске"
+            placeholder="Каталог на устройстве"
           />
         </div>
         <div class="playlist-cell label playlist-label">Аудиовыход</div>
@@ -865,6 +885,18 @@ onBeforeUnmount(() => {
             <option value="hdmi">HDMI audio</option>
             <option value="jack">3.5" jack audio</option>
           </select>
+        </div>
+        <div class="playlist-cell label playlist-label">Частота снимков (мин)</div>
+        <div class="playlist-cell">
+          <input
+            id="screenshot-interval-minutes"
+            v-model.number="screenshotSettings.intervalMinutes"
+            type="number"
+            min="0"
+            step="1"
+            class="form-control input"
+            :disabled="isDisabled || hasAnyOperationInProgress"
+          />
         </div>
       </div>
     </div>
