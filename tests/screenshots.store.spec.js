@@ -1,6 +1,7 @@
 // Copyright (c) 2026 sw.consulting
 // This file is a part of Media Pi frontend application
 
+/* global Blob */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useScreenshotsStore } from '@/stores/screenshots.store.js'
