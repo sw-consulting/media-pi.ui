@@ -310,10 +310,6 @@ describe('Device_Management.vue', () => {
 
   it('normalizes invalid screenshot interval to 0 before save', async () => {
     vi.useRealTimers()
-    getConfiguration.mockResolvedValueOnce({
-      ...configurationResponse,
-      screenshot: { intervalMinutes: -5 }
-    })
 
     const wrapper = mount(DeviceManagement, {
       props: { deviceId: 1 },
@@ -325,6 +321,10 @@ describe('Device_Management.vue', () => {
     })
 
     await flushPromises()
+
+    // Simulate user entering an invalid (negative) value into the field after mount
+    const screenshotInput = wrapper.find('#screenshot-interval-minutes')
+    await screenshotInput.setValue(-5)
 
     wrapper.vm.scheduleFormRef.value = {
       validate: vi.fn().mockResolvedValue({ valid: true }),
@@ -343,6 +343,9 @@ describe('Device_Management.vue', () => {
         screenshot: { intervalMinutes: 0 }
       })
     )
+
+    // Verify UI is also normalized to 0 after save (not left displaying the invalid value)
+    expect(Number(wrapper.find('#screenshot-interval-minutes').element.value)).toBe(0)
   })
 
   it('handles configuration load error on readAll', async () => {

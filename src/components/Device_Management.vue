@@ -509,6 +509,9 @@ const persistConfiguration = async ({
 
   const payload = buildConfigurationPayload(scheduleValues)
 
+  // Sync normalized screenshot value back to state so UI stays in sync with what is saved
+  screenshotSettings.value.intervalMinutes = payload.screenshot.intervalMinutes
+
   try {
     await devicesStore.updateConfiguration(props.deviceId, payload)
     // always apply schedule values from saved payload so internal state reflects saved data
