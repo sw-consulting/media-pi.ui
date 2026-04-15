@@ -320,7 +320,7 @@ describe('Device_Management.vue', () => {
     const labels = wrapper.findAll('.other-settings-grid .other-settings-label').map((label) => label.text())
     const screenshotInput = wrapper.find('#screenshot-interval-minutes')
 
-    expect(labels).toContain('Частота снимков (мин)')
+    expect(labels).toContain('Частота скриншотов (мин)')
     expect(screenshotInput.exists()).toBe(true)
     expect(screenshotInput.element.value).toBe('15')
   })

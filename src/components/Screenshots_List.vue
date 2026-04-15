@@ -68,7 +68,7 @@ async function loadScreenshots() {
       to: toValue.value || null
     })
   } catch (err) {
-    alertStore.error('Не удалось загрузить снимки: ' + (err?.message || err))
+    alertStore.error('Не удалось загрузить скриншоты: ' + (err?.message || err))
   }
 }
 
@@ -76,12 +76,12 @@ async function openScreenshot(item) {
   try {
     await screenshotsStore.open(item.id)
   } catch (err) {
-    alertStore.error('Не удалось открыть снимок: ' + (err?.message || err))
+    alertStore.error('Не удалось открыть скриншот: ' + (err?.message || err))
   }
 }
 
 async function deleteScreenshot(item) {
-  const confirmed = await confirmDelete(item.originalFilename || `снимок #${item.id}`, 'снимок')
+  const confirmed = await confirmDelete(item.originalFilename || `скриншот #${item.id}`, 'скриншот')
   if (!confirmed) return
 
   try {
@@ -92,7 +92,7 @@ async function deleteScreenshot(item) {
     }
     await loadScreenshots()
   } catch (err) {
-    alertStore.error('Не удалось удалить снимок: ' + (err?.message || err))
+    alertStore.error('Не удалось удалить скриншот: ' + (err?.message || err))
   }
 }
 
@@ -218,7 +218,7 @@ onBeforeUnmount(() => {
               data-test="open-screenshot-button"
               :item="item"
               icon="fa-solid fa-image"
-              tooltipText="Открыть снимок"
+              tooltipText="Открыть скриншот"
               :disabled="isBusy"
               @click="openScreenshot(item)"
             />
@@ -226,7 +226,7 @@ onBeforeUnmount(() => {
               data-test="delete-screenshot-button"
               :item="item"
               icon="fa-solid fa-trash-can"
-              tooltipText="Удалить снимок"
+              tooltipText="Удалить скриншот"
               :disabled="isBusy"
               @click="deleteScreenshot(item)"
             />
@@ -247,7 +247,7 @@ onBeforeUnmount(() => {
       </v-data-table-server>
 
       <div v-if="!isBusy && !screenshots.length" class="text-center m-5">
-        Нет снимков
+        Нет скриншотов
       </div>
     </v-card>
 

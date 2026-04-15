@@ -27,7 +27,7 @@ const deviceId = (typeof props.id === 'string' && /^\d+$/.test(props.id)) ? pars
     <template #fallback>
       <div class="text-center m-5">
         <span class="spinner-border spinner-border-lg align-center"></span>
-        <div class="mt-2">Загрузка снимков устройства...</div>
+        <div class="mt-2">Загрузка скриншотов устройства...</div>
       </div>
     </template>
   </Suspense>

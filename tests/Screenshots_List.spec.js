@@ -170,7 +170,7 @@ describe('Screenshots_List.vue', () => {
     await wrapper.find('[data-test="delete-screenshot-button"]').trigger('click')
     await flushPromises()
 
-    expect(confirmDelete).toHaveBeenCalledWith('shot.jpg', 'снимок')
+    expect(confirmDelete).toHaveBeenCalledWith('shot.jpg', 'скриншот')
     expect(removeScreenshot).toHaveBeenCalledWith(5)
   })
 

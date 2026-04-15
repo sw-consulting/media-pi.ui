@@ -714,7 +714,7 @@ onBeforeUnmount(() => {
           <ActionButton
             icon="fa-solid fa-camera"
             iconSize="2x"
-            tooltipText="Открыть снимки устройства"
+            tooltipText="Открыть скриншоты устройства"
             :item="{}"
             data-test="open-screenshots"
             @click="openScreenshots"
@@ -902,7 +902,7 @@ onBeforeUnmount(() => {
             <option value="jack">3.5" jack audio</option>
           </select>
         </div>
-        <div class="other-settings-cell label other-settings-label">Частота снимков (мин)</div>
+        <div class="other-settings-cell label other-settings-label">Частота скриншотов (мин)</div>
         <div class="other-settings-cell">
           <input
             id="screenshot-interval-minutes"

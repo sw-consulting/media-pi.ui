@@ -43,7 +43,7 @@ function decodeRFC5987Value(value) {
 
   try {
     return decodeURIComponent(encodedValue)
-  } catch {
+  } catch (_e) { // eslint-disable-line no-unused-vars
     return encodedValue
   }
 }
@@ -214,10 +214,6 @@ export const useScreenshotsStore = defineStore('screenshots', () => {
 
     try {
       await fetchWrapper.delete(`${baseUrl}/${id}`)
-      const previousLength = screenshots.value.length
-      screenshots.value = screenshots.value.filter((item) => item.id !== id)
-
-      if (screenshots.value.length < previousLength) {
       const previousLength = screenshots.value.length
       screenshots.value = screenshots.value.filter((item) => item.id !== id)
 
