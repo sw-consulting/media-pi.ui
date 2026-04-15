@@ -3,6 +3,7 @@
 // This file is a part of Media Pi frontend application
 
 import { describe, it, expect, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 
 vi.mock('@/components/Screenshots_List.vue', () => ({
@@ -43,5 +44,37 @@ describe('Screenshots_View.vue', () => {
 
     expect(wrapper.text()).toContain('Некорректный идентификатор устройства')
     expect(wrapper.findComponent({ name: 'Screenshots_List' }).exists()).toBe(false)
+  })
+
+  it('shows error message when id is "0" (not a positive integer)', () => {
+    const wrapper = mount(ScreenshotsView, {
+      props: { id: '0' },
+      global: {
+        stubs: {
+          Suspense: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Некорректный идентификатор устройства')
+    expect(wrapper.findComponent({ name: 'Screenshots_List' }).exists()).toBe(false)
+  })
+
+  it('updates deviceId reactively when the id prop changes', async () => {
+    const wrapper = mount(ScreenshotsView, {
+      props: { id: '5' },
+      global: {
+        stubs: {
+          Suspense: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    expect(wrapper.findComponent({ name: 'Screenshots_List' }).props('deviceId')).toBe(5)
+
+    await wrapper.setProps({ id: '99' })
+    await nextTick()
+
+    expect(wrapper.findComponent({ name: 'Screenshots_List' }).props('deviceId')).toBe(99)
   })
 })

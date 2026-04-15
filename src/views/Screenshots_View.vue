@@ -2,6 +2,7 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
+import { computed } from 'vue'
 import ScreenshotsList from '@/components/Screenshots_List.vue'
 
 const props = defineProps({
@@ -11,7 +12,11 @@ const props = defineProps({
   }
 })
 
-const deviceId = (typeof props.id === 'string' && /^\d+$/.test(props.id)) ? parseInt(props.id, 10) : null
+const deviceId = computed(() => {
+  if (typeof props.id !== 'string' || !/^\d+$/.test(props.id)) return null
+  const n = parseInt(props.id, 10)
+  return n > 0 ? n : null
+})
 </script>
 
 <template>
