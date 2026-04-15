@@ -123,4 +123,382 @@ describe('screenshots.store', () => {
     expect(store.screenshots).toEqual([{ id: 2 }])
     expect(store.totalCount).toBe(1)
   })
+
+  it('returns empty array and resets state when deviceId is null', async () => {
+    const store = useScreenshotsStore()
+    store.screenshots = [{ id: 1 }]
+    store.totalCount = 5
+
+    const result = await store.getAllByDevice(null)
+
+    expect(result).toEqual([])
+    expect(store.screenshots).toEqual([])
+    expect(store.totalCount).toBe(0)
+    expect(store.activeFilters).toEqual({ deviceId: null, from: null, to: null })
+    expect(fetchWrapper.get).not.toHaveBeenCalled()
+  })
+
+  it('returns empty array and resets state when deviceId is undefined', async () => {
+    const store = useScreenshotsStore()
+    store.screenshots = [{ id: 3 }]
+
+    const result = await store.getAllByDevice(undefined)
+
+    expect(result).toEqual([])
+    expect(store.screenshots).toEqual([])
+    expect(fetchWrapper.get).not.toHaveBeenCalled()
+  })
+
+  it('uses default pageSize when screenshots_per_page is 0 (invalid)', async () => {
+    authStore.screenshots_per_page = 0
+    fetchWrapper.get.mockResolvedValueOnce({ items: [], pagination: {}, sorting: {} })
+
+    const store = useScreenshotsStore()
+    await store.getAllByDevice(7)
+
+    const parsed = new URL(fetchWrapper.get.mock.calls[0][0])
+    expect(parsed.searchParams.get('pageSize')).toBe('100')
+  })
+
+  it('caps pageSize at maxPageSize (1000) when per_page is very large', async () => {
+    authStore.screenshots_per_page = 9999
+    fetchWrapper.get.mockResolvedValueOnce({ items: [], pagination: {}, sorting: {} })
+
+    const store = useScreenshotsStore()
+    await store.getAllByDevice(7)
+
+    const parsed = new URL(fetchWrapper.get.mock.calls[0][0])
+    expect(parsed.searchParams.get('pageSize')).toBe('1000')
+  })
+
+  it('resolves pageSize of -1 to totalCount when store has items loaded', async () => {
+    authStore.screenshots_per_page = -1
+    fetchWrapper.get.mockResolvedValueOnce({ items: [], pagination: {}, sorting: {} })
+
+    const store = useScreenshotsStore()
+    store.totalCount = 42
+
+    await store.getAllByDevice(7)
+
+    const parsed = new URL(fetchWrapper.get.mock.calls[0][0])
+    expect(parsed.searchParams.get('pageSize')).toBe('42')
+  })
+
+  it('resolves pageSize of -1 to defaultPageSize when totalCount is 0', async () => {
+    authStore.screenshots_per_page = -1
+    fetchWrapper.get.mockResolvedValueOnce({ items: [], pagination: {}, sorting: {} })
+
+    const store = useScreenshotsStore()
+
+    await store.getAllByDevice(7)
+
+    const parsed = new URL(fetchWrapper.get.mock.calls[0][0])
+    expect(parsed.searchParams.get('pageSize')).toBe('100')
+  })
+
+  it('uses id/asc fallbacks when screenshots_sort_by is empty', async () => {
+    authStore.screenshots_sort_by = []
+    fetchWrapper.get.mockResolvedValueOnce({ items: [], pagination: {}, sorting: {} })
+
+    const store = useScreenshotsStore()
+    await store.getAllByDevice(7)
+
+    const parsed = new URL(fetchWrapper.get.mock.calls[0][0])
+    expect(parsed.searchParams.get('sortBy')).toBe('id')
+    expect(parsed.searchParams.get('sortOrder')).toBe('asc')
+  })
+
+  it('normalizes Date object for from/to filters', async () => {
+    const fromDate = new Date('2026-04-14T10:00:00.000Z')
+    const toDate = new Date('2026-04-15T11:00:00.000Z')
+    fetchWrapper.get.mockResolvedValueOnce({ items: [], pagination: {}, sorting: {} })
+
+    const store = useScreenshotsStore()
+    await store.getAllByDevice(7, { from: fromDate, to: toDate })
+
+    const parsed = new URL(fetchWrapper.get.mock.calls[0][0])
+    expect(parsed.searchParams.get('from')).toBe('2026-04-14T10:00:00.000Z')
+    expect(parsed.searchParams.get('to')).toBe('2026-04-15T11:00:00.000Z')
+  })
+
+  it('omits from/to params when the date strings are invalid', async () => {
+    fetchWrapper.get.mockResolvedValueOnce({ items: [], pagination: {}, sorting: {} })
+
+    const store = useScreenshotsStore()
+    await store.getAllByDevice(7, { from: 'not-a-date', to: new Date('invalid') })
+
+    const parsed = new URL(fetchWrapper.get.mock.calls[0][0])
+    expect(parsed.searchParams.has('from')).toBe(false)
+    expect(parsed.searchParams.has('to')).toBe(false)
+  })
+
+  it('handles null/missing pagination and sorting in API response', async () => {
+    fetchWrapper.get.mockResolvedValueOnce({ items: [{ id: 1 }] })
+
+    const store = useScreenshotsStore()
+    await store.getAllByDevice(7)
+
+    expect(store.screenshots).toEqual([{ id: 1 }])
+    expect(store.totalCount).toBe(0)
+    expect(store.hasNextPage).toBe(false)
+  })
+
+  it('extracts filename using RFC 5987 filename* parameter', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:rfc'), revokeObjectURL: vi.fn() })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => "attachment; filename*=UTF-8''screenshot%2Ftest.jpg") },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    const result = await store.open(20)
+
+    expect(result.filename).toBe('screenshot/test.jpg')
+  })
+
+  it('decodes filename* bare value without charset/language prefix', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:bare'), revokeObjectURL: vi.fn() })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => 'attachment; filename*=photo.jpg') },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    const result = await store.open(21)
+
+    expect(result.filename).toBe('photo.jpg')
+  })
+
+  it('returns raw encoded value when filename* has invalid percent-encoding', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:inv'), revokeObjectURL: vi.fn() })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => "attachment; filename*=UTF-8''%Invalid") },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    const result = await store.open(22)
+
+    expect(result.filename).toBe('%Invalid')
+  })
+
+  it('falls back to plain filename= when filename* decodes to empty string', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:empty'), revokeObjectURL: vi.fn() })
+
+    // filename*='' → decodeRFC5987Value strips both quotes → empty string → falsy → fallback to filename=
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: {
+        get: vi.fn(() => "attachment; filename*=''; filename=\"fallback.jpg\"")
+      },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    const result = await store.open(23)
+
+    expect(result.filename).toBe('fallback.jpg')
+  })
+
+  it('uses id-based fallback filename when Content-Disposition has no filename', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:nofn'), revokeObjectURL: vi.fn() })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => 'attachment') },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    const result = await store.open(24)
+
+    expect(result.filename).toBe('screenshot-24')
+  })
+
+  it('uses id-based fallback filename when Content-Disposition is null', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:null'), revokeObjectURL: vi.fn() })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => null) },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    const result = await store.open(25)
+
+    expect(result.filename).toBe('screenshot-25')
+  })
+
+  it('creates download link when window.open is blocked (returns null)', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    const clickMock = vi.fn()
+    const removeMock = vi.fn()
+    const appendChildMock = vi.fn()
+    const createElementMock = vi.fn(() => ({ href: '', download: '', click: clickMock, remove: removeMock }))
+
+    vi.stubGlobal('open', vi.fn(() => null))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:blocked'), revokeObjectURL: vi.fn() })
+    vi.stubGlobal('document', { createElement: createElementMock, body: { appendChild: appendChildMock } })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => 'attachment; filename="blocked.jpg"') },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    await store.open(26)
+
+    expect(createElementMock).toHaveBeenCalledWith('a')
+    expect(clickMock).toHaveBeenCalled()
+    expect(removeMock).toHaveBeenCalled()
+  })
+
+  it('sets error state and rethrows when open() fails', async () => {
+    const err = new Error('network error')
+    fetchWrapper.getFile.mockRejectedValueOnce(err)
+
+    const store = useScreenshotsStore()
+    await expect(store.open(27)).rejects.toThrow('network error')
+    expect(store.error).toBe(err)
+    expect(store.loading).toBe(false)
+  })
+
+  it('does not decrement counts when removing an id that is not in the local list', async () => {
+    fetchWrapper.delete.mockResolvedValueOnce(undefined)
+
+    const store = useScreenshotsStore()
+    store.screenshots = [{ id: 2 }]
+    store.totalCount = 1
+
+    await store.remove(999)
+
+    expect(store.screenshots).toEqual([{ id: 2 }])
+    expect(store.totalCount).toBe(1)
+  })
+
+  it('sets error state and rethrows when remove() fails', async () => {
+    const err = new Error('delete failed')
+    fetchWrapper.delete.mockRejectedValueOnce(err)
+
+    const store = useScreenshotsStore()
+    await expect(store.remove(1)).rejects.toThrow('delete failed')
+    expect(store.error).toBe(err)
+    expect(store.loading).toBe(false)
+  })
+
+  it('extracts single-quoted filename from Content-Disposition', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:sq'), revokeObjectURL: vi.fn() })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => "attachment; filename='single-quoted.jpg'") },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    const result = await store.open(30)
+
+    expect(result.filename).toBe('single-quoted.jpg')
+  })
+
+  it('extracts unquoted filename from Content-Disposition', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:uq'), revokeObjectURL: vi.fn() })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => 'attachment; filename=unquoted.jpg') },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    const result = await store.open(31)
+
+    expect(result.filename).toBe('unquoted.jpg')
+  })
+
+  it('falls back to id-based name when filename value is empty', async () => {
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:efn'), revokeObjectURL: vi.fn() })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => 'attachment; filename=   ') },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    const result = await store.open(32)
+
+    expect(result.filename).toBe('screenshot-32')
+  })
+
+  it('revokes blob URL after 60 seconds via setTimeout', async () => {
+    vi.useFakeTimers()
+
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('open', vi.fn(() => ({})))
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:timer'), revokeObjectURL })
+
+    fetchWrapper.getFile.mockResolvedValueOnce({
+      headers: { get: vi.fn(() => 'attachment; filename="timed.jpg"') },
+      blob: vi.fn(async () => mockBlob)
+    })
+
+    const store = useScreenshotsStore()
+    await store.open(33)
+
+    expect(revokeObjectURL).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(60000)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:timer')
+
+    vi.useRealTimers()
+  })
+
+  it('handles missing sortBy/sortOrder when screenshots_sort_by is undefined', async () => {
+    authStore.screenshots_sort_by = undefined
+    fetchWrapper.get.mockResolvedValueOnce({ items: [], pagination: {}, sorting: {} })
+
+    const store = useScreenshotsStore()
+    await store.getAllByDevice(7)
+
+    const parsed = new URL(fetchWrapper.get.mock.calls[0][0])
+    expect(parsed.searchParams.get('sortBy')).toBe('id')
+    expect(parsed.searchParams.get('sortOrder')).toBe('asc')
+  })
+
+  it('defaults page to 1 when screenshots_page is 0 (falsy)', async () => {
+    authStore.screenshots_page = 0
+    fetchWrapper.get.mockResolvedValueOnce({ items: [], pagination: {}, sorting: {} })
+
+    const store = useScreenshotsStore()
+    await store.getAllByDevice(7)
+
+    const parsed = new URL(fetchWrapper.get.mock.calls[0][0])
+    expect(parsed.searchParams.get('page')).toBe('1')
+  })
+
+  it('defaults to empty array when API response has no items property', async () => {
+    fetchWrapper.get.mockResolvedValueOnce({ pagination: { totalCount: 0 }, sorting: {} })
+
+    const store = useScreenshotsStore()
+    await store.getAllByDevice(7)
+
+    expect(store.screenshots).toEqual([])
+  })
 })

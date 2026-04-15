@@ -92,6 +92,7 @@ const globalStubs = {
   'v-card': { template: '<div><slot /></div>' },
   'v-data-table-server': {
     props: ['items'],
+    emits: ['update:items-per-page', 'update:page', 'update:sort-by'],
     template: `
       <div class="table-server-stub">
         <div v-for="item in items" :key="item.id" class="table-row">
@@ -100,6 +101,9 @@ const globalStubs = {
           <slot name="item.originalFilename" :item="item"></slot>
           <slot name="item.fileSizeBytes" :item="item"></slot>
         </div>
+        <button data-test="emit-per-page" @click="$emit('update:items-per-page', 25)"></button>
+        <button data-test="emit-page" @click="$emit('update:page', 2)"></button>
+        <button data-test="emit-sort" @click="$emit('update:sort-by', [{key:'id',order:'desc'}])"></button>
       </div>
     `
   }
@@ -184,5 +188,317 @@ describe('Screenshots_List.vue', () => {
     await wrapper.find('[data-test="back-to-device-button"]').trigger('click')
 
     expect(pushMock).toHaveBeenCalledWith('/device/manage/7')
+  })
+
+  it('shows error alert when loading screenshots fails', async () => {
+    getAllByDevice.mockRejectedValueOnce(new Error('fetch failed'))
+
+    mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    expect(alertRef.value?.message).toContain('Не удалось загрузить скриншоты')
+  })
+
+  it('shows error alert when opening screenshot fails', async () => {
+    openScreenshot.mockRejectedValueOnce(new Error('open failed'))
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="open-screenshot-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertRef.value?.message).toContain('Не удалось открыть скриншот')
+  })
+
+  it('does not delete when confirmation is cancelled', async () => {
+    confirmDelete.mockResolvedValueOnce(false)
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="delete-screenshot-button"]').trigger('click')
+    await flushPromises()
+
+    expect(removeScreenshot).not.toHaveBeenCalled()
+  })
+
+  it('shows error alert when deleting screenshot fails', async () => {
+    removeScreenshot.mockRejectedValueOnce(new Error('delete failed'))
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="delete-screenshot-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertRef.value?.message).toContain('Не удалось удалить скриншот')
+  })
+
+  it('decrements screenshots_page and returns when list becomes empty on page > 1', async () => {
+    authStore.screenshots_page = 2
+
+    removeScreenshot.mockImplementationOnce(async () => {
+      screenshotsRef.value = []
+      return true
+    })
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="delete-screenshot-button"]').trigger('click')
+    await flushPromises()
+
+    expect(authStore.screenshots_page).toBe(1)
+  })
+
+  it('resets screenshots_page to 1 without directly reloading when applyFilters called on page > 1', async () => {
+    authStore.screenshots_page = 3
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    getAllByDevice.mockClear()
+
+    await wrapper.find('[data-test="apply-screenshots-filter"]').trigger('click')
+    await flushPromises()
+
+    expect(authStore.screenshots_page).toBe(1)
+  })
+
+  it('clears filter inputs and reloads screenshots when clearFilters is clicked', async () => {
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('#screenshots-filter-from').setValue('2026-04-14T10:15')
+    await wrapper.find('#screenshots-filter-to').setValue('2026-04-15T11:45')
+    getAllByDevice.mockClear()
+
+    await wrapper.find('[data-test="clear-screenshots-filter"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('#screenshots-filter-from').element.value).toBe('')
+    expect(wrapper.find('#screenshots-filter-to').element.value).toBe('')
+    expect(getAllByDevice).toHaveBeenCalledWith(7, { from: null, to: null })
+  })
+
+  it('shows "Нет скриншотов" when list is empty and not loading', async () => {
+    screenshotsRef.value = []
+    totalCountRef.value = 0
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    expect(wrapper.text()).toContain('Нет скриншотов')
+  })
+
+  it('clears the alert when component is unmounted', async () => {
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    wrapper.unmount()
+
+    expect(clearAlert).toHaveBeenCalled()
+  })
+
+  it('displays alert message when alert store has an error', async () => {
+    alertRef.value = { type: 'alert-danger', message: 'Something went wrong' }
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    expect(wrapper.text()).toContain('Something went wrong')
+  })
+
+  it('clears alert when the dismiss button is clicked', async () => {
+    alertRef.value = { type: 'alert-danger', message: 'An error' }
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('.btn.close').trigger('click')
+
+    expect(clearAlert).toHaveBeenCalled()
+  })
+
+  it('renders em-dash for items without originalFilename', async () => {
+    screenshotsRef.value = [{ id: 5, fileSizeBytes: 128, timeCreated: '2026-04-15T10:00:00Z' }]
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    expect(wrapper.text()).toContain('—')
+  })
+
+  it('uses item id in confirmDelete when originalFilename is missing', async () => {
+    screenshotsRef.value = [{ id: 9, fileSizeBytes: 0, timeCreated: null }]
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="delete-screenshot-button"]').trigger('click')
+    await flushPromises()
+
+    expect(confirmDelete).toHaveBeenCalledWith('скриншот #9', 'скриншот')
+  })
+
+  it('renders em-dash for formatDate when timeCreated is null', async () => {
+    screenshotsRef.value = [{ id: 5, originalFilename: 'f.jpg', fileSizeBytes: 128, timeCreated: null }]
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    const timeCell = wrapper.find('.table-row')
+    expect(timeCell.text()).toContain('—')
+  })
+
+  it('renders raw string for formatDate when timeCreated is not a valid date', async () => {
+    screenshotsRef.value = [{ id: 5, originalFilename: 'f.jpg', fileSizeBytes: 128, timeCreated: 'not-a-date' }]
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    expect(wrapper.text()).toContain('not-a-date')
+  })
+
+  it('skips loadScreenshots in watch when deviceId becomes falsy', async () => {
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    getAllByDevice.mockClear()
+
+    await wrapper.setProps({ deviceId: 0 })
+    await flushPromises()
+
+    expect(getAllByDevice).not.toHaveBeenCalled()
+  })
+
+  it('falls back to raw error object in load error message when err has no message', async () => {
+    getAllByDevice.mockRejectedValueOnce('string-error')
+
+    mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    expect(alertRef.value?.message).toContain('string-error')
+  })
+
+  it('falls back to raw error object in open error message when err has no message', async () => {
+    openScreenshot.mockRejectedValueOnce('open-string-error')
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="open-screenshot-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertRef.value?.message).toContain('open-string-error')
+  })
+
+  it('falls back to raw error object in delete error message when err has no message', async () => {
+    removeScreenshot.mockRejectedValueOnce('delete-string-error')
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="delete-screenshot-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertRef.value?.message).toContain('delete-string-error')
+  })
+
+  it('updates screenshots_per_page when data table emits update:items-per-page', async () => {
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="emit-per-page"]').trigger('click')
+    await flushPromises()
+
+    expect(authStore.screenshots_per_page).toBe(25)
+  })
+
+  it('updates screenshots_page when data table emits update:page', async () => {
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="emit-page"]').trigger('click')
+    await flushPromises()
+
+    expect(authStore.screenshots_page).toBe(2)
+  })
+
+  it('updates screenshots_sort_by when data table emits update:sort-by', async () => {
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="emit-sort"]').trigger('click')
+    await flushPromises()
+
+    expect(authStore.screenshots_sort_by).toEqual([{ key: 'id', order: 'desc' }])
   })
 })

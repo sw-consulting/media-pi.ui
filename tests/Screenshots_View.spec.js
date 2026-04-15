@@ -30,4 +30,18 @@ describe('Screenshots_View.vue', () => {
     expect(typeof stub.props('deviceId')).toBe('number')
     expect(stub.props('deviceId')).toBe(12)
   })
+
+  it('shows error message when id is not a numeric string', () => {
+    const wrapper = mount(ScreenshotsView, {
+      props: { id: 'abc' },
+      global: {
+        stubs: {
+          Suspense: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Некорректный идентификатор устройства')
+    expect(wrapper.findComponent({ name: 'Screenshots_List' }).exists()).toBe(false)
+  })
 })
