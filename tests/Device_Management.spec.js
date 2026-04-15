@@ -86,6 +86,7 @@ const alertError = vi.fn()
 const alertSuccess = vi.fn()
 const alertClear = vi.fn()
 const routerGo = vi.fn()
+const routerPush = vi.fn()
 
 vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
@@ -96,7 +97,7 @@ vi.mock('pinia', async () => {
 })
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ go: routerGo })
+  useRouter: () => ({ go: routerGo, push: routerPush })
 }))
 
 vi.mock('@/components/FieldArrayWithButtons.vue', () => ({
@@ -248,11 +249,27 @@ describe('Device_Management.vue', () => {
       }
     })
 
-    const backButton = wrapper.find('.action-btn')
+    const backButton = wrapper.find('[data-test="back-device-management"]')
     expect(backButton.exists()).toBe(true)
     
     await backButton.trigger('click')
     expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('opens screenshots page for the current device', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.find('[data-test="open-screenshots"]').trigger('click')
+
+    expect(routerPush).toHaveBeenCalledWith('/device/screenshots/1')
   })
 
   it('saves all settings using combined endpoint', async () => {

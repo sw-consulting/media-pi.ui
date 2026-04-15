@@ -680,6 +680,10 @@ const shutdown = async () => {
   await runSystemOperation('shutdown', devicesStore.shutdownSystem, timeouts.shutdown)
 }
 
+const openScreenshots = () => {
+  router.push(`/device/screenshots/${props.deviceId}`)
+}
+
 onBeforeUnmount(() => {
   componentActive.value = false
   resetSystemOperations()
@@ -707,11 +711,20 @@ onBeforeUnmount(() => {
           <span class="spinner-border"></span>
         </div>
         <div class="header-actions header-actions-group">
+          <ActionButton
+            icon="fa-solid fa-camera"
+            iconSize="2x"
+            tooltipText="Открыть снимки устройства"
+            :item="{}"
+            data-test="open-screenshots"
+            @click="openScreenshots"
+          />
           <ActionButton 
             icon="fa-solid fa-xmark" 
             iconSize="2x" 
             tooltipText="Выход из настроек устройства"
             :item="{}"
+            data-test="back-device-management"
             @click="router.go(-1)"
           />
         </div>

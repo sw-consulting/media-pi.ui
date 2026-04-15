@@ -27,6 +27,7 @@ vi.mock('@/views/DeviceGroup_EditView.vue', () => ({ default: { template: '<div 
 vi.mock('@/views/Device_CreateView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/Device_EditView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/Device_ManagementView.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/Screenshots_View.vue', () => ({ default: { template: '<div />' } }))
 
 import router from '@/router'
 
@@ -101,6 +102,16 @@ describe('router guards', () => {
       expect(router.currentRoute.value.fullPath).toBe('/accounts')
     })
 
+  })
+
+  it('allows authenticated users to open the screenshots route', async () => {
+    authStore.user = { id: 3 }
+    authStore.isAdministrator = true
+
+    await router.push('/device/screenshots/12')
+    await router.isReady()
+
+    expect(router.currentRoute.value.fullPath).toBe('/device/screenshots/12')
   })
 })
 

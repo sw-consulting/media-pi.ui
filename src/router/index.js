@@ -110,6 +110,12 @@ const router = createRouter({
       props: true
     },
     {
+      path: '/device/screenshots/:id',
+      name: 'Снимки устройства',
+      component: () => import('@/views/Screenshots_View.vue'),
+      props: true
+    },
+    {
       path: '/videos',
       name: 'Видеофайлы',
       component: () => import('@/views/Videos_View.vue')
