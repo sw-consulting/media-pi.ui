@@ -218,6 +218,10 @@ export const useScreenshotsStore = defineStore('screenshots', () => {
       screenshots.value = screenshots.value.filter((item) => item.id !== id)
 
       if (screenshots.value.length < previousLength) {
+      const previousLength = screenshots.value.length
+      screenshots.value = screenshots.value.filter((item) => item.id !== id)
+
+      if (screenshots.value.length < previousLength) {
         totalCount.value = Math.max(0, totalCount.value - 1)
         pagination.value = {
           ...pagination.value,
