@@ -36,15 +36,41 @@ function normalizeDateParam(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
 }
 
+function decodeRFC5987Value(value) {
+  const normalizedValue = value.trim().replace(/^["']|["']$/g, '')
+  const match = normalizedValue.match(/^([^']*)'[^']*'(.*)$/)
+  const encodedValue = match ? match[2] : normalizedValue
+
+  try {
+    return decodeURIComponent(encodedValue)
+  } catch {
+    return encodedValue
+  }
+}
+
 function extractFilename(disposition, fallback) {
-  if (!disposition || !disposition.includes('filename=')) {
+  if (!disposition) {
     return fallback
   }
 
-  return disposition
-    .split('filename=')[1]
-    .replace(/["']/g, '')
-    .trim() || fallback
+  const encodedFilenameMatch = disposition.match(/(?:^|;\s*)filename\*\s*=\s*([^;]+)/i)
+  if (encodedFilenameMatch) {
+    const decodedFilename = decodeRFC5987Value(encodedFilenameMatch[1])
+    if (decodedFilename) {
+      return decodedFilename
+    }
+  }
+
+  const filenameMatch = disposition.match(/(?:^|;\s*)filename\s*=\s*("([^"]*)"|'([^']*)'|[^;]*)/i)
+  if (!filenameMatch) {
+    return fallback
+  }
+
+  const filename = (filenameMatch[2] ?? filenameMatch[3] ?? filenameMatch[1] ?? '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+
+  return filename || fallback
 }
 
 export const useScreenshotsStore = defineStore('screenshots', () => {
@@ -188,11 +214,15 @@ export const useScreenshotsStore = defineStore('screenshots', () => {
 
     try {
       await fetchWrapper.delete(`${baseUrl}/${id}`)
+      const previousLength = screenshots.value.length
       screenshots.value = screenshots.value.filter((item) => item.id !== id)
-      totalCount.value = Math.max(0, totalCount.value - 1)
-      pagination.value = {
-        ...pagination.value,
-        totalCount: Math.max(0, (pagination.value?.totalCount || 0) - 1)
+
+      if (screenshots.value.length < previousLength) {
+        totalCount.value = Math.max(0, totalCount.value - 1)
+        pagination.value = {
+          ...pagination.value,
+          totalCount: Math.max(0, (pagination.value?.totalCount || 0) - 1)
+        }
       }
       return true
     } catch (err) {

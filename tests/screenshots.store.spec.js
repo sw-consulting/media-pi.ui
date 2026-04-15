@@ -2,7 +2,7 @@
 // This file is a part of Media Pi frontend application
 
 /* global Blob */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useScreenshotsStore } from '@/stores/screenshots.store.js'
 import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
@@ -36,6 +36,10 @@ describe('screenshots.store', () => {
     authStore.screenshots_page = 2
     authStore.screenshots_per_page = 50
     authStore.screenshots_sort_by = [{ key: 'time_created', order: 'desc' }]
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('loads paged screenshots for a device with filters', async () => {
@@ -87,8 +91,8 @@ describe('screenshots.store', () => {
     const createObjectURL = vi.fn(() => 'blob:test')
     const revokeObjectURL = vi.fn()
 
-    global.open = openMock
-    global.URL = { createObjectURL, revokeObjectURL }
+    vi.stubGlobal('open', openMock)
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
 
     fetchWrapper.getFile.mockResolvedValueOnce({
       headers: {
