@@ -58,6 +58,7 @@ export const fetchWrapper = {
   delete: request('DELETE'),
   postFile: requestFile('POST'),
   getFile: requestBlob('GET'),
+  postBlob: requestBlob('POST'),
   downloadFile: downloadFile
 }
 

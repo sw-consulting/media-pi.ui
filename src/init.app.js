@@ -47,7 +47,12 @@ import {
   faCloudArrowUp,
   faFolderPlus,
   faChevronDown,
-  faChevronUp
+  faChevronUp,
+  faPhotoFilm,
+  faCamera,
+  faFilter,
+  faFilterCircleXmark,
+  faImage
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -98,7 +103,12 @@ library.add(
   faCloudArrowUp,
   faFolderPlus,
   faChevronDown,
-  faChevronUp
+  faChevronUp,
+  faPhotoFilm,
+  faCamera,
+  faFilter,
+  faFilterCircleXmark,
+  faImage
 )
 
 import 'vuetify/styles'
