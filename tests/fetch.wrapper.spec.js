@@ -207,6 +207,25 @@ describe('fetchWrapper', () => {
     })
   })
 
+  it('handles binary POST with postBlob', async () => {
+    const response = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      blob: () => Promise.resolve(new Blob(['file content'], { type: 'image/jpeg' })),
+      headers: new Map([['Content-Disposition', 'attachment; filename="shot.jpg"']])
+    }
+    global.fetch = vi.fn(() => Promise.resolve(response))
+
+    const result = await fetchWrapper.postBlob(`${baseUrl}/devices/7/screenshot`)
+
+    expect(result).toBe(response)
+    expect(global.fetch).toHaveBeenCalledWith(`${baseUrl}/devices/7/screenshot`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer abc' }
+    })
+  })
+
   // Test downloadFile function
   it('handles downloadFile functionality', async () => {
     const mockBlob = new Blob(['file content'], { type: 'application/octet-stream' })

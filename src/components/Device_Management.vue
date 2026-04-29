@@ -680,6 +680,10 @@ const shutdown = async () => {
   await runSystemOperation('shutdown', devicesStore.shutdownSystem, timeouts.shutdown)
 }
 
+const openScreenshots = () => {
+  router.push(`/device/screenshots/${props.deviceId}`)
+}
+
 onBeforeUnmount(() => {
   componentActive.value = false
   resetSystemOperations()
@@ -707,11 +711,22 @@ onBeforeUnmount(() => {
           <span class="spinner-border"></span>
         </div>
         <div class="header-actions header-actions-group">
+          <ActionButton
+            icon="fa-solid fa-photo-film"
+            iconSize="2x"
+            tooltipText="Фотографии"
+            :item="{}"
+            data-test="open-screenshots"
+            @click="openScreenshots"
+          />
+        </div>
+        <div class="header-actions header-actions-group">
           <ActionButton 
             icon="fa-solid fa-xmark" 
             iconSize="2x" 
-            tooltipText="Выход из настроек устройства"
+            tooltipText="Выход"
             :item="{}"
+            data-test="back-device-management"
             @click="router.go(-1)"
           />
         </div>
@@ -877,7 +892,7 @@ onBeforeUnmount(() => {
             placeholder="Каталог на устройстве"
           />
         </div>
-        <div class="other-settings-cell label other-settings-label">Аудиовыход</div>
+        <div class="other-settings-cell label other-settings-label-y">Аудиовыход</div>
         <div class="other-settings-cell">
           <select
             id="audio-output"
@@ -889,7 +904,7 @@ onBeforeUnmount(() => {
             <option value="jack">3.5" jack audio</option>
           </select>
         </div>
-        <div class="other-settings-cell label other-settings-label">Частота снимков (мин)</div>
+        <div class="other-settings-cell label other-settings-label other-settings-label-y">Частота фотографий (мин)</div>
         <div class="other-settings-cell">
           <input
             id="screenshot-interval-minutes"
@@ -1038,7 +1053,7 @@ onBeforeUnmount(() => {
 
 .other-settings-grid {
   display: grid;
-  grid-template-columns: 120px 1.2fr 120px 0.5fr 170px 0.5fr;
+  grid-template-columns: 120px 1.2fr 100px 0.5fr 200px 0.4fr;
   gap: 1rem;
 }
 
@@ -1049,9 +1064,12 @@ onBeforeUnmount(() => {
 }
 
 .other-settings-label {
-  width: 170px;
+  width: 175px;
 }
 
+.other-settings-label-y {
+  margin-left: 15px;
+}
 
 .timers-column {
   border: 1px solid  #536373;
@@ -1060,7 +1078,7 @@ onBeforeUnmount(() => {
   background-color: rgba(0, 0, 0, 0.02);
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 800px) {
   .secondary-heading {
     width: 100%;
   }
@@ -1091,6 +1109,14 @@ onBeforeUnmount(() => {
 
   .timers-grid {
     grid-template-columns: 0.7fr;
+  }
+
+  .other-settings-grid {
+    grid-template-columns: 0.7fr;
+  }
+
+  .other-settings-label-y {
+    margin-left: 0px;
   }
 
   .form-group-add {
