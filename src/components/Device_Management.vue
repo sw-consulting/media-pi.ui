@@ -1062,7 +1062,7 @@ onBeforeUnmount(() => {
 }
 
 .other-settings-label {
-  width: 170px;
+  width: 175px;
 }
 
 
