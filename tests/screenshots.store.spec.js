@@ -86,14 +86,11 @@ describe('screenshots.store', () => {
     expect(store.error).toBe(error)
   })
 
-  it('opens screenshot in a new tab via blob url', async () => {
+  it('opens screenshot as preview blob url', async () => {
     const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
-    const openMock = vi.fn(() => ({}))
     const createObjectURL = vi.fn(() => 'blob:test')
-    const revokeObjectURL = vi.fn()
 
-    vi.stubGlobal('open', openMock)
-    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
+    vi.stubGlobal('URL', { createObjectURL })
 
     fetchWrapper.getFile.mockResolvedValueOnce({
       headers: {
@@ -107,19 +104,27 @@ describe('screenshots.store', () => {
 
     expect(fetchWrapper.getFile).toHaveBeenCalledWith('http://localhost:8080/api/screenshots/11')
     expect(createObjectURL).toHaveBeenCalledWith(mockBlob)
-    expect(openMock).toHaveBeenCalledWith('blob:test', '_blank', 'noopener')
     expect(result).toEqual({ id: 11, filename: 'shot.jpg', objectUrl: 'blob:test' })
+    expect(store.screenshot).toEqual(result)
   })
 
   it('creates screenshot through device endpoint', async () => {
-    const response = { ok: true }
+    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
+    const response = {
+      headers: {
+        get: vi.fn(() => 'attachment; filename="created.jpg"')
+      },
+      blob: vi.fn(async () => mockBlob)
+    }
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:created') })
     fetchWrapper.postBlob.mockResolvedValueOnce(response)
 
     const store = useScreenshotsStore()
     const result = await store.create(7)
 
     expect(fetchWrapper.postBlob).toHaveBeenCalledWith('http://localhost:8080/api/devices/7/screenshot')
-    expect(result).toBe(response)
+    expect(result).toEqual({ id: null, filename: 'created.jpg', objectUrl: 'blob:created' })
+    expect(store.screenshot).toEqual(result)
     expect(store.error).toBeNull()
     expect(store.loading).toBe(false)
   })
@@ -367,30 +372,6 @@ describe('screenshots.store', () => {
     expect(result.filename).toBe('screenshot-25')
   })
 
-  it('creates download link when window.open is blocked (returns null)', async () => {
-    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
-    const clickMock = vi.fn()
-    const removeMock = vi.fn()
-    const appendChildMock = vi.fn()
-    const createElementMock = vi.fn(() => ({ href: '', download: '', click: clickMock, remove: removeMock }))
-
-    vi.stubGlobal('open', vi.fn(() => null))
-    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:blocked'), revokeObjectURL: vi.fn() })
-    vi.stubGlobal('document', { createElement: createElementMock, body: { appendChild: appendChildMock } })
-
-    fetchWrapper.getFile.mockResolvedValueOnce({
-      headers: { get: vi.fn(() => 'attachment; filename="blocked.jpg"') },
-      blob: vi.fn(async () => mockBlob)
-    })
-
-    const store = useScreenshotsStore()
-    await store.open(26)
-
-    expect(createElementMock).toHaveBeenCalledWith('a')
-    expect(clickMock).toHaveBeenCalled()
-    expect(removeMock).toHaveBeenCalled()
-  })
-
   it('sets error state and rethrows when open() fails', async () => {
     const err = new Error('network error')
     fetchWrapper.getFile.mockRejectedValueOnce(err)
@@ -470,29 +451,6 @@ describe('screenshots.store', () => {
     const result = await store.open(32)
 
     expect(result.filename).toBe('screenshot-32')
-  })
-
-  it('revokes blob URL after 60 seconds via setTimeout', async () => {
-    vi.useFakeTimers()
-
-    const mockBlob = new Blob(['img'], { type: 'image/jpeg' })
-    const revokeObjectURL = vi.fn()
-    vi.stubGlobal('open', vi.fn(() => ({})))
-    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:timer'), revokeObjectURL })
-
-    fetchWrapper.getFile.mockResolvedValueOnce({
-      headers: { get: vi.fn(() => 'attachment; filename="timed.jpg"') },
-      blob: vi.fn(async () => mockBlob)
-    })
-
-    const store = useScreenshotsStore()
-    await store.open(33)
-
-    expect(revokeObjectURL).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(60000)
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:timer')
-
-    vi.useRealTimers()
   })
 
   it('handles missing sortBy/sortOrder when screenshots_sort_by is undefined', async () => {

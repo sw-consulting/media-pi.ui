@@ -74,6 +74,17 @@ function extractFilename(disposition, fallback) {
   return filename || fallback
 }
 
+async function createScreenshotPreview(response, { id = null, fallbackFilename }) {
+  const blob = await response.blob()
+  const objectUrl = globalThis.URL.createObjectURL(blob)
+  const filename = extractFilename(
+    response?.headers?.get?.('Content-Disposition'),
+    fallbackFilename
+  )
+
+  return { id, filename, objectUrl }
+}
+
 export const useScreenshotsStore = defineStore('screenshots', () => {
   const screenshots = ref([])
   const screenshot = ref(null)
@@ -177,29 +188,10 @@ export const useScreenshotsStore = defineStore('screenshots', () => {
 
     try {
       const response = await fetchWrapper.getFile(`${baseUrl}/${id}`)
-      const blob = await response.blob()
-      const objectUrl = globalThis.URL.createObjectURL(blob)
-      const filename = extractFilename(
-        response?.headers?.get?.('Content-Disposition'),
-        `screenshot-${id}`
-      )
-
-      screenshot.value = { id, filename, objectUrl }
-
-      const openedWindow = globalThis.open?.(objectUrl, '_blank', 'noopener')
-      if (!openedWindow && globalThis.document?.createElement) {
-        const link = document.createElement('a')
-        link.href = objectUrl
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-      }
-
-      globalThis.setTimeout(() => {
-        globalThis.URL.revokeObjectURL(objectUrl)
-      }, 60000)
-
+      screenshot.value = await createScreenshotPreview(response, {
+        id,
+        fallbackFilename: `screenshot-${id}`
+      })
       return screenshot.value
     } catch (err) {
       error.value = err
@@ -215,7 +207,10 @@ export const useScreenshotsStore = defineStore('screenshots', () => {
 
     try {
       const response = await fetchWrapper.postBlob(`${devicesBaseUrl}/${deviceId}/screenshot`)
-      return response
+      screenshot.value = await createScreenshotPreview(response, {
+        fallbackFilename: `screenshot-${deviceId}`
+      })
+      return screenshot.value
     } catch (err) {
       error.value = err
       throw err
