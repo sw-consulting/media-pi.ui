@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { formatFileSize } from '@/helpers/media.format.js'
+import ScreenshotViewDialog from '@/components/Screenshot_View_Dialog.vue'
 
 const props = defineProps({
   deviceId: { type: Number, required: true }
@@ -25,12 +26,15 @@ const alertStore = useAlertStore()
 const router = useRouter()
 const { confirmDelete } = useConfirmation()
 
-const { screenshots, loading: screenshotsLoading, totalCount } = storeToRefs(screenshotsStore)
+const { screenshots, screenshot, loading: screenshotsLoading, totalCount } = storeToRefs(screenshotsStore)
 const { device, loading: deviceLoading } = storeToRefs(devicesStore)
 const { alert } = storeToRefs(alertStore)
 
 const fromValue = ref('')
 const toValue = ref('')
+const screenshotDialogOpen = ref(false)
+const screenshotDialogTakenAt = ref(null)
+const previewObjectUrl = ref(null)
 
 const itemsPerPageOptions = Object.freeze([
   { value: 10, title: '10' },
@@ -91,14 +95,39 @@ async function loadDevice() {
 async function openPhoto(item) {
   try {
     await screenshotsStore.open(item.id)
+    screenshotDialogTakenAt.value = item.timeCreated || null
+    showScreenshotDialog()
   } catch (err) {
     alertStore.error('Не удалось открыть фотографию: ' + (err?.message || err))
   }
 }
 
+function clearPreviewObjectUrl() {
+  if (previewObjectUrl.value) {
+    globalThis.URL?.revokeObjectURL?.(previewObjectUrl.value)
+    previewObjectUrl.value = null
+  }
+}
+
+function showScreenshotDialog() {
+  const nextObjectUrl = screenshot.value?.objectUrl || null
+  if (previewObjectUrl.value && previewObjectUrl.value !== nextObjectUrl) {
+    clearPreviewObjectUrl()
+  }
+  previewObjectUrl.value = nextObjectUrl
+  screenshotDialogOpen.value = true
+}
+
+watch(screenshotDialogOpen, (isOpen) => {
+  if (!isOpen) {
+    clearPreviewObjectUrl()
+  }
+})
 async function takePhoto() {
   try {
     await screenshotsStore.create(props.deviceId)
+    screenshotDialogTakenAt.value = new Date()
+    showScreenshotDialog()
     await loadPhotos()
   } catch (err) {
     alertStore.error('Не удалось сделать фотографию: ' + (err?.message || err))
@@ -165,6 +194,9 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  if (previewObjectUrl.value) {
+    globalThis.URL?.revokeObjectURL?.(previewObjectUrl.value)
+  }
   alertStore.clear()
 })
 </script>
@@ -303,6 +335,13 @@ onBeforeUnmount(() => {
       <button class="btn btn-link close" @click="alertStore.clear()">×</button>
       {{ alert.message }}
     </div>
+
+    <ScreenshotViewDialog
+      v-model="screenshotDialogOpen"
+      :screenshot="screenshot"
+      :device-title="deviceTitle"
+      :taken-at="screenshotDialogTakenAt"
+    />
   </div>
 </template>
 

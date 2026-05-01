@@ -2,7 +2,7 @@
 // Copyright (c) 2026 sw.consulting
 // This file is a part of Media Pi frontend application
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { reactive, ref } from 'vue'
 
@@ -15,6 +15,7 @@ const authStore = reactive({
 })
 
 const screenshotsRef = ref([])
+const screenshotRef = ref(null)
 const screenshotsLoadingRef = ref(false)
 const totalCountRef = ref(0)
 const deviceRef = ref({ id: 7, name: 'Device 7' })
@@ -26,8 +27,14 @@ const getDeviceById = vi.fn(async (id) => {
   deviceRef.value = { id, name: `Device ${id}` }
   return deviceRef.value
 })
-const createScreenshot = vi.fn(async () => ({}))
-const openScreenshot = vi.fn(async () => ({}))
+const createScreenshot = vi.fn(async () => {
+  screenshotRef.value = { id: null, filename: 'new-shot.jpg', objectUrl: 'blob:new-shot' }
+  return screenshotRef.value
+})
+const openScreenshot = vi.fn(async (id) => {
+  screenshotRef.value = { id, filename: 'shot.jpg', objectUrl: 'blob:shot' }
+  return screenshotRef.value
+})
 const removeScreenshot = vi.fn(async () => true)
 const clearAlert = vi.fn()
 const pushMock = vi.fn()
@@ -45,6 +52,7 @@ vi.mock('@/stores/screenshots.store.js', () => ({
   useScreenshotsStore: () => ({
     __mockRefs: {
       screenshots: screenshotsRef,
+      screenshot: screenshotRef,
       loading: screenshotsLoadingRef,
       totalCount: totalCountRef
     },
@@ -108,6 +116,11 @@ vi.mock('@sw-consulting/tooling.ui.kit', () => ({
 
 const globalStubs = {
   'v-card': { template: '<div><slot /></div>' },
+  'v-dialog': {
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template: '<div v-if="modelValue" class="v-dialog-stub"><slot /></div>'
+  },
   'v-data-table-server': {
     props: ['items'],
     emits: ['update:items-per-page', 'update:page', 'update:sort-by'],
@@ -128,12 +141,17 @@ const globalStubs = {
 }
 
 describe('Screenshots_List.vue', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     authStore.screenshots_page = 1
     authStore.screenshots_per_page = 100
     authStore.screenshots_sort_by = [{ key: 'id', order: 'asc' }]
     screenshotsRef.value = [{ id: 5, originalFilename: 'shot.jpg', fileSizeBytes: 128, timeCreated: '2026-04-15T10:00:00Z' }]
+    screenshotRef.value = null
     screenshotsLoadingRef.value = false
     deviceRef.value = { id: 7, name: 'Device 7' }
     deviceLoadingRef.value = false
@@ -192,11 +210,18 @@ describe('Screenshots_List.vue', () => {
 
     await flushPromises()
     await wrapper.find('[data-test="open-photo-button"]').trigger('click')
+    await flushPromises()
 
     expect(openScreenshot).toHaveBeenCalledWith(5)
+    expect(wrapper.find('.screenshot-dialog-image').attributes('src')).toBe('blob:shot')
+    expect(wrapper.find('.screenshot-dialog-title').text()).toContain('Фотография устройства Device 7')
+    expect(wrapper.find('.screenshot-dialog-title').text()).toContain('15.04.2026')
   })
 
   it('takes a photo and reloads the list', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-16T09:08:07Z'))
+
     const wrapper = mount(ScreenshotsList, {
       props: { deviceId: 7 },
       global: { stubs: globalStubs }
@@ -210,6 +235,9 @@ describe('Screenshots_List.vue', () => {
 
     expect(createScreenshot).toHaveBeenCalledWith(7)
     expect(getAllByDevice).toHaveBeenCalledWith(7, { from: null, to: null })
+    expect(wrapper.find('.screenshot-dialog-image').attributes('src')).toBe('blob:new-shot')
+    expect(wrapper.find('.screenshot-dialog-title').text()).toContain('Фотография устройства Device 7')
+    expect(wrapper.find('.screenshot-dialog-title').text()).toContain('16.04.2026')
   })
 
   it('keeps buttons disabled while taking a photo', async () => {
