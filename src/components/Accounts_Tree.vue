@@ -56,9 +56,7 @@ import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpers/user.helpers.js'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
-import DeviceStatusDialog from '@/components/Device_Status_Dialog.vue'
 import InlineAssignment from '@/components/InlineAssignment.vue'
-import { CREATOR_ID } from '@/stores/users.store.js'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -78,20 +76,6 @@ const deviceGroupAssignmentState = ref({})
 
 // State for tracking devices being moved (to prevent duplication during transitions)
 const transitioningDevices = ref(new Set())
-
-// Device status dialog state
-const statusDialogOpen = ref(false)
-const statusDialogDeviceId = ref(null)
-
-
-
-const openDeviceStatus = (item) => {
-  const id = getDeviceIdFromNodeId(item.id)
-  if (!id) return
-  statusDialogDeviceId.value = id
-  statusDialogOpen.value = true
-}
-
 
 // Initialize tree helper
 const {
@@ -521,11 +505,6 @@ onBeforeUnmount(() => {
 
             <!-- Action buttons for individual device nodes -->
             <div v-else-if="item.id.startsWith('device-')" class="tree-actions">
-              <!-- Always allow viewing device status -->
-              <ActionButton v-if="authStore.user?.id === CREATOR_ID" :item="item" icon="fa-solid fa-book-skull" tooltip-text="Системная информация" 
-                :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
-                @click="openDeviceStatus" 
-              />
               <ActionButton :item="item" icon="fa-solid fa-list" tooltip-text="Управление устройством" 
                 :disabled="loading || deviceGroupAssignmentState[getDeviceIdFromNodeId(item.id)]?.editMode"
                 @click="manageDevice" 
@@ -607,15 +586,8 @@ onBeforeUnmount(() => {
       </v-alert>
     </v-card>
 
-    <!-- Device Status Dialog -->
-    <DeviceStatusDialog 
-      v-if="statusDialogDeviceId"
-      v-model="statusDialogOpen"
-      :device-id="statusDialogDeviceId"
-    />
-
     <!-- Global alert messages -->
-    <div v-if="alert && !statusDialogOpen" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
     </div>
