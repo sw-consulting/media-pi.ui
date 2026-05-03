@@ -16,10 +16,24 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
   const error = ref(null)
   let streamController = null
   let streamReader = null
+  let streamSubscribers = 0
 
-  const updateLocal = (item) => {
-    const idx = statuses.value.findIndex(s => s.deviceId === item.deviceId)
-    const next = { ...item }
+  const normalizeStatusItem = (item, fallbackDeviceId = null) => ({
+    deviceId: item?.deviceId ?? item?.DeviceId ?? fallbackDeviceId,
+    isOnline: item?.isOnline ?? item?.IsOnline ?? false,
+    lastChecked: item?.lastChecked ?? item?.LastChecked ?? null,
+    connectLatencyMs: item?.connectLatencyMs ?? item?.ConnectLatencyMs ?? null,
+    totalLatencyMs: item?.totalLatencyMs ?? item?.TotalLatencyMs ?? null,
+    softwareVersion: item?.softwareVersion ?? item?.SoftwareVersion ?? null,
+    playbackServiceStatus: item?.playbackServiceStatus ?? item?.PlaybackServiceStatus ?? null,
+    playlistUploadServiceStatus: item?.playlistUploadServiceStatus ?? item?.PlaylistUploadServiceStatus ?? null,
+    videoUploadServiceStatus: item?.videoUploadServiceStatus ?? item?.VideoUploadServiceStatus ?? null
+  })
+
+  const updateLocal = (item, fallbackDeviceId = null) => {
+    const next = normalizeStatusItem(item, fallbackDeviceId)
+    const deviceId = next.deviceId
+    const idx = statuses.value.findIndex(s => s.deviceId === deviceId)
     if (idx >= 0) {
       // ensure reactivity on replace
       statuses.value.splice(idx, 1, next)
@@ -34,7 +48,7 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
     error.value = null
     try {
       const result = await fetchWrapper.get(baseUrl)
-      statuses.value = result || []
+      statuses.value = (result || []).map((item) => normalizeStatusItem(item))
     } catch (err) {
       error.value = err
       statuses.value = []
@@ -49,7 +63,7 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
     error.value = null
     try {
       const result = await fetchWrapper.get(`${baseUrl}/${id}`)
-      updateLocal(result)
+      updateLocal(result, id)
       return result
     } catch (err) {
       error.value = err
@@ -64,7 +78,7 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
     error.value = null
     try {
       const result = await fetchWrapper.post(`${baseUrl}/${id}/test`, {})
-      updateLocal(result)
+      updateLocal(result, id)
       return result
     } catch (err) {
       error.value = err
@@ -75,12 +89,17 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
   }
 
   async function startStream() {
-    stopStream()
+    streamSubscribers += 1
+    if (streamController) {
+      return
+    }
+
     const authStore = useAuthStore()
     const token = authStore.user?.token
     
     if (!token) {
       error.value = new Error('No authentication token available')
+      streamSubscribers = Math.max(0, streamSubscribers - 1)
       return
     }
     
@@ -161,6 +180,11 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
   }
 
   function stopStream() {
+    streamSubscribers = Math.max(0, streamSubscribers - 1)
+    if (streamSubscribers > 0) {
+      return
+    }
+
     if (streamController) {
       streamController.abort()
       streamController = null

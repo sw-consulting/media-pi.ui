@@ -298,6 +298,7 @@ const buildConfigurationPayload = (scheduleValuesOverride) => ({
 
 
 const componentActive = ref(true)
+const statusStreamStarted = ref(false)
 
 // Ported initial loading pattern from Device_Settings.vue
 const { device, loading } = storeToRefs(devicesStore)
@@ -334,8 +335,21 @@ async function fetchDeviceStatus() {
   }
 }
 
+function startStatusStream() {
+  if (statusStreamStarted.value) return
+  statusStreamStarted.value = true
+  deviceStatusesStore.startStream()
+}
+
+function stopStatusStream() {
+  if (!statusStreamStarted.value) return
+  statusStreamStarted.value = false
+  deviceStatusesStore.stopStream()
+}
+
 onMounted(async () => {
   if (props.deviceId) {
+    startStatusStream()
     await initializeDevice()
   }
 })
@@ -344,7 +358,10 @@ watch(() => props.deviceId, async () => {
   resetSystemOperations()
   resetServiceStatus()
   if (props.deviceId) {
+    startStatusStream()
     await initializeDevice()
+  } else {
+    stopStatusStream()
   }
 })
 
@@ -447,8 +464,25 @@ const serviceActionRunners = Object.fromEntries(
   Object.keys(serviceOperationConfigs).map((key) => [key, createServiceActionRunner(key)])
 )
 
+const serviceStatusFromCurrentStatus = computed(() => {
+  const status = currentStatus.value || {}
+  return serviceDescriptors.reduce((acc, descriptor) => {
+    const value = status[descriptor.statusKey]
+    if (value === true || value === false) {
+      acc[descriptor.statusKey] = value
+    }
+    return acc
+  }, {})
+})
+
+const effectiveServiceStatus = computed(() => ({
+  ...defaultServiceStatus,
+  ...(serviceStatus.value || {}),
+  ...serviceStatusFromCurrentStatus.value
+}))
+
 const serviceRows = computed(() => {
-  const status = serviceStatus.value || defaultServiceStatus
+  const status = effectiveServiceStatus.value
   return serviceDescriptors.map((descriptor) => {
     const isActive = Boolean(status[descriptor.statusKey])
     const hasActions = Boolean(descriptor.startOperationKey && descriptor.stopOperationKey)
@@ -686,6 +720,7 @@ const openScreenshots = () => {
 
 onBeforeUnmount(() => {
   componentActive.value = false
+  stopStatusStream()
   resetSystemOperations()
   clearAlert()
 })

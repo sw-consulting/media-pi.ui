@@ -27,6 +27,33 @@ const mockStatuses = [
   { deviceId: 2, ipAddress: '192.168.1.11', isOnline: false, lastChecked: '2025-01-01T00:00:00Z', connectLatencyMs: 30, totalLatencyMs: 40 }
 ]
 
+const normalizedMockStatus = {
+  deviceId: 1,
+  isOnline: true,
+  lastChecked: '2025-01-01T00:00:00Z',
+  connectLatencyMs: 10,
+  totalLatencyMs: 20,
+  softwareVersion: null,
+  playbackServiceStatus: null,
+  playlistUploadServiceStatus: null,
+  videoUploadServiceStatus: null
+}
+
+const normalizedMockStatuses = [
+  normalizedMockStatus,
+  {
+    deviceId: 2,
+    isOnline: false,
+    lastChecked: '2025-01-01T00:00:00Z',
+    connectLatencyMs: 30,
+    totalLatencyMs: 40,
+    softwareVersion: null,
+    playbackServiceStatus: null,
+    playlistUploadServiceStatus: null,
+    videoUploadServiceStatus: null
+  }
+]
+
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
@@ -38,7 +65,7 @@ describe('device.statuses.store', () => {
     const store = useDeviceStatusesStore()
     await store.getAll()
     expect(fetchWrapper.get).toHaveBeenCalled()
-    expect(store.statuses).toEqual(mockStatuses)
+    expect(store.statuses).toEqual(normalizedMockStatuses)
   })
 
   it('getById updates status in store', async () => {
@@ -46,7 +73,54 @@ describe('device.statuses.store', () => {
     const store = useDeviceStatusesStore()
     await store.getById(1)
     expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/1'))
-    expect(store.statuses).toEqual([mockStatuses[0]])
+    expect(store.statuses).toEqual([normalizedMockStatus])
+  })
+
+  it('getById adds the requested device id when snapshot omits it', async () => {
+    const snapshot = {
+      isOnline: true,
+      lastChecked: '2025-01-01T00:00:00Z',
+      connectLatencyMs: 10,
+      totalLatencyMs: 20,
+      playbackServiceStatus: true,
+      playlistUploadServiceStatus: false,
+      videoUploadServiceStatus: null
+    }
+    fetchWrapper.get.mockResolvedValueOnce(snapshot)
+    const store = useDeviceStatusesStore()
+
+    await store.getById(1)
+
+    expect(store.statuses).toEqual([{ ...snapshot, deviceId: 1, softwareVersion: null }])
+  })
+
+  it('normalizes PascalCase status items from the API', async () => {
+    fetchWrapper.get.mockResolvedValueOnce({
+      DeviceId: 1,
+      IsOnline: true,
+      LastChecked: '2025-01-01T00:00:00Z',
+      ConnectLatencyMs: 10,
+      TotalLatencyMs: 20,
+      SoftwareVersion: '1.2.3',
+      PlaybackServiceStatus: true,
+      PlaylistUploadServiceStatus: false,
+      VideoUploadServiceStatus: null
+    })
+    const store = useDeviceStatusesStore()
+
+    await store.getById(1)
+
+    expect(store.statuses).toEqual([{
+      deviceId: 1,
+      isOnline: true,
+      lastChecked: '2025-01-01T00:00:00Z',
+      connectLatencyMs: 10,
+      totalLatencyMs: 20,
+      softwareVersion: '1.2.3',
+      playbackServiceStatus: true,
+      playlistUploadServiceStatus: false,
+      videoUploadServiceStatus: null
+    }])
   })
 
   it('test posts and updates status', async () => {
@@ -54,7 +128,7 @@ describe('device.statuses.store', () => {
     const store = useDeviceStatusesStore()
     await store.test(1)
     expect(fetchWrapper.post).toHaveBeenCalledWith(expect.stringContaining('/1/test'), {})
-    expect(store.statuses).toEqual([mockStatuses[0]])
+    expect(store.statuses).toEqual([normalizedMockStatus])
   })
 
   it('startStream uses fetch with proper authentication and stopStream cancels stream', async () => {
@@ -111,7 +185,7 @@ describe('device.statuses.store', () => {
         signal: expect.any(Object)
       })
     )
-    expect(store.statuses).toEqual([mockStatuses[0]])
+    expect(store.statuses).toEqual([normalizedMockStatus])
     
     // Stop the stream
     store.stopStream()
@@ -145,6 +219,33 @@ describe('device.statuses.store', () => {
     await startPromise
 
     expect(store.statuses).toEqual([])
+  })
+
+  it('keeps the shared stream alive until all consumers stop it', async () => {
+    let capturedSignal
+    let rejectFetch
+    global.fetch = vi.fn((_url, opts) => new Promise((resolve, reject) => {
+      capturedSignal = opts.signal
+      rejectFetch = reject
+    }))
+
+    global.AbortController = RealAbortController
+
+    const store = useDeviceStatusesStore()
+    const startPromise = store.startStream()
+    await Promise.resolve()
+    await store.startStream()
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+
+    store.stopStream()
+    expect(capturedSignal.aborted).toBe(false)
+
+    store.stopStream()
+    expect(capturedSignal.aborted).toBe(true)
+
+    rejectFetch(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+    await startPromise
   })
 
   it('startStream handles fetch errors', async () => {
