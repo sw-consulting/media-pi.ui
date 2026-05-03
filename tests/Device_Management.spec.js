@@ -56,6 +56,8 @@ const getDeviceStatusById = vi.fn(() => {
   statusesRef.value = [status]
   return Promise.resolve(status)
 })
+const startStatusStream = vi.fn()
+const stopStatusStream = vi.fn()
 const reloadSystem = vi.fn(() => Promise.resolve())
 const rebootSystem = vi.fn(() => Promise.resolve())
 const shutdownSystem = vi.fn(() => Promise.resolve())
@@ -134,7 +136,9 @@ vi.mock('@/stores/device.statuses.store.js', () => ({
     __mockRefs: {
       statuses: statusesRef
     },
-    getById: getDeviceStatusById
+    getById: getDeviceStatusById,
+    startStream: startStatusStream,
+    stopStream: stopStatusStream
   })
 }))
 
@@ -200,8 +204,26 @@ describe('Device_Management.vue', () => {
     expect(getConfiguration).toHaveBeenCalledTimes(1)
     expect(getConfiguration).toHaveBeenCalledWith(1)
     expect(getServiceStatus).toHaveBeenCalledTimes(1)
+    expect(startStatusStream).toHaveBeenCalledTimes(1)
     const headerText = wrapper.get('h1.primary-heading span').text()
     expect(headerText).toContain('Device 1')
+  })
+
+  it('stops the status stream on unmount', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+    wrapper.unmount()
+
+    expect(startStatusStream).toHaveBeenCalledTimes(1)
+    expect(stopStatusStream).toHaveBeenCalledTimes(1)
   })
 
   it('applies settings with operation timeout and status refresh', async () => {
@@ -786,6 +808,32 @@ describe('Device_Management.vue', () => {
     expect(values[0].text()).toBe('192.168.1.200')
     expect(values[1].text()).toBe('2.0.0')
     expect(values[2].text()).toBe('Да (50 мс)')
+  })
+
+  it('updates service statuses from live device status fields when provided', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    statusesRef.value = [{
+      deviceId: 1,
+      isOnline: true,
+      playbackServiceStatus: true,
+      playlistUploadServiceStatus: true,
+      videoUploadServiceStatus: false
+    }]
+
+    await wrapper.vm.$nextTick()
+
+    const serviceStatuses = wrapper.findAll('.service-status').map((item) => item.text())
+    expect(serviceStatuses).toEqual(['Запущена', 'Запущено', 'Остановлена'])
   })
 
   it('displays device info section header correctly', async () => {
