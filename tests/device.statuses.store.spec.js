@@ -71,9 +71,10 @@ describe('device.statuses.store', () => {
   it('getById updates status in store', async () => {
     fetchWrapper.get.mockResolvedValueOnce(mockStatuses[0])
     const store = useDeviceStatusesStore()
-    await store.getById(1)
+    const result = await store.getById(1)
     expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/1'))
     expect(store.statuses).toEqual([normalizedMockStatus])
+    expect(result).toEqual(normalizedMockStatus)
   })
 
   it('getById adds the requested device id when snapshot omits it', async () => {
@@ -89,9 +90,11 @@ describe('device.statuses.store', () => {
     fetchWrapper.get.mockResolvedValueOnce(snapshot)
     const store = useDeviceStatusesStore()
 
-    await store.getById(1)
+    const result = await store.getById(1)
 
-    expect(store.statuses).toEqual([{ ...snapshot, deviceId: 1, softwareVersion: null }])
+    const expected = { ...snapshot, deviceId: 1, softwareVersion: null }
+    expect(store.statuses).toEqual([expected])
+    expect(result).toEqual(expected)
   })
 
   it('normalizes PascalCase status items from the API', async () => {
@@ -108,9 +111,9 @@ describe('device.statuses.store', () => {
     })
     const store = useDeviceStatusesStore()
 
-    await store.getById(1)
+    const result = await store.getById(1)
 
-    expect(store.statuses).toEqual([{
+    const expected = {
       deviceId: 1,
       isOnline: true,
       lastChecked: '2025-01-01T00:00:00Z',
@@ -120,15 +123,18 @@ describe('device.statuses.store', () => {
       playbackServiceStatus: true,
       playlistUploadServiceStatus: false,
       videoUploadServiceStatus: null
-    }])
+    }
+    expect(store.statuses).toEqual([expected])
+    expect(result).toEqual(expected)
   })
 
   it('test posts and updates status', async () => {
     fetchWrapper.post.mockResolvedValueOnce(mockStatuses[0])
     const store = useDeviceStatusesStore()
-    await store.test(1)
+    const result = await store.test(1)
     expect(fetchWrapper.post).toHaveBeenCalledWith(expect.stringContaining('/1/test'), {})
     expect(store.statuses).toEqual([normalizedMockStatus])
+    expect(result).toEqual(normalizedMockStatus)
   })
 
   it('startStream uses fetch with proper authentication and stopStream cancels stream', async () => {

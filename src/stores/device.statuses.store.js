@@ -64,7 +64,7 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
     try {
       const result = await fetchWrapper.get(`${baseUrl}/${id}`)
       updateLocal(result, id)
-      return result
+      return normalizeStatusItem(result, id)
     } catch (err) {
       error.value = err
       throw err
@@ -79,7 +79,7 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
     try {
       const result = await fetchWrapper.post(`${baseUrl}/${id}/test`, {})
       updateLocal(result, id)
-      return result
+      return normalizeStatusItem(result, id)
     } catch (err) {
       error.value = err
       throw err

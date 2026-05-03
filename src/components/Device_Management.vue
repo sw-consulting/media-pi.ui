@@ -338,7 +338,13 @@ async function fetchDeviceStatus() {
 function startStatusStream() {
   if (statusStreamStarted.value) return
   statusStreamStarted.value = true
+  // startStream performs its auth check synchronously before its first async op.
+  // If it fails immediately (e.g. missing token), error.value is set before returning,
+  // so we can reset the flag to allow future retry attempts.
   deviceStatusesStore.startStream()
+  if (deviceStatusesStore.error) {
+    statusStreamStarted.value = false
+  }
 }
 
 function stopStatusStream() {
