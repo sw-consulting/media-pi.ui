@@ -29,6 +29,7 @@ const videosStore = {
   getAllByAccount: vi.fn(async () => videosStore.videos.value),
   update: vi.fn(async () => ({})),
   uploadFile: vi.fn(async () => ({})),
+  uploadFiles: vi.fn(async () => ({})),
   remove: vi.fn(async () => ({}))
 }
 
@@ -112,7 +113,7 @@ describe('Videos_List.vue', () => {
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
     await wrapper.vm.uploadVideo(file)
-    expect(videosStore.uploadFile).not.toHaveBeenCalled()
+    expect(videosStore.uploadFiles).not.toHaveBeenCalled()
   })
 
   it('uploads file when user has permissions', async () => {
@@ -121,7 +122,25 @@ describe('Videos_List.vue', () => {
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
     await wrapper.vm.uploadVideo(file)
-    expect(videosStore.uploadFile).toHaveBeenCalledWith(file, 0, 'test.mp4')
+    expect(videosStore.uploadFiles).toHaveBeenCalledWith([file], 0)
+  })
+
+  it('uploads multiple selected files when user has permissions', async () => {
+    currentUser = { roles: [1], accountIds: [] }
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const file1 = new File(['x'], 'first.mp4', { type: 'video/mp4' })
+    const file2 = new File(['y'], 'second.mp4', { type: 'video/mp4' })
+
+    await wrapper.vm.onFileChange({ target: { files: [file1, file2] } })
+
+    expect(videosStore.uploadFiles).toHaveBeenCalledWith([file1, file2], 0)
+  })
+
+  it('allows selecting multiple files in the hidden file input', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    expect(wrapper.find('input[type="file"]').attributes('multiple')).toBeDefined()
   })
 
   it('deletes video after confirmation for administrator', async () => {

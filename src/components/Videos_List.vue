@@ -92,25 +92,26 @@ function triggerUpload() {
 }
 
 async function uploadVideo(file) {
-  if (!file) return
+  await uploadVideos(file ? [file] : [])
+}
+
+async function uploadVideos(files) {
+  const selectedFiles = Array.from(files || []).filter(Boolean)
+  if (!selectedFiles.length) return
   if (!canManageSelectedAccount.value) {
-    alertStore.error('Недостаточно прав для загрузки видеофайла в выбранный раздел')
+    alertStore.error('Недостаточно прав для загрузки видеофайлов в выбранный раздел')
     return
   }
   try {
-    const originalFilename = file.name || ''
-    // Keep original filename (including extension) when uploading.
-    // The store can derive a title if needed from the filename.
-    await videosStore.uploadFile(file, selectedAccountId.value, originalFilename)
+    await videosStore.uploadFiles(selectedFiles, selectedAccountId.value)
     await refreshVideos()
   } catch (err) {
-    alertStore.error('Не удалось загрузить видеофайл: ' + (err?.message || err))
+    alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
   }
 }
 
 function onFileChange(event) {
-  const file = event?.target?.files?.[0]
-  uploadVideo(file)
+  uploadVideos(event?.target?.files)
 }
 
 function canManageVideo(item) {
@@ -233,11 +234,11 @@ watch(videos, (current) => {
               data-test="upload-video-button"
               :item="{}"
               icon="fa-solid fa-cloud-arrow-up"
-              tooltip-text="Загрузить видеофайл"
+              tooltip-text="Загрузить видеофайлы"
               :disabled="!canManageSelectedAccount || isBusy || titleSaving"
               @click="triggerUpload"
             />
-            <input ref="fileInput" class="d-none" type="file" accept="video/*" @change="onFileChange" />
+            <input ref="fileInput" class="d-none" type="file" accept="video/*" multiple @change="onFileChange" />
           </div>
         </div>
       </div>
