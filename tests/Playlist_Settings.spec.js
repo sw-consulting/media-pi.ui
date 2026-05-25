@@ -155,12 +155,21 @@ describe('Playlist_Settings.vue', () => {
     await wrapper.find('[data-test="form"]').trigger('submit')
     await flushPromises()
 
-    expect(playlistsStore.create).toHaveBeenCalledWith({
+    expect(playlistsStore.create).toHaveBeenCalled()
+    const callArg = playlistsStore.create.mock.calls[0][0]
+    expect(callArg).toEqual(expect.objectContaining({
       title: 'My Playlist',
-      filename: 'playlist.json',
       accountId: 1,
       items: [{ videoId: 11, position: 1 }]
-    })
+    }))
+    expect(callArg.filename).toMatch(/^playlist-\d{6}\.m3u$/)
+  })
+
+  it('does not render filename field', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Имя файла')
   })
 
   it('initializes filename for new playlist when not provided', async () => {
@@ -186,8 +195,9 @@ describe('Playlist_Settings.vue', () => {
     expect(callArg.filename).toMatch(/^playlist-\d{6}\.m3u$/)
   })
 
-  it('blocks creation when filename is not unique', async () => {
-    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([{ id: 2, filename: 'playlist.json' }])
+  it('blocks creation when generated filename is not unique', async () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([{ id: 2, filename: 'playlist-100000.m3u' }])
 
     const wrapper = mountSettings({
       accountId: 1,
@@ -205,6 +215,7 @@ describe('Playlist_Settings.vue', () => {
 
     expect(playlistsStore.create).not.toHaveBeenCalled()
     expect(alertStore.error).toHaveBeenCalledWith('Плейлист с таким именем файла уже существует')
+    randomSpy.mockRestore()
   })
 
   it('updates existing playlist', async () => {
@@ -230,7 +241,7 @@ describe('Playlist_Settings.vue', () => {
     expect(playlistsStore.getById).toHaveBeenCalledWith(9)
     expect(playlistsStore.update).toHaveBeenCalledWith(9, {
       title: 'Updated',
-      filename: 'updated.json',
+      filename: 'old.json',
       items: [{ videoId: 11, position: 1 }]
     })
   })
@@ -245,11 +256,13 @@ describe('Playlist_Settings.vue', () => {
     await wrapper.find('[data-test="form"]').trigger('submit')
     await flushPromises()
 
-    expect(playlistsStore.create).toHaveBeenCalledWith({
+    expect(playlistsStore.create).toHaveBeenCalled()
+    const callArg = playlistsStore.create.mock.calls[0][0]
+    expect(callArg).toEqual(expect.objectContaining({
       title: 'Empty',
-      filename: 'empty.json',
       accountId: 1,
       items: []
-    })
+    }))
+    expect(callArg.filename).toMatch(/^playlist-\d{6}\.m3u$/)
   })
 })
