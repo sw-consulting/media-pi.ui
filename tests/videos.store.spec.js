@@ -147,6 +147,28 @@ describe('videos.store', () => {
     expect(appendSpy).toHaveBeenCalledWith('AccountId', 0)
   })
 
+  it('uploadFiles forwards upload progress callback', async () => {
+    const appendSpy = vi.fn()
+    const mockFormData = vi.fn(() => ({
+      append: appendSpy
+    }))
+    global.FormData = mockFormData
+
+    fetchWrapper.postFile.mockResolvedValueOnce({})
+
+    const store = useVideosStore()
+    const file = new File(['one'], 'one.mp4', { type: 'video/mp4' })
+    const onUploadProgress = vi.fn()
+
+    await store.uploadFiles([file], 7, { onUploadProgress })
+
+    expect(fetchWrapper.postFile).toHaveBeenCalledWith(
+      expect.stringContaining('/videos/upload/batch'),
+      expect.any(Object),
+      { onUploadProgress }
+    )
+  })
+
   it('uploadFile throws when missing File (Russian message)', async () => {
     const store = useVideosStore()
     await expect(store.uploadFile(null, 1, 'X')).rejects.toThrow('Не выбран видеофайл')

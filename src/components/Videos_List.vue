@@ -32,9 +32,17 @@ const titleInputRef = ref(null)
 const editingVideoId = ref(null)
 const editingTitle = ref('')
 const titleSaving = ref(false)
+const isUploading = ref(false)
+const uploadProgressPercent = ref(0)
+const uploadProgressIndeterminate = ref(true)
 
 const accountOptions = computed(() => createAccountOptions(accounts.value || [], authStore.user, { includeCommon: true }))
 
+const uploadProgressLabel = computed(() => {
+  if (!isUploading.value) return ''
+  if (uploadProgressIndeterminate.value) return 'Загрузка видеофайлов...'
+  return `Загрузка видеофайлов: ${uploadProgressPercent.value}%`
+})
 
 const headers = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
@@ -53,7 +61,22 @@ const canManageSelectedAccount = computed(() => {
   return canManageAccountById(authStore.user, selectedAccountId.value)
 })
 
-const isBusy = computed(() => loading.value || accountsLoading.value)
+const isBusy = computed(() => loading.value || accountsLoading.value || isUploading.value)
+
+function resetUploadProgress() {
+  uploadProgressPercent.value = 0
+  uploadProgressIndeterminate.value = true
+}
+
+function handleUploadProgress(progress) {
+  if (!progress?.lengthComputable || progress.percentage === null || progress.percentage === undefined) {
+    uploadProgressIndeterminate.value = true
+    return
+  }
+
+  uploadProgressIndeterminate.value = false
+  uploadProgressPercent.value = Math.min(100, Math.max(0, progress.percentage))
+}
 
 function ensureSelection(options) {
   const availableValues = options.map(option => option.value)
@@ -98,11 +121,18 @@ async function uploadVideos(files) {
     alertStore.error('Недостаточно прав для загрузки видеофайлов в выбранный раздел')
     return
   }
+  resetUploadProgress()
+  isUploading.value = true
   try {
-    await videosStore.uploadFiles(selectedFiles, selectedAccountId.value)
+    await videosStore.uploadFiles(selectedFiles, selectedAccountId.value, {
+      onUploadProgress: handleUploadProgress
+    })
     await refreshVideos()
   } catch (err) {
     alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+  } finally {
+    isUploading.value = false
+    resetUploadProgress()
   }
 }
 
@@ -239,6 +269,19 @@ watch(videos, (current) => {
         </div>
       </div>
     </div>
+    <div v-if="isUploading" class="upload-progress" data-test="upload-progress">
+      <div class="upload-progress-label" data-test="upload-progress-label">
+        {{ uploadProgressLabel }}
+      </div>
+      <v-progress-linear
+        data-test="upload-progress-bar"
+        color="primary"
+        height="6"
+        rounded
+        :indeterminate="uploadProgressIndeterminate"
+        :model-value="uploadProgressPercent"
+      />
+    </div>
     <hr class="hr" />
 
     <v-card>
@@ -371,5 +414,15 @@ watch(videos, (current) => {
   border: 1px solid #666;
   border-radius: 4px;
   background-color: #fff;
+}
+
+.upload-progress {
+  margin-top: 12px;
+}
+
+.upload-progress-label {
+  margin-bottom: 6px;
+  color: #555;
+  font-size: 0.875rem;
 }
 </style>

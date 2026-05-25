@@ -3,7 +3,7 @@
 
 /* global FormData, Blob */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 // Create mock functions that can be controlled per test
 const mockLogout = vi.fn()
@@ -29,9 +29,12 @@ import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
 const baseUrl = 'http://localhost:8080/api'
 
 describe('fetchWrapper', () => {
+  let originalXMLHttpRequest
+
   beforeEach(() => {
     vi.clearAllMocks()
     vi.resetModules()
+    originalXMLHttpRequest = global.XMLHttpRequest
     
     // Reset mock auth store
     mockAuthStore.user = { token: 'abc' }
@@ -69,6 +72,10 @@ describe('fetchWrapper', () => {
     // Mock console.log for logging tests
     vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    global.XMLHttpRequest = originalXMLHttpRequest
   })
 
   it('handles successful json response', async () => {
@@ -184,6 +191,108 @@ describe('fetchWrapper', () => {
       headers: { Authorization: 'Bearer abc' },
       body: formData
     })
+  })
+
+  it('handles file upload progress with postFile', async () => {
+    const formData = new FormData()
+    const onUploadProgress = vi.fn()
+    const xhr = {
+      upload: {},
+      open: vi.fn(),
+      setRequestHeader: vi.fn(),
+      send: vi.fn(function (body) {
+        expect(body).toBe(formData)
+        this.upload.onprogress({ lengthComputable: true, loaded: 40, total: 100 })
+        this.status = 200
+        this.statusText = 'OK'
+        this.responseText = JSON.stringify({ uploaded: true })
+        this.onload()
+      })
+    }
+    global.XMLHttpRequest = vi.fn(() => xhr)
+    global.fetch = vi.fn()
+
+    const result = await fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress })
+
+    expect(result).toEqual({ uploaded: true })
+    expect(global.fetch).not.toHaveBeenCalled()
+    expect(xhr.open).toHaveBeenCalledWith('POST', `${baseUrl}/upload`)
+    expect(xhr.setRequestHeader).toHaveBeenCalledWith('Authorization', 'Bearer abc')
+    expect(onUploadProgress).toHaveBeenCalledWith({
+      loaded: 40,
+      total: 100,
+      percentage: 40,
+      lengthComputable: true
+    })
+  })
+
+  it('handles upload progress when total length is not computable', async () => {
+    const formData = new FormData()
+    const onUploadProgress = vi.fn()
+    const xhr = {
+      upload: {},
+      open: vi.fn(),
+      setRequestHeader: vi.fn(),
+      send: vi.fn(function () {
+        this.upload.onprogress({ lengthComputable: false, loaded: 25, total: 0 })
+        this.status = 204
+        this.statusText = 'No Content'
+        this.responseText = ''
+        this.onload()
+      })
+    }
+    global.XMLHttpRequest = vi.fn(() => xhr)
+
+    const result = await fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress })
+
+    expect(result).toBeUndefined()
+    expect(onUploadProgress).toHaveBeenCalledWith({
+      loaded: 25,
+      total: null,
+      percentage: null,
+      lengthComputable: false
+    })
+  })
+
+  it('handles network error in postFile with progress', async () => {
+    const formData = new FormData()
+    const xhr = {
+      upload: {},
+      open: vi.fn(),
+      setRequestHeader: vi.fn(),
+      send: vi.fn()
+    }
+    global.XMLHttpRequest = vi.fn(() => xhr)
+
+    const request = fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress: vi.fn() })
+    xhr.onerror()
+
+    await expect(request).rejects.toThrow('Не удалось соединиться')
+  })
+
+  it('handles HTTP error in postFile with progress', async () => {
+    expect.assertions(3)
+    const formData = new FormData()
+    const xhr = {
+      upload: {},
+      open: vi.fn(),
+      setRequestHeader: vi.fn(),
+      send: vi.fn(function () {
+        this.status = 413
+        this.statusText = 'Payload Too Large'
+        this.responseText = JSON.stringify({ msg: 'File too large' })
+        this.onload()
+      })
+    }
+    global.XMLHttpRequest = vi.fn(() => xhr)
+
+    try {
+      await fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress: vi.fn() })
+    } catch (error) {
+      expect(error.message).toBe('File too large')
+      expect(error.status).toBe(413)
+      expect(error.data).toEqual({ msg: 'File too large' })
+    }
   })
 
   // Test file download

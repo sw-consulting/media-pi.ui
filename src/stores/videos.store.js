@@ -95,7 +95,21 @@ export const useVideosStore = defineStore('videos', () => {
     )
   }
 
-  async function uploadFile(file, accountId, title = '') {
+  const buildUploadOptions = (options = {}) => {
+    return typeof options.onUploadProgress === 'function'
+      ? { onUploadProgress: options.onUploadProgress }
+      : null
+  }
+
+  const postUploadFile = (url, formData, options) => {
+    const uploadOptions = buildUploadOptions(options)
+    if (uploadOptions) {
+      return fetchWrapper.postFile(url, formData, uploadOptions)
+    }
+    return fetchWrapper.postFile(url, formData)
+  }
+
+  async function uploadFile(file, accountId, title = '', options = {}) {
     return handleRequest(async () => {
       if (!file) throw new Error('Не выбран видеофайл')
       assertUploadTarget(accountId)
@@ -104,11 +118,11 @@ export const useVideosStore = defineStore('videos', () => {
       formData.append('File', file)
       formData.append('Title', effectiveTitle)
       formData.append('AccountId', accountId)
-      return fetchWrapper.postFile(`${baseUrl}/upload`, formData)
+      return postUploadFile(`${baseUrl}/upload`, formData, options)
     })
   }
 
-  async function uploadFiles(files, accountId) {
+  async function uploadFiles(files, accountId, options = {}) {
     return handleRequest(async () => {
       const selectedFiles = Array.from(files || []).filter(Boolean)
       if (!selectedFiles.length) throw new Error('Не выбран видеофайл')
@@ -121,7 +135,7 @@ export const useVideosStore = defineStore('videos', () => {
       })
       formData.append('AccountId', accountId)
 
-      return fetchWrapper.postFile(`${baseUrl}/upload/batch`, formData)
+      return postUploadFile(`${baseUrl}/upload/batch`, formData, options)
     })
   }
 

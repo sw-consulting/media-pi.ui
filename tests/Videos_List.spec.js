@@ -80,7 +80,10 @@ const globalStubs = {
     `
   },
   'v-text-field': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' },
-  'v-progress-linear': { template: '<div />' },
+  'v-progress-linear': {
+    props: ['modelValue', 'indeterminate'],
+    template: `<div class="progress-linear" :data-model-value="modelValue" :data-indeterminate="indeterminate ? 'true' : 'false'" />`
+  },
   'v-progress-circular': { template: '<div />' },
   'v-alert': { template: '<div />' }
 }
@@ -91,6 +94,15 @@ describe('Videos_List.vue', () => {
     accountsStore.accounts.value = []
     videosStore.videos.value = []
     currentUser = { roles: [1], accountIds: [] }
+    accountsStore.getAll.mockImplementation(async () => accountsStore.accounts.value)
+    videosStore.getAllByAccount.mockImplementation(async () => videosStore.videos.value)
+    videosStore.update.mockImplementation(async () => ({}))
+    videosStore.uploadFile.mockImplementation(async () => ({}))
+    videosStore.uploadFiles.mockImplementation(async () => ({}))
+    videosStore.remove.mockImplementation(async () => ({}))
+    alertStore.error.mockImplementation((message) => { alertStore.alert.value = { message } })
+    alertStore.clear.mockImplementation(() => {})
+    confirmation.confirmDelete.mockImplementation(async () => true)
   })
 
   it('loads videos for default and changed account selection', async () => {
@@ -122,7 +134,11 @@ describe('Videos_List.vue', () => {
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
     await wrapper.vm.uploadVideos([file])
-    expect(videosStore.uploadFiles).toHaveBeenCalledWith([file], 0)
+    expect(videosStore.uploadFiles).toHaveBeenCalledWith(
+      [file],
+      0,
+      { onUploadProgress: expect.any(Function) }
+    )
   })
 
   it('uploads multiple selected files when user has permissions', async () => {
@@ -134,7 +150,60 @@ describe('Videos_List.vue', () => {
 
     await wrapper.vm.onFileChange({ target: { files: [file1, file2] } })
 
-    expect(videosStore.uploadFiles).toHaveBeenCalledWith([file1, file2], 0)
+    expect(videosStore.uploadFiles).toHaveBeenCalledWith(
+      [file1, file2],
+      0,
+      { onUploadProgress: expect.any(Function) }
+    )
+  })
+
+  it('shows total upload progress and disables actions while upload is pending', async () => {
+    videosStore.videos.value = [{ id: 1, title: 'Clip', accountId: 0 }]
+    let resolveUpload
+    let onUploadProgress
+    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+      onUploadProgress = options.onUploadProgress
+      return new Promise(resolve => {
+        resolveUpload = resolve
+      })
+    })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const callsBeforeUpload = videosStore.getAllByAccount.mock.calls.length
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    const uploadPromise = wrapper.vm.uploadVideos([file])
+    await nextTick()
+
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов...')
+    expect(wrapper.find('[data-test="upload-video-button"]').element.disabled).toBe(true)
+    expect(wrapper.find('select').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="edit-video-button"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="delete-video-button"]').element.disabled).toBe(true)
+
+    onUploadProgress({ lengthComputable: false, loaded: 10, total: null, percentage: null })
+    await nextTick()
+
+    let progressBar = wrapper.find('[data-test="upload-progress-bar"]')
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов...')
+    expect(progressBar.attributes('data-indeterminate')).toBe('true')
+
+    onUploadProgress({ lengthComputable: true, loaded: 42, total: 100, percentage: 42 })
+    await nextTick()
+
+    progressBar = wrapper.find('[data-test="upload-progress-bar"]')
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов: 42%')
+    expect(progressBar.attributes('data-model-value')).toBe('42')
+    expect(progressBar.attributes('data-indeterminate')).toBe('false')
+
+    resolveUpload({})
+    await uploadPromise
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
+    expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload + 1)
   })
 
   it('allows selecting multiple files in the hidden file input', async () => {
