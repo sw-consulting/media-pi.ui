@@ -231,11 +231,6 @@ const createDefaultConfiguration = () => ({
 })
 
 const normalizeConfiguration = (config = {}) => {
-  const allowedOutputs = ['hdmi', 'jack']
-  const rawAudioOutput = typeof config?.audio?.output === 'string'
-    ? config.audio.output.trim().toLowerCase()
-    : ''
-  const audioFallback = !allowedOutputs.includes(rawAudioOutput)
   const screenshotIntervalRaw = Number(config?.screenshot?.intervalMinutes)
   const screenshotIntervalMinutes = Number.isInteger(screenshotIntervalRaw) && screenshotIntervalRaw >= 0
     ? screenshotIntervalRaw
@@ -252,24 +247,22 @@ const normalizeConfiguration = (config = {}) => {
       rest: normalizeRestList(config?.schedule?.rest)
     },
     audio: {
-      output: audioFallback ? 'hdmi' : rawAudioOutput
+      output: typeof config?.audio?.output === 'string' && config.audio.output.trim()
+        ? config.audio.output.trim()
+        : 'hdmi'
     },
     screenshot: {
       intervalMinutes: screenshotIntervalMinutes
-    },
-    audioFallback
+    }
   }
 }
 
-const applyConfiguration = (configuration, originalConfig = {}) => {
+const applyConfiguration = (configuration) => {
   const normalized = configuration ?? createDefaultConfiguration()
   playlistSettings.value.source = normalized.playlist.source
   playlistSettings.value.destination = normalized.playlist.destination
   applyScheduleValues(normalized.schedule)
 
-  if (normalized.audioFallback && originalConfig?.audio) {
-    alertStore.error('Неизвестный тип аудио выхода. Установлено значение по умолчанию: HDMI')
-  }
   audioSettings.value.output = normalized.audio.output
   screenshotSettings.value.intervalMinutes = normalized.screenshot.intervalMinutes
 }
@@ -287,7 +280,7 @@ const buildConfigurationPayload = (scheduleValuesOverride) => ({
   },
   schedule: buildSchedulePayload(scheduleValuesOverride ?? scheduleFormValues.value),
   audio: {
-    output: ['hdmi', 'jack'].includes(audioSettings.value.output) ? audioSettings.value.output : 'hdmi'
+    output: audioSettings.value.output || 'hdmi'
   },
   screenshot: {
     intervalMinutes: Number.isInteger(Number(screenshotSettings.value.intervalMinutes))
@@ -521,7 +514,7 @@ const loadConfiguration = async (errorPrefix = 'Не удалось загруз
   try {
     const configuration = await devicesStore.getConfiguration(props.deviceId)
     const normalized = normalizeConfiguration(configuration || createDefaultConfiguration())
-    applyConfiguration(normalized, configuration)
+    applyConfiguration(normalized)
     return true
   } catch (err) {
     alertStore.error(`${errorPrefix}: ${err?.message || 'Неизвестная ошибка'}`)
@@ -918,34 +911,11 @@ onBeforeUnmount(() => {
       </Form>
     </div>
 
-    <!-- Playlist Settings Section -->
+    <!-- Other Settings Section -->
     <div class="form-group mt-4 form-group-add">
       <h2 class="secondary-heading">Другие настройки</h2>
       <div class="other-settings-grid">
-        <div class="other-settings-cell label other-settings-label">Расположение</div>
-        <div class="other-settings-cell">
-          <input
-            id="playlist-destination"
-            v-model="playlistSettings.destination"
-            type="text"
-            class="form-control input"
-            :disabled="isDisabled || hasAnyOperationInProgress"
-            placeholder="Каталог на устройстве"
-          />
-        </div>
-        <div class="other-settings-cell label other-settings-label-y">Аудиовыход</div>
-        <div class="other-settings-cell">
-          <select
-            id="audio-output"
-            v-model="audioSettings.output"
-            class="form-control input"
-            :disabled="isDisabled || hasAnyOperationInProgress"
-          >
-            <option value="hdmi">HDMI audio</option>
-            <option value="jack">3.5" jack audio</option>
-          </select>
-        </div>
-        <div class="other-settings-cell label other-settings-label other-settings-label-y">Частота фотографий (мин)</div>
+        <div class="other-settings-cell label other-settings-label">Период фотографирования (мин)</div>
         <div class="other-settings-cell">
           <input
             id="screenshot-interval-minutes"
@@ -1094,8 +1064,10 @@ onBeforeUnmount(() => {
 
 .other-settings-grid {
   display: grid;
-  grid-template-columns: 120px 1.2fr 100px 0.5fr 200px 0.4fr;
+  grid-template-columns: max-content 52px;
   gap: 1rem;
+  align-items: center;
+  width: fit-content;
 }
 
 .other-settings-cell {
@@ -1105,11 +1077,8 @@ onBeforeUnmount(() => {
 }
 
 .other-settings-label {
-  width: 175px;
-}
-
-.other-settings-label-y {
-  margin-left: 15px;
+  width: auto;
+  white-space: nowrap;
 }
 
 .timers-column {
@@ -1153,11 +1122,8 @@ onBeforeUnmount(() => {
   }
 
   .other-settings-grid {
-    grid-template-columns: 0.7fr;
-  }
-
-  .other-settings-label-y {
-    margin-left: 0px;
+    grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .form-group-add {
