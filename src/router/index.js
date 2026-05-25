@@ -126,6 +126,22 @@ const router = createRouter({
       component: () => import('@/views/Playlists_View.vue')
     },
     {
+      path: '/categories',
+      name: 'Категории',
+      component: () => import('@/views/Categories_View.vue')
+    },
+    {
+      path: '/category/create',
+      name: 'Создание категории',
+      component: () => import('@/views/Category_CreateView.vue')
+    },
+    {
+      path: '/category/edit/:id',
+      name: 'Настройки категории',
+      component: () => import('@/views/Category_EditView.vue'),
+      props: true
+    },
+    {
       path: '/playlist/create',
       name: 'Создание плейлиста',
       component: () => import('@/views/Playlist_CreateView.vue')

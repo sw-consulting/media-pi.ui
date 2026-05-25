@@ -28,6 +28,9 @@ vi.mock('@/views/Device_CreateView.vue', () => ({ default: { template: '<div />'
 vi.mock('@/views/Device_EditView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/Device_ManagementView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/views/Screenshots_View.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/Categories_View.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/Category_CreateView.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/views/Category_EditView.vue', () => ({ default: { template: '<div />' } }))
 
 import router from '@/router'
 
@@ -112,6 +115,23 @@ describe('router guards', () => {
     await router.isReady()
 
     expect(router.currentRoute.value.fullPath).toBe('/device/screenshots/12')
+  })
+
+  it('allows authenticated users to open category routes', async () => {
+    authStore.user = { id: 3 }
+    authStore.isAdministrator = true
+
+    await router.push('/categories')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe('/categories')
+
+    await router.push('/category/create')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe('/category/create')
+
+    await router.push('/category/edit/5')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe('/category/edit/5')
   })
 })
 
