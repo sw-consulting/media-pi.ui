@@ -274,7 +274,7 @@ async function loadAvailableVideos() {
           fileSize: video.fileSizeBytes,
           duration: video.durationSeconds,
           accountId: video.accountId,
-          accountName: video.accountId == 0 ? accountNameById.value.get(video.accountId) || `Лицевой счёт ${video.accountId}` : null
+          accountName: accountNameById.value.get(video.accountId) || `Лицевой счёт ${video.accountId}`
         })
       }
     }

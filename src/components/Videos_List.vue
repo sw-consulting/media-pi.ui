@@ -443,19 +443,19 @@ watch(videos, (current) => {
             </div>
             <div v-else class="title-display">
               <span class="title-text">{{ item.title || '—' }}</span>
-              <ActionButton
-                data-test="edit-video-button"
-                :item="item"
-                icon="fa-solid fa-pen"
-                tooltip-text="Редактировать название видео"
-                :disabled="!canManageVideo(item) || isBusy || titleSaving"
-                @click="startEdit(item)"
-              />
             </div>
           </div>
         </template>
         <template v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">
+            <ActionButton
+              data-test="edit-video-button"
+              :item="item"
+              icon="fa-solid fa-pen"
+              tooltip-text="Редактировать название видео"
+              :disabled="!canManageVideo(item) || isBusy || titleSaving"
+              @click="startEdit(item)"
+            />
             <ActionButton
               data-test="delete-video-button"
               :item="item"

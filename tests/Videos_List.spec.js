@@ -95,8 +95,8 @@ const globalStubs = {
             :checked="Array.isArray(modelValue) && modelValue.includes(item.id)"
             @change="toggleItem(item.id, $event.target.checked)"
           />
-          <slot name="item.title" :item="item" />
           <slot name="item.actions" :item="item" />
+          <slot name="item.title" :item="item" />
         </div>
       </div>
     `
