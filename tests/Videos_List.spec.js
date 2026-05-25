@@ -245,12 +245,53 @@ describe('Videos_List.vue', () => {
     expect(progressSpinner.attributes('data-model-value')).toBe('42')
     expect(progressSpinner.attributes('data-indeterminate')).toBe('false')
 
+    onUploadProgress({ lengthComputable: true, loaded: 100, total: 100, percentage: 100 })
+    await nextTick()
+
+    progressSpinner = wrapper.find('[data-test="upload-progress-spinner"]')
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Обработка видеофайлов')
+    expect(wrapper.find('[data-test="upload-progress-text"]').text()).toBe('Файлы загружены. Идёт обработка на сервере...')
+    expect(wrapper.find('[data-test="cancel-upload-button"]').exists()).toBe(false)
+    expect(progressSpinner.text()).toBe('')
+    expect(progressSpinner.attributes('data-indeterminate')).toBe('true')
+
     resolveUpload({})
     await uploadPromise
     await flushPromises()
 
     expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
     expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload + 1)
+  })
+
+  it('shows a refresh phase after upload completes while the list reloads', async () => {
+    let refreshCall = 0
+    let resolveRefresh
+    videosStore.getAllByAccount.mockImplementation(() => {
+      refreshCall += 1
+      if (refreshCall === 1) return Promise.resolve(videosStore.videos.value)
+      return new Promise(resolve => {
+        resolveRefresh = () => resolve(videosStore.videos.value)
+      })
+    })
+    videosStore.uploadFiles.mockResolvedValue({})
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const uploadPromise = wrapper.vm.uploadVideos([new File(['x'], 'test.mp4', { type: 'video/mp4' })])
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Обновление списка видеофайлов')
+    expect(wrapper.find('[data-test="upload-progress-text"]').text()).toBe('Получаем обновлённую информацию...')
+    expect(wrapper.find('[data-test="upload-progress-spinner"]').attributes('data-indeterminate')).toBe('true')
+    expect(wrapper.find('[data-test="cancel-upload-button"]').exists()).toBe(false)
+
+    resolveRefresh()
+    await uploadPromise
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
   })
 
   it('cancels an in-progress upload without refreshing or showing an error', async () => {

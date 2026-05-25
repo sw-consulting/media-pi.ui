@@ -33,6 +33,7 @@ const editingVideoId = ref(null)
 const editingTitle = ref('')
 const titleSaving = ref(false)
 const isUploading = ref(false)
+const uploadPhase = ref('idle')
 const uploadProgressPercent = ref(0)
 const uploadProgressIndeterminate = ref(true)
 const uploadAbortController = ref(null)
@@ -40,7 +41,17 @@ const selectedVideoIds = ref([])
 
 const accountOptions = computed(() => createAccountOptions(accounts.value || [], authStore.user, { includeCommon: true }))
 
-const uploadProgressTitle = computed(() => isUploading.value ? 'Загрузка видеофайлов' : '')
+const uploadProgressTitle = computed(() => {
+  if (uploadPhase.value === 'processing') return 'Обработка видеофайлов'
+  if (uploadPhase.value === 'refreshing') return 'Обновление списка видеофайлов'
+  return isUploading.value ? 'Загрузка видеофайлов' : ''
+})
+const uploadProgressText = computed(() => {
+  if (uploadPhase.value === 'processing') return 'Файлы загружены. Идёт обработка на сервере...'
+  if (uploadPhase.value === 'refreshing') return 'Получаем обновлённую информацию...'
+  return ''
+})
+const canCancelUpload = computed(() => uploadPhase.value === 'uploading')
 
 const headers = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
@@ -64,6 +75,7 @@ const selectedVideoCount = computed(() => selectedVideoIds.value.length)
 const canDeleteSelectedVideos = computed(() => canManageSelectedAccount.value && selectedVideoCount.value > 0 && !isBusy.value && !titleSaving.value)
 
 function resetUploadProgress() {
+  uploadPhase.value = 'idle'
   uploadProgressPercent.value = 0
   uploadProgressIndeterminate.value = true
 }
@@ -74,8 +86,17 @@ function handleUploadProgress(progress) {
     return
   }
 
+  const nextPercent = Math.min(100, Math.max(0, progress.percentage))
+  uploadProgressPercent.value = nextPercent
+
+  if (nextPercent >= 100) {
+    uploadPhase.value = 'processing'
+    uploadProgressIndeterminate.value = true
+    return
+  }
+
+  uploadPhase.value = 'uploading'
   uploadProgressIndeterminate.value = false
-  uploadProgressPercent.value = Math.min(100, Math.max(0, progress.percentage))
 }
 
 function cancelUpload() {
@@ -134,6 +155,7 @@ async function uploadVideos(files) {
   }
   resetUploadProgress()
   isUploading.value = true
+  uploadPhase.value = 'uploading'
   const abortController = new AbortController()
   uploadAbortController.value = abortController
   try {
@@ -141,6 +163,8 @@ async function uploadVideos(files) {
       onUploadProgress: handleUploadProgress,
       signal: abortController.signal
     })
+    uploadPhase.value = 'refreshing'
+    uploadProgressIndeterminate.value = true
     await refreshVideos()
   } catch (err) {
     if (!isAbortError(err)) {
@@ -355,6 +379,9 @@ watch(videos, (current) => {
         <div id="upload-progress-title" class="primary-heading upload-progress-title" data-test="upload-progress-label">
           {{ uploadProgressTitle }}
         </div>
+        <div v-if="uploadProgressText" class="upload-progress-text" data-test="upload-progress-text">
+          {{ uploadProgressText }}
+        </div>
         <div class="upload-progress-spinner-wrap">
           <v-progress-circular
             data-test="upload-progress-spinner"
@@ -370,6 +397,7 @@ watch(videos, (current) => {
           </v-progress-circular>
         </div>
         <v-btn
+          v-if="canCancelUpload"
           data-test="cancel-upload-button"
           color="orange-darken-3"
           variant="text"
@@ -538,6 +566,12 @@ watch(videos, (current) => {
 
 .upload-progress-title {
   margin-bottom: 0.5rem;
+}
+
+.upload-progress-text {
+  color: #5c6f7f;
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
 }
 
 .upload-progress-spinner-wrap {
