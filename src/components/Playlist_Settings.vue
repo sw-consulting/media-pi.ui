@@ -66,6 +66,7 @@ const initialLoading = ref(false)
 const videosLoading = ref(false)
 const selectedAvailableVideoIds = ref([])
 const selectedPlaylistItemKeys = ref([])
+const availableSortBy = ref([])
 let playlistItemUid = 0
 
 const schema = Yup.object().shape({
@@ -123,6 +124,17 @@ const filteredAvailableVideos = computed(() => {
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(query)))
 })
 
+const sortedFilteredAvailableVideos = computed(() => {
+  const items = filteredAvailableVideos.value
+  if (!availableSortBy.value.length) return items
+  const { key, order } = availableSortBy.value[0]
+  const sorted = [...items].sort((a, b) => {
+    const result = compareMediaNumber(a[key], b[key])
+    return order === 'desc' ? -result : result
+  })
+  return sorted
+})
+
 const playlistVideoDetails = computed(() => playlistItems.value.map((item, index) => {
   const video = availableVideoMap.value.get(item.videoId)
   const title = video?.title || video?.originalFilename || `Видео #${item.videoId}`
@@ -140,7 +152,7 @@ const playlistVideoDetails = computed(() => playlistItems.value.map((item, index
 const totalVideoCount = computed(() => playlistItems.value.length)
 const totalFileSize = computed(() => playlistVideoDetails.value.reduce((sum, item) => sum + (Number(item.fileSize) || 0), 0))
 const totalDuration = computed(() => playlistVideoDetails.value.reduce((sum, item) => sum + (Number(item.duration) || 0), 0))
-const visibleAvailableVideoIds = computed(() => filteredAvailableVideos.value.map(video => video.id))
+const visibleAvailableVideoIds = computed(() => sortedFilteredAvailableVideos.value.map(video => video.id))
 const visiblePlaylistItemKeys = computed(() => playlistVideoDetails.value.map(item => item.key))
 const hasSelectedAvailableVideos = computed(() => selectedAvailableVideoIds.value.length > 0)
 const hasSelectedPlaylistItems = computed(() => selectedPlaylistItemKeys.value.length > 0)
@@ -295,7 +307,7 @@ function addVideoToPlaylist(video) {
 function addSelectedVideosToPlaylist() {
   if (!selectedAvailableVideoIds.value.length) return
   const selectedIds = new Set(selectedAvailableVideoIds.value)
-  const videosToAdd = availableVideos.value.filter(video => selectedIds.has(video.id))
+  const videosToAdd = sortedFilteredAvailableVideos.value.filter(video => selectedIds.has(video.id))
   for (const video of videosToAdd) {
     playlistItems.value.push(createPlaylistItem(video.id, playlistItems.value.length + 1))
   }
@@ -619,7 +631,8 @@ async function onSubmit(values) {
           </div>
           <v-data-table
             :headers="availableVideoHeaders"
-            :items="filteredAvailableVideos"
+            :items="sortedFilteredAvailableVideos"
+            v-model:sort-by="availableSortBy"
             item-value="id"
             :items-per-page="-1"
             hide-default-footer
