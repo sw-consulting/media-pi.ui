@@ -217,7 +217,7 @@ function requestFile(method) {
 
 function requestFileWithProgress(method, url, body, options) {
   return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
+    const xhr = new window.XMLHttpRequest()
     let settled = false
 
     const onAbortSignal = () => {
