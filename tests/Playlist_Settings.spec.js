@@ -84,11 +84,14 @@ const mountSettings = (props = {}) => mount({
   global: {
     stubs: {
       Form: {
-        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="false" /></form>',
+        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" /></form>',
         props: ['validationSchema', 'initialValues'],
         emits: ['submit'],
         data() {
-          return { errors: props.showValidationError ? { title: 'Required' } : {} }
+          return {
+            errors: props.showValidationError ? { title: 'Required' } : {},
+            isSubmitting: props.isSubmitting || false
+          }
         },
         methods: {
           onSubmit() {
@@ -108,13 +111,38 @@ const mountSettings = (props = {}) => mount({
         },
         template: '<div><slot v-if="$slots.default" :field="{ value, onChange }" /><input v-else data-test="field-input" /></div>'
       },
-      'v-text-field': { template: '<input />', props: ['modelValue'] }
+      'v-text-field': {
+        template: '<input data-test="video-search-input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+        props: ['modelValue'],
+        emits: ['update:modelValue']
+      }
     },
     mocks: {
       $router: { go: routerGo }
     }
   }
 })
+
+function findRowByTextAndSelector(wrapper, selector, text) {
+  return wrapper.findAll('.playlist-video-row')
+    .find(row => row.find(selector).exists() && row.text().includes(text))
+}
+
+async function selectAvailableVideo(wrapper, text) {
+  const row = findRowByTextAndSelector(wrapper, '[data-test="available-video-select"]', text)
+  expect(row).toBeTruthy()
+  await row.find('[data-test="available-video-select"]').setValue(true)
+}
+
+async function clickBatchAdd(wrapper) {
+  await wrapper.find('[data-test="batch-add-video-button"]').trigger('click')
+  await flushPromises()
+}
+
+async function clickBatchRemove(wrapper) {
+  await wrapper.find('[data-test="batch-remove-video-button"]').trigger('click')
+  await flushPromises()
+}
 
 describe('Playlist_Settings.vue', () => {
   beforeEach(() => {
@@ -163,6 +191,151 @@ describe('Playlist_Settings.vue', () => {
       items: [{ videoId: 11, position: 1 }]
     }))
     expect(callArg.filename).toMatch(/^playlist-\d{6}\.m3u$/)
+  })
+
+  it('batch-adds selected available videos in list order', async () => {
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: 'Batch Playlist' }
+    })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Shared')
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    const callArg = playlistsStore.create.mock.calls[0][0]
+    expect(callArg.items).toEqual([
+      { videoId: 22, position: 1 },
+      { videoId: 11, position: 2 }
+    ])
+  })
+
+  it('batch add allows duplicate playlist entries', async () => {
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: 'Duplicate Playlist' }
+    })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    const callArg = playlistsStore.create.mock.calls[0][0]
+    expect(callArg.items).toEqual([
+      { videoId: 11, position: 1 },
+      { videoId: 11, position: 2 }
+    ])
+  })
+
+  it('batch-removes only selected duplicate playlist row instances', async () => {
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: 'Remove Duplicate Playlist' }
+    })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistSelections = wrapper.findAll('[data-test="playlist-row-select"]')
+    expect(playlistSelections).toHaveLength(2)
+    await playlistSelections[0].setValue(true)
+    await clickBatchRemove(wrapper)
+
+    expect(wrapper.findAll('[data-test="playlist-row-select"]')).toHaveLength(1)
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    const callArg = playlistsStore.create.mock.calls[0][0]
+    expect(callArg.items).toEqual([{ videoId: 11, position: 1 }])
+  })
+
+  it('batch removal rebuilds playlist item positions before submit', async () => {
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: 'Repositioned Playlist' }
+    })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Shared')
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistSelections = wrapper.findAll('[data-test="playlist-row-select"]')
+    await playlistSelections[0].setValue(true)
+    await clickBatchRemove(wrapper)
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    const callArg = playlistsStore.create.mock.calls[0][0]
+    expect(callArg.items).toEqual([{ videoId: 11, position: 1 }])
+  })
+
+  it('select-all checkbox selects and clears currently visible available videos', async () => {
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: 'Filtered Batch Playlist' }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="video-search-input"]').setValue('Video 1')
+    await flushPromises()
+
+    const selectAll = wrapper.find('[data-test="available-select-all"]')
+    await selectAll.setValue(true)
+    expect(wrapper.find('[data-test="batch-add-video-button"]').element.disabled).toBe(false)
+
+    await selectAll.setValue(false)
+    expect(wrapper.find('[data-test="batch-add-video-button"]').element.disabled).toBe(true)
+
+    await selectAll.setValue(true)
+    await clickBatchAdd(wrapper)
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    const callArg = playlistsStore.create.mock.calls[0][0]
+    expect(callArg.items).toEqual([{ videoId: 11, position: 1 }])
+  })
+
+  it('disables batch buttons without selection and while submitting', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="batch-add-video-button"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(true)
+
+    const submittingWrapper = mountSettings({ accountId: 1, isSubmitting: true })
+    await flushPromises()
+
+    await submittingWrapper.find('[data-test="available-select-all"]').setValue(true)
+    expect(submittingWrapper.find('[data-test="batch-add-video-button"]').element.disabled).toBe(true)
+    expect(submittingWrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(true)
+    expect(submittingWrapper.find('[data-test="available-select-all"]').element.disabled).toBe(true)
+  })
+
+  it('loads common videos only once when editing a common playlist', async () => {
+    const wrapper = mountSettings({ accountId: 0 })
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-test="available-video-select"]')).toHaveLength(1)
+    const commonAccountLoads = videosStore.getAllByAccount.mock.calls
+      .map(call => call[0])
+      .filter(accountId => accountId === 0)
+    expect(commonAccountLoads).toHaveLength(1)
   })
 
   it('does not render filename field', async () => {
