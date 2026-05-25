@@ -261,7 +261,13 @@ async function deleteSelectedVideos() {
   try {
     const result = await videosStore.removeBatch(ids)
     selectedVideoIds.value = []
-    await refreshVideos()
+
+    try {
+      await refreshVideos()
+    } catch {
+      return
+    }
+
     summarizeBatchDeleteResult(result, ids.length)
   } catch (err) {
     alertStore.error('Не удалось удалить видеофайлы: ' + (err?.message || err))
