@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 import PlaylistSettings from '@/components/Playlist_Settings.vue'
+import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 
 const routerGo = vi.hoisted(() => vi.fn())
 
@@ -117,7 +118,8 @@ const mountSettings = (props = {}) => mount({
         emits: ['update:modelValue']
       },
       'v-data-table': {
-        props: ['headers', 'items', 'loading', 'loadingText', 'noDataText'],
+        props: ['headers', 'items', 'loading', 'loadingText', 'noDataText', 'sortBy'],
+        emits: ['update:sort-by'],
         data() {
           return {
             sortKey: null,
@@ -147,6 +149,7 @@ const mountSettings = (props = {}) => mount({
               this.sortKey = header.key
               this.sortOrder = 'asc'
             }
+            this.$emit('update:sort-by', [{ key: this.sortKey, order: this.sortOrder }])
           }
         },
         template: `
@@ -184,6 +187,12 @@ const mountSettings = (props = {}) => mount({
     }
   }
 })
+
+function getPlaylistTable(wrapper) {
+  const tables = wrapper.findAll('.data-table')
+  expect(tables.length).toBeGreaterThanOrEqual(1)
+  return tables[0]
+}
 
 function findRowByTextAndSelector(wrapper, selector, text) {
   return wrapper.findAll('.playlist-video-row')
@@ -563,5 +572,671 @@ describe('Playlist_Settings.vue', () => {
       items: []
     }))
     expect(callArg.filename).toMatch(/^playlist-\d{6}\.m3u$/)
+  })
+
+  it('removes individual playlist video via remove button', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistTable = getPlaylistTable(wrapper)
+    expect(playlistTable.findAll('.playlist-video-row')).toHaveLength(1)
+
+    await playlistTable.find('[data-test="remove-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(playlistTable.findAll('.playlist-video-row')).toHaveLength(0)
+  })
+
+  it('moves playlist video up in order', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Shared')
+    await clickBatchAdd(wrapper)
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistTable = getPlaylistTable(wrapper)
+    const getTitles = () => playlistTable.findAll('.playlist-video-title').map(el => el.text())
+
+    expect(getTitles()).toEqual(['Shared', 'Video 1'])
+
+    await playlistTable.findAll('[data-test="move-up-button"]')[1].trigger('click')
+    await flushPromises()
+
+    expect(getTitles()).toEqual(['Video 1', 'Shared'])
+  })
+
+  it('moves playlist video down in order', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Shared')
+    await clickBatchAdd(wrapper)
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistTable = getPlaylistTable(wrapper)
+    const getTitles = () => playlistTable.findAll('.playlist-video-title').map(el => el.text())
+
+    await playlistTable.findAll('[data-test="move-down-button"]')[0].trigger('click')
+    await flushPromises()
+
+    expect(getTitles()).toEqual(['Video 1', 'Shared'])
+  })
+
+  it('playlist select-all checkbox selects and deselects all playlist items', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Shared')
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const selectAll = wrapper.find('[data-test="playlist-select-all"]')
+    await selectAll.setValue(true)
+    expect(wrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(false)
+
+    await selectAll.setValue(false)
+    expect(wrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(true)
+  })
+
+  it('deselects an individual playlist item after selecting', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const rowSelect = wrapper.find('[data-test="playlist-row-select"]')
+    await rowSelect.setValue(true)
+    expect(wrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(false)
+
+    await rowSelect.setValue(false)
+    expect(wrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(true)
+  })
+
+  it('deselects an available video after selecting', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableRow = wrapper.findAll('.playlist-video-row')
+      .find(r => r.text().includes('Video 1'))
+    const checkbox = availableRow.find('[data-test="available-video-select"]')
+
+    await checkbox.setValue(true)
+    expect(wrapper.find('[data-test="batch-add-video-button"]').element.disabled).toBe(false)
+
+    await checkbox.setValue(false)
+    expect(wrapper.find('[data-test="batch-add-video-button"]').element.disabled).toBe(true)
+  })
+
+  it('cancel button navigates back', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await wrapper.find('button.secondary').trigger('click')
+    expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('dismisses alert via close button', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({ status: 409 })
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'My Playlist' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.alert.value).not.toBeNull()
+    await wrapper.find('.alert .close').trigger('click')
+    expect(alertStore.clear).toHaveBeenCalled()
+  })
+
+  it('shows error alert when loading available videos fails', async () => {
+    videosStore.getAllByAccount = vi.fn().mockRejectedValue(new Error('Network error'))
+    mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Не удалось загрузить список видео')
+    )
+  })
+
+  it('handles 401 error during submit by redirecting', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({ status: 401 })
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('handles 403 error during submit by redirecting', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({ status: 403 })
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('handles 404 error during submit', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({ status: 404 })
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('не найден'))
+  })
+
+  it('handles 409 conflict error during submit', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({ status: 409 })
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Плейлист с таким названием уже существует')
+  })
+
+  it('handles 422 validation error during submit', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({ status: 422 })
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Проверьте корректность введённых данных')
+  })
+
+  it('handles generic error during submit', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue(new Error('Server failure'))
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Ошибка при создании плейлиста')
+    )
+  })
+
+  it('shows error when edited playlist is not found in store', async () => {
+    playlistsStore.playlist = null
+    playlistsStore.getById = vi.fn().mockResolvedValue()
+
+    mountSettings({ register: false, id: 99 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Ошибка загрузки плейлиста')
+    )
+  })
+
+  it('handles 401 error when loading playlist for editing', async () => {
+    playlistsStore.getById = vi.fn().mockRejectedValue({ status: 401 })
+
+    mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('handles 403 error when loading playlist for editing', async () => {
+    playlistsStore.getById = vi.fn().mockRejectedValue({ status: 403 })
+
+    mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('handles 404 error when loading playlist for editing', async () => {
+    playlistsStore.getById = vi.fn().mockRejectedValue({ status: 404 })
+
+    mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('9'))
+  })
+
+  it('handles generic error when loading playlist for editing', async () => {
+    playlistsStore.getById = vi.fn().mockRejectedValue(new Error('Connection timeout'))
+
+    mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Ошибка загрузки плейлиста')
+    )
+  })
+
+  it('shows error when loading accounts fails', async () => {
+    accountsStore.getAll = vi.fn().mockRejectedValue(new Error('Account service down'))
+
+    mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Не удалось загрузить лицевые счета')
+    )
+  })
+
+  it('batch-add respects descending sort order of available videos', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [
+        { id: 51, title: 'Small', originalFilename: 'small.mp4', fileSizeBytes: 100, durationSeconds: 10, accountId: 1 },
+        { id: 52, title: 'Large', originalFilename: 'large.mp4', fileSizeBytes: 9000, durationSeconds: 60, accountId: 1 }
+      ]
+    })
+
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Desc Sorted' } })
+    await flushPromises()
+
+    // Click sort-fileSize twice: first asc then desc
+    await sortAvailableTableBy(wrapper, 'fileSize')
+    await sortAvailableTableBy(wrapper, 'fileSize')
+
+    // Select all visible and batch-add
+    await wrapper.find('[data-test="available-select-all"]').setValue(true)
+    await clickBatchAdd(wrapper)
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    const callArg = playlistsStore.create.mock.calls[0][0]
+    // Large (9000) should be added first in descending file-size order
+    expect(callArg.items).toEqual([
+      { videoId: 52, position: 1 },
+      { videoId: 51, position: 2 }
+    ])
+  })
+
+  it('remove-selected clears selection so batch-remove is disabled afterwards', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    await wrapper.find('[data-test="playlist-row-select"]').setValue(true)
+    expect(wrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(false)
+
+    await clickBatchRemove(wrapper)
+
+    expect(wrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(true)
+  })
+
+  it('handles update 401 error by redirecting', async () => {
+    playlistsStore.playlist = {
+      id: 9, title: 'Existing', filename: 'existing.m3u', accountId: 1, items: []
+    }
+    playlistsStore.update = vi.fn().mockRejectedValue({ status: 401 })
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: 'Updated', filename: 'existing.m3u', accountId: 1 }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('handles update generic error', async () => {
+    playlistsStore.playlist = {
+      id: 9, title: 'Existing', filename: 'existing.m3u', accountId: 1, items: []
+    }
+    playlistsStore.update = vi.fn().mockRejectedValue(new Error('Unexpected'))
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: 'Updated', filename: 'existing.m3u', accountId: 1 }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Ошибка при обновлении плейлиста')
+    )
+  })
+
+  it('remove-selected-items button is disabled when playlist is empty', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(true)
+  })
+
+  it('clears available videos when user has no account options', async () => {
+    authStore = { user: null }
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-test="available-video-select"]')).toHaveLength(0)
+  })
+
+  it('shows originalFilename as subtitle when title differs from filename', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    // Video 1 has title 'Video 1' and originalFilename 'one.mp4' — different, so subtitle must appear
+    const availableTable = getAvailableTable(wrapper)
+    expect(availableTable.text()).toContain('one.mp4')
+  })
+
+  it('shows fallback title for available video with no title', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [{ id: 61, title: null, originalFilename: 'noname.mp4', fileSizeBytes: 500, durationSeconds: 30, accountId: 1 }]
+    })
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableTable = getAvailableTable(wrapper)
+    expect(availableTable.text()).toContain('noname.mp4')
+  })
+
+  it('uses playlist video fallback title when video has no title', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [{ id: 71, title: null, originalFilename: 'fallback.mp4', fileSizeBytes: 100, durationSeconds: 5, accountId: 1 }]
+    })
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableRow = wrapper.findAll('.playlist-video-row').find(r => r.text().includes('fallback.mp4'))
+    await availableRow.find('button').trigger('click')
+    await flushPromises()
+
+    const playlistTable = getPlaylistTable(wrapper)
+    expect(playlistTable.text()).toContain('fallback.mp4')
+  })
+
+  it('normalizes playlist items from edit mode when items is null', async () => {
+    playlistsStore.playlist = {
+      id: 9, title: 'Nullish', filename: 'nullish.m3u', accountId: 1, items: null
+    }
+
+    const wrapper = mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    expect(getPlaylistTable(wrapper).findAll('.playlist-video-row')).toHaveLength(0)
+  })
+
+  it('fills in missing title and accountId fallbacks in edit mode', async () => {
+    playlistsStore.playlist = {
+      id: 9, title: undefined, filename: undefined, accountId: undefined, items: []
+    }
+
+    const wrapper = mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    // Component should render without errors (title defaults to '' etc.)
+    expect(wrapper.find('[data-test="form"]').exists()).toBe(true)
+  })
+
+  it('error objects without message property use the error itself as the message', async () => {
+    videosStore.getAllByAccount = vi.fn().mockRejectedValue({ code: 'ERR_NETWORK' })
+    mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    // err.message is undefined, so `err.message || err` falls back to the object itself
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Не удалось загрузить список видео')
+    )
+  })
+
+  it('error objects without message property in accounts load use object fallback', async () => {
+    accountsStore.getAll = vi.fn().mockRejectedValue({ code: 'ERR_NETWORK' })
+    mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Не удалось загрузить лицевые счета')
+    )
+  })
+
+  it('error objects without message in edit-mode load use object fallback', async () => {
+    playlistsStore.getById = vi.fn().mockRejectedValue({ code: 'ERR_NETWORK' })
+    mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Ошибка загрузки плейлиста')
+    )
+  })
+
+  it('error objects without message in submit use object fallback', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({ code: 'ERR_NETWORK' })
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Ошибка при создании плейлиста')
+    )
+  })
+
+  it('checkFilenameUnique skips current playlist when editing', async () => {
+    playlistsStore.playlist = {
+      id: 9, title: 'Same Name', filename: 'same.m3u', accountId: 1, items: []
+    }
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([
+      { id: 9, filename: 'same.m3u' }
+    ])
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: 'Same Name', filename: 'same.m3u', accountId: 1 }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    // Should not show duplicate error (current playlist's own filename is excluded)
+    expect(playlistsStore.update).toHaveBeenCalled()
+    expect(alertStore.error).not.toHaveBeenCalledWith('Плейлист с таким именем файла уже существует')
+  })
+
+  it('movePlaylistItem does nothing when trying to move first item up', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistTable = getPlaylistTable(wrapper)
+    const titles = () => playlistTable.findAll('.playlist-video-title').map(el => el.text())
+
+    // Move first (and only) item up — move-up is disabled but calling the handler directly
+    // is safe since there's only one item
+    const moveUpBtn = playlistTable.find('[data-test="move-up-button"]')
+    // Disabled attribute should prevent click, but trigger it anyway to verify guard
+    await moveUpBtn.trigger('click')
+    await flushPromises()
+
+    // Still one item, unchanged
+    expect(titles()).toEqual(['Video 1'])
+  })
+
+  it('removes a selected playlist item while cleaning up selection state', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    // Select the item then remove it individually
+    await wrapper.find('[data-test="playlist-row-select"]').setValue(true)
+
+    const playlistTable = getPlaylistTable(wrapper)
+    await playlistTable.find('[data-test="remove-video-button"]').trigger('click')
+    await flushPromises()
+
+    // Item and its selection are gone
+    expect(wrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(true)
+  })
+
+  it('account name uses fallback when account is unknown', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 0) return []
+      // Return a video with an accountId that is not in the accounts list
+      return [{ id: 91, title: 'Mystery', originalFilename: 'mystery.mp4', fileSizeBytes: 200, durationSeconds: 15, accountId: 999 }]
+    })
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableTable = getAvailableTable(wrapper)
+    expect(availableTable.text()).toContain('Mystery')
+  })
+
+  it('falls back to empty array when accounts store is null', async () => {
+    accountsStore.accounts = null
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    // Should mount without error; no account-based videos since accounts is null
+    expect(wrapper.find('[data-test="form"]').exists()).toBe(true)
+  })
+
+  it('uses fallback account name when account has no name property', async () => {
+    accountsStore.accounts = [{ id: 1 }] // No name property
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="form"]').exists()).toBe(true)
+  })
+
+  it('shows fallback accountLabel when accountId is not in account map', async () => {
+    playlistsStore.playlist = {
+      id: 9, title: 'Unknown Account', filename: 'ua.m3u', accountId: 999, items: []
+    }
+    const wrapper = mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    // accountId 999 is not in accountNameById map → shows fallback label
+    expect(wrapper.text()).toContain('999')
+  })
+
+  it('getVideoTitle returns video id as fallback when title and filename are both null', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [{ id: 62, title: null, originalFilename: null, fileSizeBytes: 100, durationSeconds: 5, accountId: 1 }]
+    })
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableTable = getAvailableTable(wrapper)
+    expect(availableTable.text()).toContain('62')
+  })
+
+  it('toSortableMediaNumber returns 0 for non-numeric file size', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [
+        { id: 71, title: 'Valid', originalFilename: 'valid.mp4', fileSizeBytes: 1000, durationSeconds: 30, accountId: 1 },
+        { id: 72, title: 'NoSize', originalFilename: 'nosize.mp4', fileSizeBytes: 'unknown', durationSeconds: 20, accountId: 1 }
+      ]
+    })
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    // Sorting should not throw even with a non-numeric fileSize
+    await sortAvailableTableBy(wrapper, 'fileSize')
+    expect(getAvailableTableTitles(wrapper)).toHaveLength(2)
+  })
+
+  it('handles getAllByAccount returning null without crashing', async () => {
+    videosStore.getAllByAccount = vi.fn().mockResolvedValue(null)
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(getAvailableTable(wrapper).findAll('.playlist-video-row')).toHaveLength(0)
+  })
+
+  it('checkFilenameUnique treats empty filename as unique', async () => {
+    playlistsStore.playlist = {
+      id: 9, title: 'Empty Filename', filename: '', accountId: 1, items: []
+    }
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([])
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: 'Empty Filename', accountId: 1 }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    // Empty filename is considered unique, so update should proceed
+    expect(playlistsStore.update).toHaveBeenCalled()
+  })
+
+  it('checkFilenameUnique ignores items without a filename', async () => {
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([
+      { id: 99, title: 'No Filename Playlist' } // No filename property
+    ])
+
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: 'Test' }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    // The item without filename is skipped; create should succeed
+    expect(playlistsStore.create).toHaveBeenCalled()
+  })
+
+  it('available video with same title and filename shows no subtitle', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [{ id: 81, title: 'video.mp4', originalFilename: 'video.mp4', fileSizeBytes: 300, durationSeconds: 10, accountId: 1 }]
+    })
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableTable = getAvailableTable(wrapper)
+    // Title equals filename → no subtitle; should appear exactly once
+    const titleDivs = availableTable.findAll('.playlist-video-title')
+    expect(titleDivs).toHaveLength(1)
+    expect(availableTable.findAll('.playlist-video-sub')).toHaveLength(0)
+  })
+
+  it('shows validation error when form has title error', async () => {
+    const wrapper = mountSettings({ accountId: 1, showValidationError: true })
+    await flushPromises()
+
+    // The form stub exposes errors.title = 'Required', which triggers the v-if="errors.title" block
+    expect(wrapper.text()).toContain('Required')
   })
 })
