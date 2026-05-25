@@ -33,8 +33,7 @@ const accountOptions = computed(() => createAccountOptions(accounts.value || [],
 
 const headers = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
-  { title: 'Название', align: 'start', key: 'title', width: '25%' },
-  { title: 'Имя файла', align: 'start', key: 'filename', width: '25%' },
+  { title: 'Описание', align: 'start', key: 'title', width: '25%' },
   { title: 'Размер', align: 'start', key: 'totalFileSizeBytes', width: '15%' },
   { title: 'Длительность', align: 'start', key: 'totalDurationSeconds', width: '15%' },
   { title: 'Видео', align: 'start', key: 'videoCount', width: '10%' }

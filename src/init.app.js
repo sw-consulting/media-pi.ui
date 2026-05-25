@@ -36,13 +36,10 @@ import {
   faTriangleExclamation,
   faRotateRight,
   faBan,
-  faTags,
-  faFilm,
   faCircleXmark,
   faPowerOff,
   faRetweet,
   faSpinner,
-  faBookSkull,
   faStop,
   faCloudArrowUp,
   faFolderPlus,
@@ -52,13 +49,17 @@ import {
   faCamera,
   faFilter,
   faFilterCircleXmark,
-  faImage
+  faImage,
+  faAngleLeft,
+  faAngleRight,
+  faAnglesLeft,
+  faAnglesRight,
+  faFilm
 } from '@fortawesome/free-solid-svg-icons'
 
-  import {
+import {
   faCircle,
-  faCircleQuestion,
-  faSave,
+  faCircleQuestion
 } from '@fortawesome/free-regular-svg-icons'
 
 library.add(
@@ -91,14 +92,10 @@ library.add(
   faTriangleExclamation,
   faRotateRight,
   faBan,
-  faTags,
-  faFilm,
   faCircleXmark,
   faPowerOff,
   faRetweet,
-  faSave,
   faSpinner,
-  faBookSkull,
   faStop,
   faCloudArrowUp,
   faFolderPlus,
@@ -108,7 +105,12 @@ library.add(
   faCamera,
   faFilter,
   faFilterCircleXmark,
-  faImage
+  faImage,
+  faAngleLeft,
+  faAngleRight,
+  faAnglesLeft,
+  faAnglesRight,
+  faFilm
 )
 
 import 'vuetify/styles'
