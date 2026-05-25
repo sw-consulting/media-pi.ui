@@ -91,10 +91,6 @@ function triggerUpload() {
   fileInput.value.click()
 }
 
-async function uploadVideo(file) {
-  await uploadVideos(file ? [file] : [])
-}
-
 async function uploadVideos(files) {
   const selectedFiles = Array.from(files || []).filter(Boolean)
   if (!selectedFiles.length) return

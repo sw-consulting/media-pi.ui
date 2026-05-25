@@ -112,7 +112,7 @@ describe('Videos_List.vue', () => {
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
-    await wrapper.vm.uploadVideo(file)
+    await wrapper.vm.uploadVideos([file])
     expect(videosStore.uploadFiles).not.toHaveBeenCalled()
   })
 
@@ -121,7 +121,7 @@ describe('Videos_List.vue', () => {
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
-    await wrapper.vm.uploadVideo(file)
+    await wrapper.vm.uploadVideos([file])
     expect(videosStore.uploadFiles).toHaveBeenCalledWith([file], 0)
   })
 
