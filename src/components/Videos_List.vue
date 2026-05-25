@@ -280,9 +280,16 @@ watch(videos, (current) => {
         </div>
       </div>
     </div>
-    <div v-if="isUploading" class="upload-progress-overlay" role="dialog" aria-modal="true" data-test="upload-progress">
+    <div
+      v-if="isUploading"
+      class="upload-progress-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upload-progress-title"
+      data-test="upload-progress"
+    >
       <div class="upload-progress-card">
-        <div class="primary-heading upload-progress-title" data-test="upload-progress-label">
+        <div id="upload-progress-title" class="primary-heading upload-progress-title" data-test="upload-progress-label">
           {{ uploadProgressTitle }}
         </div>
         <div class="upload-progress-spinner-wrap">
