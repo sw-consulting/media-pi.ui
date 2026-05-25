@@ -115,6 +115,68 @@ const mountSettings = (props = {}) => mount({
         template: '<input data-test="video-search-input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
         props: ['modelValue'],
         emits: ['update:modelValue']
+      },
+      'v-data-table': {
+        props: ['headers', 'items', 'loading', 'loadingText', 'noDataText'],
+        data() {
+          return {
+            sortKey: null,
+            sortOrder: 'asc'
+          }
+        },
+        computed: {
+          renderedItems() {
+            if (!this.sortKey) return this.items
+            const header = (this.headers || []).find(item => item.key === this.sortKey)
+            const sorted = [...(this.items || [])]
+            sorted.sort((a, b) => {
+              const compare = header?.sort
+                ? header.sort(a?.[this.sortKey], b?.[this.sortKey])
+                : String(a?.[this.sortKey] ?? '').localeCompare(String(b?.[this.sortKey] ?? ''))
+              return this.sortOrder === 'desc' ? -compare : compare
+            })
+            return sorted
+          }
+        },
+        methods: {
+          toggleSort(header) {
+            if (!header?.key || header.sortable === false) return
+            if (this.sortKey === header.key) {
+              this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'
+            } else {
+              this.sortKey = header.key
+              this.sortOrder = 'asc'
+            }
+          }
+        },
+        template: `
+          <div class="data-table">
+            <div class="data-table-header">
+              <template v-for="header in headers" :key="header.key">
+                <button
+                  v-if="header.title"
+                  :data-test="'sort-' + header.key"
+                  :disabled="header.sortable === false"
+                  @click="toggleSort(header)"
+                >
+                  {{ header.title }}
+                </button>
+              </template>
+              <slot name="header.select" />
+            </div>
+            <div v-if="loading" data-test="table-loading">{{ loadingText }}</div>
+            <div v-else-if="!items || !items.length" data-test="table-empty">{{ noDataText }}</div>
+            <div v-else v-for="item in renderedItems" :key="item.key || item.id" class="playlist-video-row">
+              <slot name="item.select" :item="item" />
+              <slot name="item.position" :item="item" />
+              <slot name="item.title" :item="item" />
+              <slot name="item.accountName" :item="item" />
+              <slot name="item.fileSize" :item="item" />
+              <slot name="item.duration" :item="item" />
+              <slot name="item.actions" :item="item" />
+            </div>
+          </div>
+        `
       }
     },
     mocks: {
@@ -144,6 +206,26 @@ async function clickBatchRemove(wrapper) {
   await flushPromises()
 }
 
+function getAvailableTable(wrapper) {
+  const tables = wrapper.findAll('.data-table')
+  expect(tables.length).toBeGreaterThanOrEqual(2)
+  return tables[1]
+}
+
+function getAvailableTableTitles(wrapper) {
+  return getAvailableTable(wrapper)
+    .findAll('.playlist-video-title')
+    .map(item => item.text())
+}
+
+async function sortAvailableTableBy(wrapper, key) {
+  const sortButton = getAvailableTable(wrapper).find(`[data-test="sort-${key}"]`)
+  expect(sortButton.exists()).toBe(true)
+  expect(sortButton.element.disabled).toBe(false)
+  await sortButton.trigger('click')
+  await flushPromises()
+}
+
 describe('Playlist_Settings.vue', () => {
   beforeEach(() => {
     authStore = { user: { roles: [1], accountIds: [] } }
@@ -154,10 +236,10 @@ describe('Playlist_Settings.vue', () => {
     playlistsStore.update = vi.fn().mockResolvedValue()
     videosStore.getAllByAccount = vi.fn(async (accountId) => {
       if (accountId === 1) {
-        return [{ id: 11, title: 'Video 1', originalFilename: 'one.mp4', fileSize: 1200, duration: 60, accountId: 1 }]
+        return [{ id: 11, title: 'Video 1', originalFilename: 'one.mp4', fileSizeBytes: 1200, durationSeconds: 60, accountId: 1 }]
       }
       if (accountId === 0) {
-        return [{ id: 22, title: 'Shared', originalFilename: 'shared.mp4', fileSize: 2400, duration: 90, accountId: 0 }]
+        return [{ id: 22, title: 'Shared', originalFilename: 'shared.mp4', fileSizeBytes: 2400, durationSeconds: 90, accountId: 0 }]
       }
       return []
     })
@@ -325,6 +407,50 @@ describe('Playlist_Settings.vue', () => {
     expect(submittingWrapper.find('[data-test="batch-add-video-button"]').element.disabled).toBe(true)
     expect(submittingWrapper.find('[data-test="batch-remove-video-button"]').element.disabled).toBe(true)
     expect(submittingWrapper.find('[data-test="available-select-all"]').element.disabled).toBe(true)
+  })
+
+  it('sorts available videos by file size as numbers', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [
+        { id: 31, title: 'Ten KB', originalFilename: 'ten.mp4', fileSizeBytes: 10000, durationSeconds: 30, accountId: 1 },
+        { id: 32, title: 'Nine Hundred B', originalFilename: 'nine-hundred.mp4', fileSizeBytes: 900, durationSeconds: 20, accountId: 1 },
+        { id: 33, title: 'Two KB', originalFilename: 'two.mp4', fileSizeBytes: 2000, durationSeconds: 10, accountId: 1 }
+      ]
+    })
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await sortAvailableTableBy(wrapper, 'fileSize')
+
+    expect(getAvailableTableTitles(wrapper)).toEqual([
+      'Nine Hundred B',
+      'Two KB',
+      'Ten KB'
+    ])
+  })
+
+  it('sorts available videos by duration as seconds', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [
+        { id: 41, title: 'Long', originalFilename: 'long.mp4', fileSizeBytes: 100, durationSeconds: 600, accountId: 1 },
+        { id: 42, title: 'Short', originalFilename: 'short.mp4', fileSizeBytes: 200, durationSeconds: 5, accountId: 1 },
+        { id: 43, title: 'Medium', originalFilename: 'medium.mp4', fileSizeBytes: 300, durationSeconds: 120, accountId: 1 }
+      ]
+    })
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await sortAvailableTableBy(wrapper, 'duration')
+
+    expect(getAvailableTableTitles(wrapper)).toEqual([
+      'Short',
+      'Medium',
+      'Long'
+    ])
   })
 
   it('loads common videos only once when editing a common playlist', async () => {

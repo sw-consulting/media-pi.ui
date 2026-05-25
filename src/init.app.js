@@ -52,7 +52,11 @@ import {
   faCamera,
   faFilter,
   faFilterCircleXmark,
-  faImage
+  faImage,
+  faAngleLeft,
+  faAngleRight,
+  faAnglesLeft,
+  faAnglesRight
 } from '@fortawesome/free-solid-svg-icons'
 
   import {
@@ -108,7 +112,11 @@ library.add(
   faCamera,
   faFilter,
   faFilterCircleXmark,
-  faImage
+  faImage,
+  faAngleLeft,
+  faAngleRight,
+  faAnglesLeft,
+  faAnglesRight
 )
 
 import 'vuetify/styles'

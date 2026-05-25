@@ -72,6 +72,24 @@ const schema = Yup.object().shape({
   title: Yup.string().trim().required('Необходимо указать описание')
 })
 
+const playlistVideoHeaders = [
+  { title: '', align: 'center', key: 'select', sortable: false, width: '44px' },
+  { title: '#', align: 'center', key: 'position', sortable: false, width: '44px' },
+  { title: 'Название', align: 'start', key: 'title', sortable: false },
+  { title: 'Размер', align: 'start', key: 'fileSize', sortable: false, width: '120px' },
+  { title: 'Длительность', align: 'start', key: 'duration', sortable: false, width: '130px' },
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '44px' }
+]
+
+const availableVideoHeaders = [
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '44px' },
+  { title: '', align: 'center', key: 'select', sortable: false, width: '44px' },
+  { title: 'Название', align: 'start', key: 'title' },
+  { title: 'Лицевой счёт', align: 'start', key: 'accountName', sortable: false, width: '150px' },
+  { title: 'Размер', align: 'start', key: 'fileSize', sortable: true, sort: compareMediaNumber, width: '120px' },
+  { title: 'Длительность', align: 'start', key: 'duration', sortable: true, sort: compareMediaNumber, width: '130px' }
+]
+
 const videoAccountOptions = computed(() => createAccountOptions(accountsStore.accounts || [], authStore.user, { includeCommon: true }))
 
 const accountNameById = computed(() => {
@@ -223,6 +241,19 @@ function createPlaylistItem(videoId, position) {
   }
 }
 
+function getVideoTitle(video) {
+  return video?.title || video?.originalFilename || `Видео #${video?.id}`
+}
+
+function toSortableMediaNumber(value) {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : 0
+}
+
+function compareMediaNumber(a, b) {
+  return toSortableMediaNumber(a) - toSortableMediaNumber(b)
+}
+
 async function loadAvailableVideos() {
   videosLoading.value = true
   try {
@@ -273,11 +304,16 @@ function addSelectedVideosToPlaylist() {
 }
 
 function removePlaylistItem(index) {
+  if (index < 0 || index >= playlistItems.value.length) return
   const [removed] = playlistItems.value.splice(index, 1)
   if (removed) {
     selectedPlaylistItemKeys.value = selectedPlaylistItemKeys.value.filter(key => key !== removed.uid)
   }
   rebuildPositions()
+}
+
+function getPlaylistItemIndex(key) {
+  return playlistItems.value.findIndex(item => item.uid === key)
 }
 
 function removeSelectedPlaylistItems() {
@@ -452,9 +488,44 @@ async function onSubmit(values) {
 
       <div class="playlist-columns">
         <div class="playlist-column">
-          <div class="playlist-column-header">
+          <div class="playlist-column-header header-with-actions">
             <div class="playlist-column-title">
-              <label class="playlist-select-all" title="Выбрать все видео в плейлисте">
+              <h2 class="secondary-heading">Видео в плейлисте</h2>
+            </div>
+          </div>
+          <div class="playlist-column-controls">
+            <div class="playlist-summary">
+              <div>Видео: {{ totalVideoCount }}</div>
+              <div>Размер: {{ formatFileSize(totalFileSize) }}</div>
+              <div>Длительность: {{ formatDuration(totalDuration) }}</div>
+            </div>
+            <div class="playlist-controls-actions playlist-controls-actions-end">
+              <div class="header-actions-container">
+                <div class="header-actions header-actions-group">
+                  <ActionButton
+                    data-test="batch-remove-video-button"
+                    :item="{}"
+                    icon="fa-solid fa-angles-right"
+                    tooltip-text="Удалить выбранные из плейлиста"
+                    :disabled="isSubmitting || !hasSelectedPlaylistItems"
+                    @click="removeSelectedPlaylistItems"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <v-data-table
+            :headers="playlistVideoHeaders"
+            :items="playlistVideoDetails"
+            item-value="key"
+            :items-per-page="-1"
+            hide-default-footer
+            density="compact"
+            class="playlist-table elevation-1"
+            no-data-text="Добавьте видео в плейлист"
+          >
+            <template v-slot:[`header.select`]>
+              <label class="playlist-table-checkbox" title="Выбрать все видео в плейлисте">
                 <input
                   data-test="playlist-select-all"
                   type="checkbox"
@@ -465,32 +536,9 @@ async function onSubmit(values) {
                   @change="toggleVisiblePlaylistItems($event.target.checked)"
                 />
               </label>
-              <h2 class="secondary-heading">Видео в плейлисте</h2>
-            </div>
-            <ActionButton
-              data-test="batch-remove-video-button"
-              :item="{}"
-              icon="fa-solid fa-minus"
-              tooltip-text="Удалить выбранные из плейлиста"
-              :disabled="isSubmitting || !hasSelectedPlaylistItems"
-              @click="removeSelectedPlaylistItems"
-            />
-          </div>
-          <div class="playlist-summary">
-            <div>Видео: {{ totalVideoCount }}</div>
-            <div>Размер: {{ formatFileSize(totalFileSize) }}</div>
-            <div>Длительность: {{ formatDuration(totalDuration) }}</div>
-          </div>
-          <div class="playlist-video-list">
-            <div v-if="!playlistVideoDetails.length" class="text-center m-3">
-              Добавьте видео в плейлист
-            </div>
-            <div
-              v-for="(item, index) in playlistVideoDetails"
-              :key="item.key"
-              class="playlist-video-row"
-            >
-              <label class="playlist-video-select" :title="`Выбрать ${item.title}`">
+            </template>
+            <template v-slot:[`item.select`]="{ item }">
+              <label class="playlist-table-checkbox" :title="`Выбрать ${item.title}`">
                 <input
                   data-test="playlist-row-select"
                   type="checkbox"
@@ -500,48 +548,93 @@ async function onSubmit(values) {
                   @change="togglePlaylistItemSelection(item.key, $event.target.checked)"
                 />
               </label>
-              <div class="playlist-video-position">{{ item.position }}</div>
-              <div class="playlist-video-meta">
+            </template>
+            <template v-slot:[`item.title`]="{ item }">
+              <div class="playlist-title-cell">
                 <div class="playlist-video-title">{{ item.title }}</div>
-                <div class="playlist-video-sub">
-                  {{ formatFileSize(item.fileSize) }} · {{ formatDuration(item.duration) }}
-                </div>
               </div>
+            </template>
+            <template v-slot:[`item.fileSize`]="{ item }">
+              {{ formatFileSize(item.fileSize) }}
+            </template>
+            <template v-slot:[`item.duration`]="{ item }">
+              {{ formatDuration(item.duration) }}
+            </template>
+            <template v-slot:[`item.actions`]="{ item }">
               <div class="playlist-video-actions">
                 <ActionButton
                   data-test="move-up-button"
                   :item="item"
                   icon="fa-solid fa-chevron-up"
                   tooltip-text="Переместить вверх"
-                  :disabled="isSubmitting || index === 0"
-                  @click="movePlaylistItem(index, -1)"
+                  :disabled="isSubmitting || getPlaylistItemIndex(item.key) <= 0"
+                  @click="movePlaylistItem(getPlaylistItemIndex(item.key), -1)"
                 />
                 <ActionButton
                   data-test="move-down-button"
                   :item="item"
                   icon="fa-solid fa-chevron-down"
                   tooltip-text="Переместить вниз"
-                  :disabled="isSubmitting || index === playlistVideoDetails.length - 1"
-                  @click="movePlaylistItem(index, 1)"
+                  :disabled="isSubmitting || getPlaylistItemIndex(item.key) < 0 || getPlaylistItemIndex(item.key) === playlistVideoDetails.length - 1"
+                  @click="movePlaylistItem(getPlaylistItemIndex(item.key), 1)"
                 />
                 <ActionButton
                   data-test="remove-video-button"
                   :item="item"
-                  icon="fa-solid fa-minus"
+                  icon="fa-solid fa-angle-right"
                   tooltip-text="Удалить из плейлиста"
                   :disabled="isSubmitting"
-                  @click="removePlaylistItem(index)"
+                  @click="removePlaylistItem(getPlaylistItemIndex(item.key))"
                 />
               </div>
-            </div>
-          </div>
+            </template>
+          </v-data-table>
           <div v-if="itemsError" class="alert alert-danger mt-3 mb-0">{{ itemsError }}</div>
         </div>
 
         <div class="playlist-column">
-          <div class="playlist-column-header">
+          <div class="playlist-column-header header-with-actions">
             <div class="playlist-column-title">
-              <label class="playlist-select-all" title="Выбрать все доступные видео">
+              <h2 class="secondary-heading">Доступные видео</h2>
+            </div>
+          </div>
+          <div class="playlist-column-controls">
+            <div class="playlist-controls-actions playlist-controls-actions-start">
+              <div class="header-actions-container">
+                <div class="header-actions header-actions-group">
+                  <ActionButton
+                    data-test="batch-add-video-button"
+                    :item="{}"
+                    icon="fa-solid fa-angles-left"
+                    tooltip-text="Добавить выбранные видео"
+                    :disabled="isSubmitting || videosLoading || !hasSelectedAvailableVideos"
+                    @click="addSelectedVideosToPlaylist"
+                  />
+                </div>
+              </div>
+            </div>
+            <v-text-field
+              v-model="videoSearch"
+              label="Поиск видео"
+              variant="outlined"
+              density="compact"
+              hide-details
+            />
+          </div>
+          <v-data-table
+            :headers="availableVideoHeaders"
+            :items="filteredAvailableVideos"
+            item-value="id"
+            :items-per-page="-1"
+            hide-default-footer
+            density="compact"
+            class="playlist-table elevation-1"
+            :loading="videosLoading"
+            loading-text="Загрузка видео..."
+            no-data-text="Нет доступных видео"
+          >
+            <template v-slot:[`header.select`]>
+              <label class="playlist-table-checkbox" title="Выбрать все доступные видео">
                 <input
                   data-test="available-select-all"
                   type="checkbox"
@@ -552,63 +645,49 @@ async function onSubmit(values) {
                   @change="toggleVisibleAvailableVideos($event.target.checked)"
                 />
               </label>
-              <h2 class="secondary-heading">Доступные видео</h2>
-            </div>
-            <ActionButton
-              data-test="batch-add-video-button"
-              :item="{}"
-              icon="fa-solid fa-plus"
-              tooltip-text="Добавить выбранные видео"
-              :disabled="isSubmitting || videosLoading || !hasSelectedAvailableVideos"
-              @click="addSelectedVideosToPlaylist"
-            />
-          </div>
-          <v-text-field
-            v-model="videoSearch"
-            label="Поиск видео"
-            variant="outlined"
-            density="compact"
-            hide-details
-          />
-          <div class="playlist-video-list">
-            <div v-if="videosLoading" class="text-center m-3">Загрузка видео...</div>
-            <div v-else-if="!filteredAvailableVideos.length" class="text-center m-3">
-              Нет доступных видео
-            </div>
-            <div
-              v-for="video in filteredAvailableVideos"
-              :key="video.id"
-              class="playlist-video-row"
-            >
-              <label class="playlist-video-select" :title="`Выбрать ${video.title || video.originalFilename || 'Видео #' + video.id}`">
+            </template>
+            <template v-slot:[`item.select`]="{ item }">
+              <label class="playlist-table-checkbox" :title="`Выбрать ${getVideoTitle(item)}`">
                 <input
                   data-test="available-video-select"
                   type="checkbox"
-                  :aria-label="`Выбрать ${video.title || video.originalFilename || 'Видео #' + video.id}`"
-                  :checked="selectedAvailableVideoIds.includes(video.id)"
+                  :aria-label="`Выбрать ${getVideoTitle(item)}`"
+                  :checked="selectedAvailableVideoIds.includes(item.id)"
                   :disabled="isSubmitting"
-                  @change="toggleAvailableVideoSelection(video.id, $event.target.checked)"
+                  @change="toggleAvailableVideoSelection(item.id, $event.target.checked)"
                 />
               </label>
-              <div class="playlist-video-meta">
+            </template>
+            <template v-slot:[`item.title`]="{ item }">
+              <div class="playlist-title-cell">
                 <div class="playlist-video-title">
-                  {{ video.title || video.originalFilename || `Видео #${video.id}` }}
+                  {{ getVideoTitle(item) }}
                 </div>
-                <div class="playlist-video-sub">
-                  <span v-if="video.accountName">{{ video.accountName }} · </span>
-                  {{ formatFileSize(video.fileSize) }} · {{ formatDuration(video.duration) }}
+                <div v-if="item.title && item.originalFilename && item.title !== item.originalFilename" class="playlist-video-sub">
+                  {{ item.originalFilename }}
                 </div>
               </div>
+            </template>
+            <template v-slot:[`item.accountName`]="{ item }">
+              <span class="playlist-account-cell">{{ item.accountName || '—' }}</span>
+            </template>
+            <template v-slot:[`item.fileSize`]="{ item }">
+              {{ formatFileSize(item.fileSize) }}
+            </template>
+            <template v-slot:[`item.duration`]="{ item }">
+              {{ formatDuration(item.duration) }}
+            </template>
+            <template v-slot:[`item.actions`]="{ item }">
               <ActionButton
                 data-test="add-video-button"
-                :item="video"
-                icon="fa-solid fa-plus"
+                :item="item"
+                icon="fa-solid fa-angle-left"
                 tooltip-text="Добавить в плейлист"
                 :disabled="isSubmitting"
                 @click="addVideoToPlaylist"
               />
-            </div>
-          </div>
+            </template>
+          </v-data-table>
         </div>
       </div>
 
@@ -652,10 +731,6 @@ async function onSubmit(values) {
 }
 
 .playlist-column-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -670,60 +745,62 @@ async function onSubmit(values) {
   margin: 0;
 }
 
-.playlist-select-all,
-.playlist-video-select {
+.playlist-column {
+  min-width: 0;
+}
+
+.playlist-column-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-bottom: 8px;
+}
+
+.playlist-column-controls :deep(.v-input) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.playlist-controls-actions {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.playlist-controls-actions-end {
+  margin-left: auto;
+}
+
+.playlist-table-checkbox {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 24px;
-  width: 24px;
+  width: 100%;
 }
 
-.playlist-select-all input,
-.playlist-video-select input {
+.playlist-table-checkbox input {
   width: 16px;
   height: 16px;
   margin: 0;
   cursor: pointer;
 }
 
-.playlist-select-all input:disabled,
-.playlist-video-select input:disabled {
+.playlist-table-checkbox input:disabled {
   cursor: not-allowed;
 }
 
-.playlist-video-list {
+.playlist-table {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 8px;
-  min-height: 220px;
-  background: #fff;
+  overflow: hidden;
 }
 
-.playlist-video-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 6px;
-  border-bottom: 1px solid #f0f0f0;
+:deep(.playlist-table th),
+:deep(.playlist-table td) {
+  white-space: nowrap;
 }
 
-.playlist-video-row:last-child {
-  border-bottom: none;
-}
-
-.playlist-video-position {
-  font-weight: 600;
-  width: 24px;
-  text-align: center;
-  color: #5c6f7f;
-}
-
-.playlist-video-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
+.playlist-title-cell {
   min-width: 0;
 }
 
@@ -733,25 +810,30 @@ async function onSubmit(values) {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  flex: 1 1 auto;
 }
 
 .playlist-video-sub {
   font-size: 0.85rem;
   color: #6c7a89;
-  margin-top: 0;
-  flex: 0 0 auto;
+  margin-top: 2px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .playlist-video-actions {
   display: flex;
   gap: 6px;
+  justify-content: center;
+}
+
+.playlist-account-cell {
+  color: #6c7a89;
 }
 
 .playlist-summary {
-  margin-top: 0px;
-  margin-bottom: 18px;
+  margin-top: 0;
+  margin-bottom: 0;
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
