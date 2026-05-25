@@ -66,8 +66,7 @@ const initialLoading = ref(false)
 const videosLoading = ref(false)
 
 const schema = Yup.object().shape({
-  title: Yup.string().trim().required('Необходимо указать название'),
-  filename: Yup.string().trim().required('Необходимо указать имя файла')
+  title: Yup.string().trim().required('Необходимо указать название')
 })
 
 const videoAccountOptions = computed(() => createAccountOptions(accountsStore.accounts || [], authStore.user, { includeCommon: true }))
@@ -257,17 +256,16 @@ async function onSubmit(values) {
   filenameError.value = ''
 
   const trimmedTitle = values.title.trim()
-  const trimmedFilename = values.filename.trim()
   const accountId = values.accountId ?? playlist.value.accountId ?? props.accountId ?? null
 
   try {
-    let finalFilename = trimmedFilename
+    let finalFilename = (playlist.value.filename || '').trim()
     if (props.register && !finalFilename) {
       finalFilename = generatePlaylistFilename()
       // reflect into reactive state so UI is consistent
       playlist.value.filename = finalFilename
     }
-    const isUnique = await checkFilenameUnique(trimmedFilename, accountId)
+    const isUnique = await checkFilenameUnique(finalFilename, accountId)
     if (!isUnique) {
       filenameError.value = 'Плейлист с таким именем файла уже существует'
       alertStore.error(filenameError.value)
@@ -322,7 +320,7 @@ async function onSubmit(values) {
       </div>
 
       <div class="form-group">
-        <label for="title" class="label-1">Название:</label>
+        <label for="title" class="label-1">Описание:</label>
         <Field
           name="title"
           type="text"
@@ -330,20 +328,7 @@ async function onSubmit(values) {
           :disabled="isSubmitting"
           class="form-control input-1"
           :class="{ 'is-invalid': errors.title }"
-          placeholder="Введите название плейлиста"
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="filename" class="label-1">Имя файла:</label>
-        <Field
-          name="filename"
-          type="text"
-          id="filename"
-          :disabled="isSubmitting"
-          class="form-control input-1"
-          :class="{ 'is-invalid': errors.filename || filenameError }"
-          placeholder="Введите имя файла плейлиста"
+          placeholder="Введите описание плейлиста"
         />
       </div>
 
@@ -464,7 +449,6 @@ async function onSubmit(values) {
       </div>
 
       <div v-if="errors.title" class="alert alert-danger mt-3 mb-0">{{ errors.title }}</div>
-      <div v-if="errors.filename" class="alert alert-danger mt-3 mb-0">{{ errors.filename }}</div>
     </Form>
 
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
