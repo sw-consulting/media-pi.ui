@@ -32,9 +32,14 @@ const titleInputRef = ref(null)
 const editingVideoId = ref(null)
 const editingTitle = ref('')
 const titleSaving = ref(false)
+const isUploading = ref(false)
+const uploadProgressPercent = ref(0)
+const uploadProgressIndeterminate = ref(true)
+const uploadAbortController = ref(null)
 
 const accountOptions = computed(() => createAccountOptions(accounts.value || [], authStore.user, { includeCommon: true }))
 
+const uploadProgressTitle = computed(() => isUploading.value ? 'Загрузка видеофайлов' : '')
 
 const headers = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
@@ -53,7 +58,30 @@ const canManageSelectedAccount = computed(() => {
   return canManageAccountById(authStore.user, selectedAccountId.value)
 })
 
-const isBusy = computed(() => loading.value || accountsLoading.value)
+const isBusy = computed(() => loading.value || accountsLoading.value || isUploading.value)
+
+function resetUploadProgress() {
+  uploadProgressPercent.value = 0
+  uploadProgressIndeterminate.value = true
+}
+
+function handleUploadProgress(progress) {
+  if (!progress?.lengthComputable || progress.percentage === null || progress.percentage === undefined) {
+    uploadProgressIndeterminate.value = true
+    return
+  }
+
+  uploadProgressIndeterminate.value = false
+  uploadProgressPercent.value = Math.min(100, Math.max(0, progress.percentage))
+}
+
+function cancelUpload() {
+  uploadAbortController.value?.abort()
+}
+
+function isAbortError(err) {
+  return err?.name === 'AbortError'
+}
 
 function ensureSelection(options) {
   const availableValues = options.map(option => option.value)
@@ -91,26 +119,36 @@ function triggerUpload() {
   fileInput.value.click()
 }
 
-async function uploadVideo(file) {
-  if (!file) return
+async function uploadVideos(files) {
+  const selectedFiles = Array.from(files || []).filter(Boolean)
+  if (!selectedFiles.length) return
   if (!canManageSelectedAccount.value) {
-    alertStore.error('Недостаточно прав для загрузки видеофайла в выбранный раздел')
+    alertStore.error('Недостаточно прав для загрузки видеофайлов в выбранный раздел')
     return
   }
+  resetUploadProgress()
+  isUploading.value = true
+  const abortController = new AbortController()
+  uploadAbortController.value = abortController
   try {
-    const originalFilename = file.name || ''
-    // Keep original filename (including extension) when uploading.
-    // The store can derive a title if needed from the filename.
-    await videosStore.uploadFile(file, selectedAccountId.value, originalFilename)
+    await videosStore.uploadFiles(selectedFiles, selectedAccountId.value, {
+      onUploadProgress: handleUploadProgress,
+      signal: abortController.signal
+    })
     await refreshVideos()
   } catch (err) {
-    alertStore.error('Не удалось загрузить видеофайл: ' + (err?.message || err))
+    if (!isAbortError(err)) {
+      alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+    }
+  } finally {
+    isUploading.value = false
+    uploadAbortController.value = null
+    resetUploadProgress()
   }
 }
 
 function onFileChange(event) {
-  const file = event?.target?.files?.[0]
-  uploadVideo(file)
+  uploadVideos(event?.target?.files)
 }
 
 function canManageVideo(item) {
@@ -233,13 +271,50 @@ watch(videos, (current) => {
               data-test="upload-video-button"
               :item="{}"
               icon="fa-solid fa-cloud-arrow-up"
-              tooltip-text="Загрузить видеофайл"
+              tooltip-text="Загрузить видеофайлы"
               :disabled="!canManageSelectedAccount || isBusy || titleSaving"
               @click="triggerUpload"
             />
-            <input ref="fileInput" class="d-none" type="file" accept="video/*" @change="onFileChange" />
+            <input ref="fileInput" class="d-none" type="file" accept="video/*" multiple @change="onFileChange" />
           </div>
         </div>
+      </div>
+    </div>
+    <div
+      v-if="isUploading"
+      class="upload-progress-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upload-progress-title"
+      data-test="upload-progress"
+    >
+      <div class="upload-progress-card">
+        <div id="upload-progress-title" class="primary-heading upload-progress-title" data-test="upload-progress-label">
+          {{ uploadProgressTitle }}
+        </div>
+        <div class="upload-progress-spinner-wrap">
+          <v-progress-circular
+            data-test="upload-progress-spinner"
+            :model-value="uploadProgressPercent"
+            :indeterminate="uploadProgressIndeterminate"
+            :size="70"
+            :width="7"
+            color="primary"
+          >
+            <span v-if="!uploadProgressIndeterminate" class="upload-progress-percent">
+              {{ uploadProgressPercent }}%
+            </span>
+          </v-progress-circular>
+        </div>
+        <v-btn
+          data-test="cancel-upload-button"
+          color="orange-darken-3"
+          variant="text"
+          class="upload-cancel-button"
+          @click="cancelUpload"
+        >
+          Отменить
+        </v-btn>
       </div>
     </div>
     <hr class="hr" />
@@ -374,5 +449,43 @@ watch(videos, (current) => {
   border: 1px solid #666;
   border-radius: 4px;
   background-color: #fff;
+}
+
+.upload-progress-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+}
+
+.upload-progress-card {
+  background: #fff;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  min-width: 260px;
+  max-width: 90%;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+}
+
+.upload-progress-title {
+  margin-bottom: 0.5rem;
+}
+
+.upload-progress-spinner-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.upload-progress-percent {
+  color: #1976d2;
+  font-size: 0.875rem;
+}
+
+.upload-cancel-button {
+  margin: 0.75rem 0 0;
 }
 </style>

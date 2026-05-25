@@ -39,6 +39,14 @@ export const useVideosStore = defineStore('videos', () => {
     }
   }
 
+  const assertUploadTarget = (accountId) => {
+    if (accountId === undefined || accountId === null) throw new Error('Не выбран лицевой счёт')
+  }
+
+  const deriveUploadTitle = (file, title = '') => {
+    return (title && title.trim()) ? title.trim() : (file.name ? file.name.replace(/\.[^.]+$/, '') : '')
+  }
+
   async function getAll() {
     return handleRequest(
       async () => {
@@ -87,16 +95,53 @@ export const useVideosStore = defineStore('videos', () => {
     )
   }
 
-  async function uploadFile(file, accountId, title = '') {
+  const buildUploadOptions = (options = {}) => {
+    const uploadOptions = {}
+    if (typeof options.onUploadProgress === 'function') {
+      uploadOptions.onUploadProgress = options.onUploadProgress
+    }
+    if (options.signal) {
+      uploadOptions.signal = options.signal
+    }
+
+    return Object.keys(uploadOptions).length ? uploadOptions : null
+  }
+
+  const postUploadFile = (url, formData, options) => {
+    const uploadOptions = buildUploadOptions(options)
+    if (uploadOptions) {
+      return fetchWrapper.postFile(url, formData, uploadOptions)
+    }
+    return fetchWrapper.postFile(url, formData)
+  }
+
+  async function uploadFile(file, accountId, title = '', options = {}) {
     return handleRequest(async () => {
       if (!file) throw new Error('Не выбран видеофайл')
-      if (accountId === undefined || accountId === null) throw new Error('Не выбран лицевой счёт')
-      const effectiveTitle = (title && title.trim()) ? title.trim() : (file.name ? file.name.replace(/\.[^.]+$/, '') : '')
+      assertUploadTarget(accountId)
+      const effectiveTitle = deriveUploadTitle(file, title)
       const formData = new globalThis.FormData()
       formData.append('File', file)
       formData.append('Title', effectiveTitle)
       formData.append('AccountId', accountId)
-      return fetchWrapper.postFile(`${baseUrl}/upload`, formData)
+      return postUploadFile(`${baseUrl}/upload`, formData, options)
+    })
+  }
+
+  async function uploadFiles(files, accountId, options = {}) {
+    return handleRequest(async () => {
+      const selectedFiles = Array.from(files || []).filter(Boolean)
+      if (!selectedFiles.length) throw new Error('Не выбран видеофайл')
+      assertUploadTarget(accountId)
+
+      const formData = new globalThis.FormData()
+      selectedFiles.forEach(file => {
+        formData.append('Files', file)
+        formData.append('Titles', deriveUploadTitle(file, file.name || ''))
+      })
+      formData.append('AccountId', accountId)
+
+      return postUploadFile(`${baseUrl}/upload/batch`, formData, options)
     })
   }
 
@@ -128,6 +173,7 @@ export const useVideosStore = defineStore('videos', () => {
     update,
     remove,
     uploadFile,
+    uploadFiles,
     getAllByAccount,
   }
 })

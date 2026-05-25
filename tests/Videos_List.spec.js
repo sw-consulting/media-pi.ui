@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref, nextTick } from 'vue'
 import VideosList from '@/components/Videos_List.vue'
 
-/* global File */
+/* global File, AbortSignal */
 
 let currentUser
 
@@ -29,6 +29,7 @@ const videosStore = {
   getAllByAccount: vi.fn(async () => videosStore.videos.value),
   update: vi.fn(async () => ({})),
   uploadFile: vi.fn(async () => ({})),
+  uploadFiles: vi.fn(async () => ({})),
   remove: vi.fn(async () => ({}))
 }
 
@@ -79,8 +80,19 @@ const globalStubs = {
     `
   },
   'v-text-field': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' },
-  'v-progress-linear': { template: '<div />' },
-  'v-progress-circular': { template: '<div />' },
+  'v-progress-linear': {
+    props: ['modelValue', 'indeterminate'],
+    template: `<div class="progress-linear" :data-model-value="modelValue" :data-indeterminate="indeterminate ? 'true' : 'false'" />`
+  },
+  'v-progress-circular': {
+    props: ['modelValue', 'indeterminate'],
+    template: `<div class="progress-circular" :data-model-value="modelValue" :data-indeterminate="indeterminate ? 'true' : 'false'"><slot /></div>`
+  },
+  'v-btn': {
+    props: ['color', 'variant'],
+    emits: ['click'],
+    template: `<button :data-color="color" :data-variant="variant" @click="$emit('click')"><slot /></button>`
+  },
   'v-alert': { template: '<div />' }
 }
 
@@ -90,6 +102,15 @@ describe('Videos_List.vue', () => {
     accountsStore.accounts.value = []
     videosStore.videos.value = []
     currentUser = { roles: [1], accountIds: [] }
+    accountsStore.getAll.mockImplementation(async () => accountsStore.accounts.value)
+    videosStore.getAllByAccount.mockImplementation(async () => videosStore.videos.value)
+    videosStore.update.mockImplementation(async () => ({}))
+    videosStore.uploadFile.mockImplementation(async () => ({}))
+    videosStore.uploadFiles.mockImplementation(async () => ({}))
+    videosStore.remove.mockImplementation(async () => ({}))
+    alertStore.error.mockImplementation((message) => { alertStore.alert.value = { message } })
+    alertStore.clear.mockImplementation(() => {})
+    confirmation.confirmDelete.mockImplementation(async () => true)
   })
 
   it('loads videos for default and changed account selection', async () => {
@@ -111,8 +132,8 @@ describe('Videos_List.vue', () => {
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
-    await wrapper.vm.uploadVideo(file)
-    expect(videosStore.uploadFile).not.toHaveBeenCalled()
+    await wrapper.vm.uploadVideos([file])
+    expect(videosStore.uploadFiles).not.toHaveBeenCalled()
   })
 
   it('uploads file when user has permissions', async () => {
@@ -120,8 +141,130 @@ describe('Videos_List.vue', () => {
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
-    await wrapper.vm.uploadVideo(file)
-    expect(videosStore.uploadFile).toHaveBeenCalledWith(file, 0, 'test.mp4')
+    await wrapper.vm.uploadVideos([file])
+    expect(videosStore.uploadFiles).toHaveBeenCalledWith(
+      [file],
+      0,
+      {
+        onUploadProgress: expect.any(Function),
+        signal: expect.any(AbortSignal)
+      }
+    )
+  })
+
+  it('uploads multiple selected files when user has permissions', async () => {
+    currentUser = { roles: [1], accountIds: [] }
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const file1 = new File(['x'], 'first.mp4', { type: 'video/mp4' })
+    const file2 = new File(['y'], 'second.mp4', { type: 'video/mp4' })
+
+    await wrapper.vm.onFileChange({ target: { files: [file1, file2] } })
+
+    expect(videosStore.uploadFiles).toHaveBeenCalledWith(
+      [file1, file2],
+      0,
+      {
+        onUploadProgress: expect.any(Function),
+        signal: expect.any(AbortSignal)
+      }
+    )
+  })
+
+  it('shows total upload progress and disables actions while upload is pending', async () => {
+    videosStore.videos.value = [{ id: 1, title: 'Clip', accountId: 0 }]
+    let resolveUpload
+    let onUploadProgress
+    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+      onUploadProgress = options.onUploadProgress
+      return new Promise(resolve => {
+        resolveUpload = resolve
+      })
+    })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const callsBeforeUpload = videosStore.getAllByAccount.mock.calls.length
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    const uploadPromise = wrapper.vm.uploadVideos([file])
+    await nextTick()
+
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов')
+    expect(wrapper.find('[data-test="upload-progress-text"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="upload-video-button"]').element.disabled).toBe(true)
+    expect(wrapper.find('select').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="edit-video-button"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="delete-video-button"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="cancel-upload-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="cancel-upload-button"]').attributes('data-color')).toBe('orange-darken-3')
+    expect(wrapper.find('[data-test="cancel-upload-button"]').attributes('data-variant')).toBe('text')
+
+    onUploadProgress({ lengthComputable: false, loaded: 10, total: null, percentage: null })
+    await nextTick()
+
+    let progressSpinner = wrapper.find('[data-test="upload-progress-spinner"]')
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов')
+    expect(wrapper.find('[data-test="upload-progress-text"]').exists()).toBe(false)
+    expect(progressSpinner.attributes('data-indeterminate')).toBe('true')
+
+    onUploadProgress({ lengthComputable: true, loaded: 42, total: 100, percentage: 42 })
+    await nextTick()
+
+    progressSpinner = wrapper.find('[data-test="upload-progress-spinner"]')
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов')
+    expect(wrapper.find('[data-test="upload-progress-text"]').exists()).toBe(false)
+    expect(progressSpinner.text()).toBe('42%')
+    expect(progressSpinner.attributes('data-model-value')).toBe('42')
+    expect(progressSpinner.attributes('data-indeterminate')).toBe('false')
+
+    resolveUpload({})
+    await uploadPromise
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
+    expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload + 1)
+  })
+
+  it('cancels an in-progress upload without refreshing or showing an error', async () => {
+    let rejectUpload
+    let uploadSignal
+    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+      uploadSignal = options.signal
+      return new Promise((_resolve, reject) => {
+        rejectUpload = reject
+        options.signal.addEventListener('abort', () => {
+          const error = new Error('Загрузка отменена')
+          error.name = 'AbortError'
+          reject(error)
+        })
+      })
+    })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const callsBeforeUpload = videosStore.getAllByAccount.mock.calls.length
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    const uploadPromise = wrapper.vm.uploadVideos([file])
+    await nextTick()
+
+    await wrapper.find('[data-test="cancel-upload-button"]').trigger('click')
+    await uploadPromise
+    await flushPromises()
+
+    expect(uploadSignal.aborted).toBe(true)
+    expect(rejectUpload).toEqual(expect.any(Function))
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
+    expect(alertStore.error).not.toHaveBeenCalled()
+    expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload)
+  })
+
+  it('allows selecting multiple files in the hidden file input', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    expect(wrapper.find('input[type="file"]').attributes('multiple')).toBeDefined()
   })
 
   it('deletes video after confirmation for administrator', async () => {

@@ -100,7 +100,9 @@ function request(method) {
            response = await fetch(url, requestOptions);
         } catch (error) {
             // Handle network-level errors with user-friendly messages
-            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            if (error.name === 'AbortError') {
+                throw createAbortError();
+            } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
                 throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
             } else {
                 throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
@@ -154,12 +156,20 @@ function request(method) {
  * await uploadRequest('/api/upload', formData)
  */
 function requestFile(method) {
-    return async (url, body) => {
+    return async (url, body, options = {}) => {
+        if (typeof options?.onUploadProgress === 'function') {
+            return requestFileWithProgress(method, url, body, options)
+        }
+
         // Prepare request with authentication but no content-type header
         const requestOptions = {
             method,
             headers: authHeader(url)
         };
+
+        if (options?.signal) {
+            requestOptions.signal = options.signal
+        }
 
         // Add body (typically FormData) without serialization
         if (body) {
@@ -175,7 +185,9 @@ function requestFile(method) {
           response = await fetch(url, requestOptions);
         } catch (error) {
             // Handle network errors with user-friendly messages
-            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            if (error.name === 'AbortError') {
+                throw createAbortError();
+            } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
                 throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
             } else {
                 throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
@@ -201,6 +213,113 @@ function requestFile(method) {
 
         return handleResponse(response);
     };
+}
+
+function requestFileWithProgress(method, url, body, options) {
+  return new Promise((resolve, reject) => {
+    const xhr = new window.XMLHttpRequest()
+    let settled = false
+
+    const onAbortSignal = () => {
+      xhr.abort()
+    }
+
+    const cleanup = () => {
+      if (options.signal) {
+        options.signal.removeEventListener('abort', onAbortSignal)
+      }
+    }
+
+    const resolveOnce = (value) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(value)
+    }
+
+    const rejectOnce = (error) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(error)
+    }
+
+    if (options.signal?.aborted) {
+      rejectOnce(createAbortError())
+      return
+    }
+
+    xhr.open(method, url)
+
+    const headers = authHeader(url)
+    Object.entries(headers).forEach(([key, value]) => {
+      xhr.setRequestHeader(key, value)
+    })
+
+    if (options.signal) {
+      options.signal.addEventListener('abort', onAbortSignal, { once: true })
+    }
+
+    xhr.upload.onprogress = (event) => {
+      const lengthComputable = Boolean(event.lengthComputable)
+      const total = lengthComputable ? event.total : null
+      const percentage = lengthComputable && event.total > 0
+        ? Math.round((event.loaded / event.total) * 100)
+        : null
+
+      options.onUploadProgress({
+        loaded: event.loaded,
+        total,
+        percentage,
+        lengthComputable
+      })
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolveOnce(handleResponseText(xhr.status, xhr.responseText, xhr.statusText))
+        return
+      }
+
+      rejectOnce(createHttpError(xhr.status, xhr.responseText))
+    }
+
+    xhr.onerror = () => {
+      rejectOnce(new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.'))
+    }
+
+    xhr.ontimeout = () => {
+      rejectOnce(new Error('Произошла непредвиденная ошибка при обращении к серверу: timeout'))
+    }
+
+    xhr.onabort = () => {
+      rejectOnce(createAbortError())
+    }
+
+    xhr.send(body)
+  })
+}
+
+function createAbortError() {
+  const error = new Error('Загрузка отменена')
+  error.name = 'AbortError'
+  return error
+}
+
+function createHttpError(status, errorText) {
+  let errorMessage
+  let errorObj
+  try {
+    errorObj = JSON.parse(errorText)
+    errorMessage = errorObj.msg || `Ошибка ${status}`
+  } catch {
+    errorMessage = errorText || `Ошибка ${status}`
+  }
+
+  const error = new Error(errorMessage)
+  error.status = status
+  if (errorObj) error.data = errorObj
+  return error
 }
 
 /**
@@ -271,7 +390,9 @@ function requestBlob(method) {
            response = await fetch(url, requestOptions);
         } catch (error) {
             // Handle network errors with user-friendly messages
-            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            if (error.name === 'AbortError') {
+                throw createAbortError();
+            } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
                 throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
             } else {
                 throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
@@ -371,42 +492,46 @@ async function downloadFile(fileUrl, defaultFilename) {
  * const data = await handleResponse(response)  // Returns parsed JSON
  */
 function handleResponse(response) {
+  return response.text().then((text) => {
+    return handleResponseText(response.status, text, response.statusText, response.ok)
+  })
+}
+
+function handleResponseText(status, text, statusText = '', ok = true) {
   // Handle empty success responses
-  if (response.status == 204) {
+  if (status == 204) {
     return Promise.resolve()
   }
 
   // Process text response and attempt JSON parsing
-  return response.text().then((text) => {
-    try {
-      const data = JSON.parse(text)
+  try {
+    const data = JSON.parse(text)
 
-      // Log response details if debugging is enabled
-      if (enableLog) {
-        console.log(response.status, response.statusText, data)
-      }
-
-      // Handle error responses that weren't caught earlier
-      if (!response.ok) {
-        const { user, logout } = useAuthStore()
-
-        // Handle authentication failures
-        if ([401].includes(response.status)) {
-          // Auto logout if 401 Unauthorized response returned from api
-          if (user) {
-            logout()
-          }
-        }
-
-        // Extract error message from response or use generic message
-        const error = (data && data.msg) || response.statusText
-        return Promise.reject(error)
-      }
-
-      return data
-    } catch {
-      // Handle non-JSON responses by returning raw text as error
-      return Promise.reject(text)
+    // Log response details if debugging is enabled
+    if (enableLog) {
+      console.log(status, statusText, data)
     }
-  })
+
+    // Handle error responses that weren't caught earlier
+    if (!ok) {
+      const { user, logout } = useAuthStore()
+
+      // Handle authentication failures
+      if ([401].includes(status)) {
+        // Auto logout if 401 Unauthorized response returned from api
+        if (user) {
+          logout()
+        }
+      }
+
+      // Extract error message from response or use generic message
+      const error = (data && data.msg) || statusText
+      return Promise.reject(error)
+    }
+
+    return data
+  } catch {
+    // Handle non-JSON responses by returning raw text as error
+    return Promise.reject(text)
+  }
 }
