@@ -15,7 +15,7 @@ vi.mock('@/helpers/fetch.wrapper.js', () => ({
   }
 }))
 
-/* global Blob, File */
+/* global Blob, File, AbortController */
 
 const mockVideos = [
   { id: 1, name: 'Video A' },
@@ -159,13 +159,14 @@ describe('videos.store', () => {
     const store = useVideosStore()
     const file = new File(['one'], 'one.mp4', { type: 'video/mp4' })
     const onUploadProgress = vi.fn()
+    const abortController = new AbortController()
 
-    await store.uploadFiles([file], 7, { onUploadProgress })
+    await store.uploadFiles([file], 7, { onUploadProgress, signal: abortController.signal })
 
     expect(fetchWrapper.postFile).toHaveBeenCalledWith(
       expect.stringContaining('/videos/upload/batch'),
       expect.any(Object),
-      { onUploadProgress }
+      { onUploadProgress, signal: abortController.signal }
     )
   })
 

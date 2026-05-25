@@ -100,7 +100,9 @@ function request(method) {
            response = await fetch(url, requestOptions);
         } catch (error) {
             // Handle network-level errors with user-friendly messages
-            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            if (error.name === 'AbortError') {
+                throw createAbortError();
+            } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
                 throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
             } else {
                 throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
@@ -156,7 +158,7 @@ function request(method) {
 function requestFile(method) {
     return async (url, body, options = {}) => {
         if (typeof options?.onUploadProgress === 'function') {
-            return requestFileWithProgress(method, url, body, options.onUploadProgress)
+            return requestFileWithProgress(method, url, body, options)
         }
 
         // Prepare request with authentication but no content-type header
@@ -164,6 +166,10 @@ function requestFile(method) {
             method,
             headers: authHeader(url)
         };
+
+        if (options?.signal) {
+            requestOptions.signal = options.signal
+        }
 
         // Add body (typically FormData) without serialization
         if (body) {
@@ -179,7 +185,9 @@ function requestFile(method) {
           response = await fetch(url, requestOptions);
         } catch (error) {
             // Handle network errors with user-friendly messages
-            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            if (error.name === 'AbortError') {
+                throw createAbortError();
+            } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
                 throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
             } else {
                 throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
@@ -207,15 +215,50 @@ function requestFile(method) {
     };
 }
 
-function requestFileWithProgress(method, url, body, onUploadProgress) {
+function requestFileWithProgress(method, url, body, options) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
+    let settled = false
+
+    const onAbortSignal = () => {
+      xhr.abort()
+    }
+
+    const cleanup = () => {
+      if (options.signal) {
+        options.signal.removeEventListener('abort', onAbortSignal)
+      }
+    }
+
+    const resolveOnce = (value) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(value)
+    }
+
+    const rejectOnce = (error) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(error)
+    }
+
+    if (options.signal?.aborted) {
+      rejectOnce(createAbortError())
+      return
+    }
+
     xhr.open(method, url)
 
     const headers = authHeader(url)
     Object.entries(headers).forEach(([key, value]) => {
       xhr.setRequestHeader(key, value)
     })
+
+    if (options.signal) {
+      options.signal.addEventListener('abort', onAbortSignal, { once: true })
+    }
 
     xhr.upload.onprogress = (event) => {
       const lengthComputable = Boolean(event.lengthComputable)
@@ -224,7 +267,7 @@ function requestFileWithProgress(method, url, body, onUploadProgress) {
         ? Math.round((event.loaded / event.total) * 100)
         : null
 
-      onUploadProgress({
+      options.onUploadProgress({
         loaded: event.loaded,
         total,
         percentage,
@@ -234,23 +277,33 @@ function requestFileWithProgress(method, url, body, onUploadProgress) {
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(handleResponseText(xhr.status, xhr.responseText, xhr.statusText))
+        resolveOnce(handleResponseText(xhr.status, xhr.responseText, xhr.statusText))
         return
       }
 
-      reject(createHttpError(xhr.status, xhr.responseText))
+      rejectOnce(createHttpError(xhr.status, xhr.responseText))
     }
 
     xhr.onerror = () => {
-      reject(new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.'))
+      rejectOnce(new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.'))
     }
 
     xhr.ontimeout = () => {
-      reject(new Error('Произошла непредвиденная ошибка при обращении к серверу: timeout'))
+      rejectOnce(new Error('Произошла непредвиденная ошибка при обращении к серверу: timeout'))
+    }
+
+    xhr.onabort = () => {
+      rejectOnce(createAbortError())
     }
 
     xhr.send(body)
   })
+}
+
+function createAbortError() {
+  const error = new Error('Загрузка отменена')
+  error.name = 'AbortError'
+  return error
 }
 
 function createHttpError(status, errorText) {
@@ -337,7 +390,9 @@ function requestBlob(method) {
            response = await fetch(url, requestOptions);
         } catch (error) {
             // Handle network errors with user-friendly messages
-            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            if (error.name === 'AbortError') {
+                throw createAbortError();
+            } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
                 throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
             } else {
                 throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );

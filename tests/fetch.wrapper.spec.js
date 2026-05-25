@@ -1,7 +1,7 @@
 // Copyright (c) 2025 sw.consulting
 // This file is a part of Media Pi  frontend application
 
-/* global FormData, Blob */
+/* global FormData, Blob, AbortController */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
@@ -268,6 +268,34 @@ describe('fetchWrapper', () => {
     xhr.onerror()
 
     await expect(request).rejects.toThrow('Не удалось соединиться')
+  })
+
+  it('aborts postFile with progress when signal is cancelled', async () => {
+    const formData = new FormData()
+    const abortController = new AbortController()
+    const xhr = {
+      upload: {},
+      open: vi.fn(),
+      setRequestHeader: vi.fn(),
+      abort: vi.fn(function () {
+        this.onabort()
+      }),
+      send: vi.fn()
+    }
+    global.XMLHttpRequest = vi.fn(() => xhr)
+
+    const request = fetchWrapper.postFile(`${baseUrl}/upload`, formData, {
+      onUploadProgress: vi.fn(),
+      signal: abortController.signal
+    })
+
+    abortController.abort()
+
+    await expect(request).rejects.toMatchObject({
+      name: 'AbortError',
+      message: 'Загрузка отменена'
+    })
+    expect(xhr.abort).toHaveBeenCalled()
   })
 
   it('handles HTTP error in postFile with progress', async () => {

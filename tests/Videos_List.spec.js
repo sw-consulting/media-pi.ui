@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref, nextTick } from 'vue'
 import VideosList from '@/components/Videos_List.vue'
 
-/* global File */
+/* global File, AbortSignal */
 
 let currentUser
 
@@ -84,7 +84,15 @@ const globalStubs = {
     props: ['modelValue', 'indeterminate'],
     template: `<div class="progress-linear" :data-model-value="modelValue" :data-indeterminate="indeterminate ? 'true' : 'false'" />`
   },
-  'v-progress-circular': { template: '<div />' },
+  'v-progress-circular': {
+    props: ['modelValue', 'indeterminate'],
+    template: `<div class="progress-circular" :data-model-value="modelValue" :data-indeterminate="indeterminate ? 'true' : 'false'"><slot /></div>`
+  },
+  'v-btn': {
+    props: ['color', 'variant'],
+    emits: ['click'],
+    template: `<button :data-color="color" :data-variant="variant" @click="$emit('click')"><slot /></button>`
+  },
   'v-alert': { template: '<div />' }
 }
 
@@ -137,7 +145,10 @@ describe('Videos_List.vue', () => {
     expect(videosStore.uploadFiles).toHaveBeenCalledWith(
       [file],
       0,
-      { onUploadProgress: expect.any(Function) }
+      {
+        onUploadProgress: expect.any(Function),
+        signal: expect.any(AbortSignal)
+      }
     )
   })
 
@@ -153,7 +164,10 @@ describe('Videos_List.vue', () => {
     expect(videosStore.uploadFiles).toHaveBeenCalledWith(
       [file1, file2],
       0,
-      { onUploadProgress: expect.any(Function) }
+      {
+        onUploadProgress: expect.any(Function),
+        signal: expect.any(AbortSignal)
+      }
     )
   })
 
@@ -177,26 +191,33 @@ describe('Videos_List.vue', () => {
     await nextTick()
 
     expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов...')
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов')
+    expect(wrapper.find('[data-test="upload-progress-text"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="upload-video-button"]').element.disabled).toBe(true)
     expect(wrapper.find('select').element.disabled).toBe(true)
     expect(wrapper.find('[data-test="edit-video-button"]').element.disabled).toBe(true)
     expect(wrapper.find('[data-test="delete-video-button"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="cancel-upload-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="cancel-upload-button"]').attributes('data-color')).toBe('orange-darken-3')
+    expect(wrapper.find('[data-test="cancel-upload-button"]').attributes('data-variant')).toBe('text')
 
     onUploadProgress({ lengthComputable: false, loaded: 10, total: null, percentage: null })
     await nextTick()
 
-    let progressBar = wrapper.find('[data-test="upload-progress-bar"]')
-    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов...')
-    expect(progressBar.attributes('data-indeterminate')).toBe('true')
+    let progressSpinner = wrapper.find('[data-test="upload-progress-spinner"]')
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов')
+    expect(wrapper.find('[data-test="upload-progress-text"]').exists()).toBe(false)
+    expect(progressSpinner.attributes('data-indeterminate')).toBe('true')
 
     onUploadProgress({ lengthComputable: true, loaded: 42, total: 100, percentage: 42 })
     await nextTick()
 
-    progressBar = wrapper.find('[data-test="upload-progress-bar"]')
-    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов: 42%')
-    expect(progressBar.attributes('data-model-value')).toBe('42')
-    expect(progressBar.attributes('data-indeterminate')).toBe('false')
+    progressSpinner = wrapper.find('[data-test="upload-progress-spinner"]')
+    expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов')
+    expect(wrapper.find('[data-test="upload-progress-text"]').exists()).toBe(false)
+    expect(progressSpinner.text()).toBe('42%')
+    expect(progressSpinner.attributes('data-model-value')).toBe('42')
+    expect(progressSpinner.attributes('data-indeterminate')).toBe('false')
 
     resolveUpload({})
     await uploadPromise
@@ -204,6 +225,40 @@ describe('Videos_List.vue', () => {
 
     expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
     expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload + 1)
+  })
+
+  it('cancels an in-progress upload without refreshing or showing an error', async () => {
+    let rejectUpload
+    let uploadSignal
+    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+      uploadSignal = options.signal
+      return new Promise((_resolve, reject) => {
+        rejectUpload = reject
+        options.signal.addEventListener('abort', () => {
+          const error = new Error('Загрузка отменена')
+          error.name = 'AbortError'
+          reject(error)
+        })
+      })
+    })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const callsBeforeUpload = videosStore.getAllByAccount.mock.calls.length
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    const uploadPromise = wrapper.vm.uploadVideos([file])
+    await nextTick()
+
+    await wrapper.find('[data-test="cancel-upload-button"]').trigger('click')
+    await uploadPromise
+    await flushPromises()
+
+    expect(uploadSignal.aborted).toBe(true)
+    expect(rejectUpload).toEqual(expect.any(Function))
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
+    expect(alertStore.error).not.toHaveBeenCalled()
+    expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload)
   })
 
   it('allows selecting multiple files in the hidden file input', async () => {

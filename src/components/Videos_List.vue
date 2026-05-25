@@ -35,14 +35,11 @@ const titleSaving = ref(false)
 const isUploading = ref(false)
 const uploadProgressPercent = ref(0)
 const uploadProgressIndeterminate = ref(true)
+const uploadAbortController = ref(null)
 
 const accountOptions = computed(() => createAccountOptions(accounts.value || [], authStore.user, { includeCommon: true }))
 
-const uploadProgressLabel = computed(() => {
-  if (!isUploading.value) return ''
-  if (uploadProgressIndeterminate.value) return 'Загрузка видеофайлов...'
-  return `Загрузка видеофайлов: ${uploadProgressPercent.value}%`
-})
+const uploadProgressTitle = computed(() => isUploading.value ? 'Загрузка видеофайлов' : '')
 
 const headers = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
@@ -76,6 +73,14 @@ function handleUploadProgress(progress) {
 
   uploadProgressIndeterminate.value = false
   uploadProgressPercent.value = Math.min(100, Math.max(0, progress.percentage))
+}
+
+function cancelUpload() {
+  uploadAbortController.value?.abort()
+}
+
+function isAbortError(err) {
+  return err?.name === 'AbortError'
 }
 
 function ensureSelection(options) {
@@ -123,15 +128,21 @@ async function uploadVideos(files) {
   }
   resetUploadProgress()
   isUploading.value = true
+  const abortController = new AbortController()
+  uploadAbortController.value = abortController
   try {
     await videosStore.uploadFiles(selectedFiles, selectedAccountId.value, {
-      onUploadProgress: handleUploadProgress
+      onUploadProgress: handleUploadProgress,
+      signal: abortController.signal
     })
     await refreshVideos()
   } catch (err) {
-    alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+    if (!isAbortError(err)) {
+      alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+    }
   } finally {
     isUploading.value = false
+    uploadAbortController.value = null
     resetUploadProgress()
   }
 }
@@ -269,18 +280,35 @@ watch(videos, (current) => {
         </div>
       </div>
     </div>
-    <div v-if="isUploading" class="upload-progress" data-test="upload-progress">
-      <div class="upload-progress-label" data-test="upload-progress-label">
-        {{ uploadProgressLabel }}
+    <div v-if="isUploading" class="upload-progress-overlay" role="dialog" aria-modal="true" data-test="upload-progress">
+      <div class="upload-progress-card">
+        <div class="primary-heading upload-progress-title" data-test="upload-progress-label">
+          {{ uploadProgressTitle }}
+        </div>
+        <div class="upload-progress-spinner-wrap">
+          <v-progress-circular
+            data-test="upload-progress-spinner"
+            :model-value="uploadProgressPercent"
+            :indeterminate="uploadProgressIndeterminate"
+            :size="70"
+            :width="7"
+            color="primary"
+          >
+            <span v-if="!uploadProgressIndeterminate" class="upload-progress-percent">
+              {{ uploadProgressPercent }}%
+            </span>
+          </v-progress-circular>
+        </div>
+        <v-btn
+          data-test="cancel-upload-button"
+          color="orange-darken-3"
+          variant="text"
+          class="upload-cancel-button"
+          @click="cancelUpload"
+        >
+          Отменить
+        </v-btn>
       </div>
-      <v-progress-linear
-        data-test="upload-progress-bar"
-        color="primary"
-        height="6"
-        rounded
-        :indeterminate="uploadProgressIndeterminate"
-        :model-value="uploadProgressPercent"
-      />
     </div>
     <hr class="hr" />
 
@@ -416,13 +444,41 @@ watch(videos, (current) => {
   background-color: #fff;
 }
 
-.upload-progress {
-  margin-top: 12px;
+.upload-progress-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 2000;
 }
 
-.upload-progress-label {
-  margin-bottom: 6px;
-  color: #555;
+.upload-progress-card {
+  background: #fff;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  min-width: 260px;
+  max-width: 90%;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+}
+
+.upload-progress-title {
+  margin-bottom: 0.5rem;
+}
+
+.upload-progress-spinner-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.upload-progress-percent {
+  color: #1976d2;
   font-size: 0.875rem;
+}
+
+.upload-cancel-button {
+  margin: 0.75rem 0 0;
 }
 </style>

@@ -96,9 +96,15 @@ export const useVideosStore = defineStore('videos', () => {
   }
 
   const buildUploadOptions = (options = {}) => {
-    return typeof options.onUploadProgress === 'function'
-      ? { onUploadProgress: options.onUploadProgress }
-      : null
+    const uploadOptions = {}
+    if (typeof options.onUploadProgress === 'function') {
+      uploadOptions.onUploadProgress = options.onUploadProgress
+    }
+    if (options.signal) {
+      uploadOptions.signal = options.signal
+    }
+
+    return Object.keys(uploadOptions).length ? uploadOptions : null
   }
 
   const postUploadFile = (url, formData, options) => {
