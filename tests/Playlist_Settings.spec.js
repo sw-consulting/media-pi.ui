@@ -1239,4 +1239,59 @@ describe('Playlist_Settings.vue', () => {
     // The form stub exposes errors.title = 'Required', which triggers the v-if="errors.title" block
     expect(wrapper.text()).toContain('Required')
   })
+
+  it('search filter handles null video fields gracefully', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [{ id: 63, title: null, originalFilename: null, fileSizeBytes: 100, durationSeconds: 5, accountId: 1 }]
+    })
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    // Trigger the filter path with a query — null fields are handled by (field || '')
+    await wrapper.find('[data-test="video-search-input"]').setValue('nomatch')
+    await flushPromises()
+
+    expect(getAvailableTable(wrapper).find('[data-test="table-empty"]').exists()).toBe(true)
+  })
+
+  it('checkFilenameUnique handles null result from playlistsStore.getAllByAccount', async () => {
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue(null)
+
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    // null from getAllByAccount falls back to [], so filename is unique → create proceeds
+    expect(playlistsStore.create).toHaveBeenCalled()
+  })
+
+  it('available video with title but no originalFilename shows no subtitle', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [{ id: 82, title: 'Has Title', originalFilename: null, fileSizeBytes: 400, durationSeconds: 25, accountId: 1 }]
+    })
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableTable = getAvailableTable(wrapper)
+    expect(availableTable.text()).toContain('Has Title')
+    // null originalFilename → condition short-circuits → no subtitle rendered
+    expect(availableTable.findAll('.playlist-video-sub')).toHaveLength(0)
+  })
+
+  it('onSubmit falls through accountId chain when values.accountId is null', async () => {
+    // Mount without accountId prop so playlist.value.accountId = null
+    const wrapper = mountSettings({ submitValues: { title: 'Null Account' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(playlistsStore.create).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: null })
+    )
+  })
 })
