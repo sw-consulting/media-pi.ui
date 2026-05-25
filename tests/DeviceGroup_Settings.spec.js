@@ -83,7 +83,7 @@ const mountSettings = (props = {}) => mount({
     stubs: {
       'v-card': { template: '<div><slot /></div>' },
       'v-data-table': {
-        props: ['items'],
+        props: ['items', 'noDataText'],
         template: `
           <div class="data-table">
             <div v-for="item in items" :key="item.id" class="data-table-row">
@@ -92,6 +92,7 @@ const mountSettings = (props = {}) => mount({
               <slot name="item.totalFileSizeBytes" :item="item" />
               <slot name="item.totalDurationSeconds" :item="item" />
             </div>
+            <div v-if="!items.length" data-test="playlists-empty-state">{{ noDataText }}</div>
           </div>
         `
       },
@@ -494,6 +495,15 @@ describe('DeviceGroup_Settings.vue', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Сохранить')
+  })
+
+  it('shows a single empty playlist message when no playlists are available', async () => {
+    const wrapper = mountSettings({ register: true, accountId: 5 })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlists-empty-state"]').text()).toBe('Нет плейлистов')
+    expect(wrapper.text()).not.toContain('No data available')
+    expect(wrapper.text().match(/Нет плейлистов/g)).toHaveLength(1)
   })
 
   it('shows component in edit mode for existing group', async () => {

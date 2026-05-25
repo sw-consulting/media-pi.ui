@@ -60,6 +60,8 @@ const playlistHeaders = computed(() => ([
   { title: 'Файлов', align: 'center', key: 'videoCount', width: '12%' }
 ]))
 
+const playlistsEmptyText = computed(() => playlistsLoading.value ? 'Загрузка...' : 'Нет плейлистов')
+
 if (!isRegister()) {
   initialLoading.value = true
   try {
@@ -220,6 +222,7 @@ async function onSubmit (values) {
           class="elevation-1"
           v-model:items-per-page="itemsPerPage"
           items-per-page-text="Плейлистов на странице"
+          :no-data-text="playlistsEmptyText"
           :items-per-page-options="itemsPerPageOptions"
           page-text="{0}-{1} из {2}"
           v-model:page="page"
@@ -262,9 +265,6 @@ async function onSubmit (values) {
             {{ formatDuration(item.totalDurationSeconds) }}
           </template>
         </v-data-table>
-        <div v-if="!playlists?.length" class="text-center m-5">
-          {{ playlistsLoading ? 'Загрузка...' : 'Нет плейлистов' }}
-        </div>
       </v-card>
       <div v-if="playlistsError" class="text-center m-5">
         <div class="text-danger">Ошибка при загрузке списка плейлистов: {{ playlistsError }}</div>
