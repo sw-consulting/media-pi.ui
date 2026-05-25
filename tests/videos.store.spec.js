@@ -106,16 +106,15 @@ describe('videos.store', () => {
     expect(fetchWrapper.get).toHaveBeenCalled()
   })
 
-  it('removeBatch posts selected ids and refreshes list', async () => {
+  it('removeBatch posts selected ids and leaves scoped refresh to the caller', async () => {
     const response = { requestedCount: 2, deletedIds: [1, 2], failures: [] }
     fetchWrapper.post.mockResolvedValueOnce(response)
-    fetchWrapper.get.mockResolvedValueOnce(mockVideos)
 
     const store = useVideosStore()
     const result = await store.removeBatch([1, 2])
 
     expect(fetchWrapper.post).toHaveBeenCalledWith(expect.stringContaining('/videos/delete/batch'), { ids: [1, 2] })
-    expect(fetchWrapper.get).toHaveBeenCalled()
+    expect(fetchWrapper.get).not.toHaveBeenCalled()
     expect(result).toEqual(response)
   })
 

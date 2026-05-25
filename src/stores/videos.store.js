@@ -102,7 +102,6 @@ export const useVideosStore = defineStore('videos', () => {
         if (!selectedIds.length) throw new Error('Не выбраны видеофайлы')
 
         const result = await fetchWrapper.post(`${baseUrl}/delete/batch`, { ids: selectedIds })
-        await getAll()
         return result
       }
     )

@@ -388,6 +388,29 @@ describe('Videos_List.vue', () => {
     expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось найти видеофайл [id=19]'))
   })
 
+  it('does not hide batch delete refresh failures with a delete summary', async () => {
+    videosStore.videos.value = [
+      { id: 20, title: 'First', accountId: 0 },
+      { id: 21, title: 'Second', accountId: 0 }
+    ]
+    videosStore.removeBatch.mockResolvedValueOnce({ requestedCount: 2, deletedIds: [20, 21], failures: [] })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    alertStore.success.mockClear()
+    alertStore.error.mockClear()
+    videosStore.getAllByAccount.mockRejectedValueOnce(new Error('refresh failed'))
+
+    wrapper.vm.selectedVideoIds = [20, 21]
+    await wrapper.vm.deleteSelectedVideos()
+    await flushPromises()
+
+    expect(videosStore.removeBatch).toHaveBeenCalledWith([20, 21])
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось загрузить информацию о видеофайлах: refresh failed')
+    expect(alertStore.success).not.toHaveBeenCalled()
+    expect(alertStore.error).not.toHaveBeenCalledWith('Удалено видеофайлов: 2')
+  })
+
   it('edits video title inline and saves on Enter', async () => {
     videosStore.videos.value = [{ id: 1, title: 'Old', accountId: null }]
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })

@@ -96,8 +96,10 @@ function ensureSelection(options) {
 const refreshVideos = async () => {
   try {
     await videosStore.getAllByAccount(selectedAccountId.value)
+    return true
   } catch (err) {
     alertStore.error('Не удалось загрузить информацию о видеофайлах: ' + (err?.message || err))
+    return false
   }
 }
 
@@ -261,8 +263,10 @@ async function deleteSelectedVideos() {
   try {
     const result = await videosStore.removeBatch(ids)
     selectedVideoIds.value = []
-    await refreshVideos()
-    summarizeBatchDeleteResult(result, ids.length)
+    const refreshed = await refreshVideos()
+    if (refreshed) {
+      summarizeBatchDeleteResult(result, ids.length)
+    }
   } catch (err) {
     alertStore.error('Не удалось удалить видеофайлы: ' + (err?.message || err))
   }
