@@ -95,6 +95,19 @@ export const useVideosStore = defineStore('videos', () => {
     )
   }
 
+  async function removeBatch(ids) {
+    return handleRequest(
+      async () => {
+        const selectedIds = Array.from(ids || [])
+        if (!selectedIds.length) throw new Error('Не выбраны видеофайлы')
+
+        const result = await fetchWrapper.post(`${baseUrl}/delete/batch`, { ids: selectedIds })
+        await getAll()
+        return result
+      }
+    )
+  }
+
   const buildUploadOptions = (options = {}) => {
     const uploadOptions = {}
     if (typeof options.onUploadProgress === 'function') {
@@ -172,6 +185,7 @@ export const useVideosStore = defineStore('videos', () => {
     getById,
     update,
     remove,
+    removeBatch,
     uploadFile,
     uploadFiles,
     getAllByAccount,

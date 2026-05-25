@@ -9,6 +9,7 @@ import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
 vi.mock('@/helpers/fetch.wrapper.js', () => ({
   fetchWrapper: {
     get: vi.fn(),
+    post: vi.fn(),
     put: vi.fn(),
     delete: vi.fn(),
     postFile: vi.fn()
@@ -103,6 +104,26 @@ describe('videos.store', () => {
 
     expect(fetchWrapper.delete).toHaveBeenCalledWith(expect.stringContaining('/videos/1'))
     expect(fetchWrapper.get).toHaveBeenCalled()
+  })
+
+  it('removeBatch posts selected ids and refreshes list', async () => {
+    const response = { requestedCount: 2, deletedIds: [1, 2], failures: [] }
+    fetchWrapper.post.mockResolvedValueOnce(response)
+    fetchWrapper.get.mockResolvedValueOnce(mockVideos)
+
+    const store = useVideosStore()
+    const result = await store.removeBatch([1, 2])
+
+    expect(fetchWrapper.post).toHaveBeenCalledWith(expect.stringContaining('/videos/delete/batch'), { ids: [1, 2] })
+    expect(fetchWrapper.get).toHaveBeenCalled()
+    expect(result).toEqual(response)
+  })
+
+  it('removeBatch throws when no ids are selected', async () => {
+    const store = useVideosStore()
+
+    await expect(store.removeBatch([])).rejects.toThrow('Не выбраны видеофайлы')
+    expect(fetchWrapper.post).not.toHaveBeenCalled()
   })
 
   it('uploadFile posts to /videos/upload with File, Title and AccountId (new signature)', async () => {
