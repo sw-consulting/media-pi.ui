@@ -321,10 +321,53 @@ describe('Device_Management.vue', () => {
       1,
       expect.objectContaining({
         audio: { output: 'hdmi' },
+        playlist: { source: '', destination: '' },
         screenshot: { intervalMinutes: 15 }
       })
     )
     expect(alertSuccess).toHaveBeenCalledWith('Все настройки сохранены')
+  })
+
+  it('preserves hidden playlist destination and audio output values from server configuration', async () => {
+    vi.useRealTimers()
+    getConfiguration.mockResolvedValueOnce({
+      playlist: { source: 'server-source', destination: '/srv/playlists' },
+      schedule: configurationResponse.schedule,
+      audio: { output: 'usb-dac' },
+      screenshot: { intervalMinutes: 20 }
+    })
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    wrapper.vm.scheduleFormRef.value = {
+      validate: vi.fn().mockResolvedValue({ valid: true }),
+      values: configurationResponse.schedule
+    }
+
+    await wrapper.vm.persistConfiguration({
+      errorPrefix: 'Не удалось сохранить настройки',
+      successMessage: 'Все настройки сохранены'
+    })
+    await flushPromises()
+
+    expect(wrapper.find('#playlist-destination').exists()).toBe(false)
+    expect(wrapper.find('#audio-output').exists()).toBe(false)
+    expect(updateConfiguration).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        playlist: { source: 'server-source', destination: '/srv/playlists' },
+        audio: { output: 'usb-dac' }
+      })
+    )
   })
 
   it('renders screenshot interval field in other settings', async () => {
@@ -342,7 +385,10 @@ describe('Device_Management.vue', () => {
     const labels = wrapper.findAll('.other-settings-grid .other-settings-label').map((label) => label.text())
     const screenshotInput = wrapper.find('#screenshot-interval-minutes')
 
-    expect(labels).toContain('Частота фотографий (мин)')
+    expect(labels).toContain('Период фотографирования (мин)')
+    expect(labels).not.toContain('Частота фотографий (мин)')
+    expect(wrapper.find('#playlist-destination').exists()).toBe(false)
+    expect(wrapper.find('#audio-output').exists()).toBe(false)
     expect(screenshotInput.exists()).toBe(true)
     expect(screenshotInput.element.value).toBe('15')
   })

@@ -66,7 +66,7 @@ const initialLoading = ref(false)
 const videosLoading = ref(false)
 
 const schema = Yup.object().shape({
-  title: Yup.string().trim().required('Необходимо указать название')
+  title: Yup.string().trim().required('Необходимо указать описание')
 })
 
 const videoAccountOptions = computed(() => createAccountOptions(accountsStore.accounts || [], authStore.user, { includeCommon: true }))
