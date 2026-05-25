@@ -78,7 +78,7 @@ function getUserRole() {
     <v-navigation-drawer v-model="drawer" elevation="4">
       <template v-slot:prepend>
         <div class="pa-2" v-if="height > 480">
-          <img alt="Media Pi" class="logo" src="@/assets/logo.svg" />
+          <img alt="ММБОКС" class="logo" src="@/assets/logo.svg" />
         </div>
       </template>
       <v-list v-if="authStore.user">
