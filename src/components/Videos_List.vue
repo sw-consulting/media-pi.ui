@@ -20,7 +20,7 @@ const videosStore = useVideosStore()
 const accountsStore = useAccountsStore()
 const authStore = useAuthStore()
 const alertStore = useAlertStore()
-const { confirmDelete } = useConfirmation()
+const { confirmDelete, confirmAction } = useConfirmation()
 
 const { videos, loading } = storeToRefs(videosStore)
 const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
@@ -36,6 +36,7 @@ const isUploading = ref(false)
 const uploadProgressPercent = ref(0)
 const uploadProgressIndeterminate = ref(true)
 const uploadAbortController = ref(null)
+const selectedVideoIds = ref([])
 
 const accountOptions = computed(() => createAccountOptions(accounts.value || [], authStore.user, { includeCommon: true }))
 
@@ -59,6 +60,8 @@ const canManageSelectedAccount = computed(() => {
 })
 
 const isBusy = computed(() => loading.value || accountsLoading.value || isUploading.value)
+const selectedVideoCount = computed(() => selectedVideoIds.value.length)
+const canDeleteSelectedVideos = computed(() => canManageSelectedAccount.value && selectedVideoCount.value > 0 && !isBusy.value && !titleSaving.value)
 
 function resetUploadProgress() {
   uploadProgressPercent.value = 0
@@ -93,8 +96,10 @@ function ensureSelection(options) {
 const refreshVideos = async () => {
   try {
     await videosStore.getAllByAccount(selectedAccountId.value)
+    return true
   } catch (err) {
     alertStore.error('Не удалось загрузить информацию о видеофайлах: ' + (err?.message || err))
+    return false
   }
 }
 
@@ -102,6 +107,7 @@ watch(accountOptions, (options) => ensureSelection(options), { immediate: true }
 
 watch(selectedAccountId, async () => {
   if (selectedAccountId.value === undefined) return
+  selectedVideoIds.value = []
   await refreshVideos()
 }, { immediate: true })
 
@@ -222,6 +228,50 @@ async function deleteVideo(item) {
   }
 }
 
+function summarizeBatchDeleteResult(result, requestedCount) {
+  const failures = Array.isArray(result?.failures) ? result.failures : []
+  const deletedIds = Array.isArray(result?.deletedIds) ? result.deletedIds : []
+  const deletedCount = deletedIds.length
+
+  if (failures.length === 0) {
+    alertStore.success(`Удалено видеофайлов: ${deletedCount || requestedCount}`)
+    return
+  }
+
+  const failureDetails = failures
+    .slice(0, 3)
+    .map(failure => failure?.message || `id=${failure?.id}`)
+    .join('; ')
+  const remainingCount = failures.length > 3 ? `; ещё ${failures.length - 3}` : ''
+  alertStore.error(`Удалено видеофайлов: ${deletedCount}. Не удалось удалить: ${failures.length}. ${failureDetails}${remainingCount}`)
+}
+
+async function deleteSelectedVideos() {
+  const ids = [...selectedVideoIds.value]
+  if (!ids.length || !canManageSelectedAccount.value) return
+
+  const confirmed = await confirmAction(`Удалить выбранные видеофайлы (${ids.length})?`, {
+    title: 'Подтверждение удаления',
+    confirmationText: 'Удалить',
+    cancellationText: 'Отмена',
+    confirmationButtonProps: {
+      color: 'orange-darken-3'
+    }
+  })
+  if (!confirmed) return
+
+  try {
+    const result = await videosStore.removeBatch(ids)
+    selectedVideoIds.value = []
+    const refreshed = await refreshVideos()
+    if (refreshed) {
+      summarizeBatchDeleteResult(result, ids.length)
+    }
+  } catch (err) {
+    alertStore.error('Не удалось удалить видеофайлы: ' + (err?.message || err))
+  }
+}
+
 function filterVideos(value, query, item) {
   if (!query) return true
   const rawVideo = item?.raw
@@ -237,8 +287,11 @@ function filterVideos(value, query, item) {
 }
 
 watch(videos, (current) => {
+  const currentIds = new Set((current || []).map(video => video.id))
+  selectedVideoIds.value = selectedVideoIds.value.filter(id => currentIds.has(id))
+
   if (!editingVideoId.value) return
-  const exists = (current || []).some(video => video.id === editingVideoId.value)
+  const exists = currentIds.has(editingVideoId.value)
   if (!exists) {
     cancelEdit()
   }
@@ -276,6 +329,16 @@ watch(videos, (current) => {
               @click="triggerUpload"
             />
             <input ref="fileInput" class="d-none" type="file" accept="video/*" multiple @change="onFileChange" />
+          </div>
+          <div class="header-actions header-actions-group">
+            <ActionButton
+              data-test="batch-delete-video-button"
+              :item="{}"
+              icon="fa-solid fa-trash-can"
+              tooltip-text="Удалить выбранные видеофайлы"
+              :disabled="!canDeleteSelectedVideos"
+              @click="deleteSelectedVideos"
+            />
           </div>
         </div>
       </div>
@@ -336,11 +399,13 @@ watch(videos, (current) => {
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
         v-model:page="authStore.videos_page"
+        v-model="selectedVideoIds"
         :headers="headers"
         :items="videos"
         :search="authStore.videos_search"
         v-model:sort-by="authStore.videos_sort_by"
         :custom-filter="filterVideos"
+        :show-select="canManageSelectedAccount"
         item-value="id"
         class="elevation-1"
       >

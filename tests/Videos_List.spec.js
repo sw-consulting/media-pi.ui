@@ -30,16 +30,21 @@ const videosStore = {
   update: vi.fn(async () => ({})),
   uploadFile: vi.fn(async () => ({})),
   uploadFiles: vi.fn(async () => ({})),
-  remove: vi.fn(async () => ({}))
+  remove: vi.fn(async () => ({})),
+  removeBatch: vi.fn(async () => ({ requestedCount: 0, deletedIds: [], failures: [] }))
 }
 
 const alertStore = {
   alert: ref(null),
+  success: vi.fn((message) => { alertStore.alert.value = { message, type: 'alert-success' } }),
   error: vi.fn((message) => { alertStore.alert.value = { message } }),
   clear: vi.fn()
 }
 
-const confirmation = { confirmDelete: vi.fn(async () => true) }
+const confirmation = {
+  confirmDelete: vi.fn(async () => true),
+  confirmAction: vi.fn(async () => true)
+}
 
 vi.mock('@/stores/accounts.store.js', () => ({ useAccountsStore: () => accountsStore }))
 vi.mock('@/stores/videos.store.js', () => ({ useVideosStore: () => videosStore }))
@@ -69,10 +74,27 @@ const globalStubs = {
     template: '<select @change="emitValue"><option v-for="item in items" :key="item.value" :value="item.value">{{ item.title }}</option></select>'
   },
   'v-data-table': {
-    props: ['items'],
+    props: ['items', 'modelValue', 'showSelect'],
+    emits: ['update:modelValue'],
+    methods: {
+      toggleItem(id, checked) {
+        const selected = Array.isArray(this.modelValue) ? [...this.modelValue] : []
+        const next = checked
+          ? [...new Set([...selected, id])]
+          : selected.filter(value => value !== id)
+        this.$emit('update:modelValue', next)
+      }
+    },
     template: `
-      <div class="data-table">
+      <div class="data-table" :data-show-select="showSelect ? 'true' : 'false'">
         <div v-for="item in items" :key="item.id">
+          <input
+            v-if="showSelect"
+            data-test="video-row-select"
+            type="checkbox"
+            :checked="Array.isArray(modelValue) && modelValue.includes(item.id)"
+            @change="toggleItem(item.id, $event.target.checked)"
+          />
           <slot name="item.title" :item="item" />
           <slot name="item.actions" :item="item" />
         </div>
@@ -108,9 +130,12 @@ describe('Videos_List.vue', () => {
     videosStore.uploadFile.mockImplementation(async () => ({}))
     videosStore.uploadFiles.mockImplementation(async () => ({}))
     videosStore.remove.mockImplementation(async () => ({}))
+    videosStore.removeBatch.mockImplementation(async () => ({ requestedCount: 0, deletedIds: [], failures: [] }))
+    alertStore.success.mockImplementation((message) => { alertStore.alert.value = { message, type: 'alert-success' } })
     alertStore.error.mockImplementation((message) => { alertStore.alert.value = { message } })
     alertStore.clear.mockImplementation(() => {})
     confirmation.confirmDelete.mockImplementation(async () => true)
+    confirmation.confirmAction.mockImplementation(async () => true)
   })
 
   it('loads videos for default and changed account selection', async () => {
@@ -194,6 +219,7 @@ describe('Videos_List.vue', () => {
     expect(wrapper.find('[data-test="upload-progress-label"]').text()).toBe('Загрузка видеофайлов')
     expect(wrapper.find('[data-test="upload-progress-text"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="upload-video-button"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="batch-delete-video-button"]').element.disabled).toBe(true)
     expect(wrapper.find('select').element.disabled).toBe(true)
     expect(wrapper.find('[data-test="edit-video-button"]').element.disabled).toBe(true)
     expect(wrapper.find('[data-test="delete-video-button"]').element.disabled).toBe(true)
@@ -273,6 +299,116 @@ describe('Videos_List.vue', () => {
     await flushPromises()
     await wrapper.vm.deleteVideo(videosStore.videos.value[0])
     expect(videosStore.remove).toHaveBeenCalledWith(9)
+  })
+
+  it('enables table selection for a manageable current list', async () => {
+    currentUser = { roles: [], accountIds: [42] }
+    accountsStore.accounts.value = [{ id: 42, name: 'Account 42' }]
+    videosStore.videos.value = [
+      { id: 12, title: 'First', accountId: 42 },
+      { id: 13, title: 'Second', accountId: 42 }
+    ]
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.find('.data-table').attributes('data-show-select')).toBe('true')
+    expect(wrapper.find('[data-test="batch-delete-video-button"]').element.disabled).toBe(true)
+
+    await wrapper.find('[data-test="video-row-select"]').setValue(true)
+    await nextTick()
+
+    expect(wrapper.vm.selectedVideoIds).toEqual([12])
+    expect(wrapper.find('[data-test="batch-delete-video-button"]').element.disabled).toBe(false)
+  })
+
+  it('disables table selection for a non-manageable current list', async () => {
+    currentUser = { roles: [], accountIds: [42] }
+    videosStore.videos.value = [{ id: 14, title: 'Common', accountId: 0 }]
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.find('.data-table').attributes('data-show-select')).toBe('false')
+    expect(wrapper.find('[data-test="video-row-select"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="batch-delete-video-button"]').element.disabled).toBe(true)
+  })
+
+  it('deletes selected videos after confirmation', async () => {
+    videosStore.videos.value = [
+      { id: 15, title: 'First', accountId: 0 },
+      { id: 16, title: 'Second', accountId: 0 }
+    ]
+    videosStore.removeBatch.mockResolvedValueOnce({ requestedCount: 2, deletedIds: [15, 16], failures: [] })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    wrapper.vm.selectedVideoIds = [15, 16]
+    await wrapper.vm.deleteSelectedVideos()
+    await flushPromises()
+
+    expect(confirmation.confirmAction).toHaveBeenCalledWith('Удалить выбранные видеофайлы (2)?', expect.objectContaining({
+      confirmationText: 'Удалить'
+    }))
+    expect(videosStore.removeBatch).toHaveBeenCalledWith([15, 16])
+    expect(wrapper.vm.selectedVideoIds).toEqual([])
+    expect(alertStore.success).toHaveBeenCalledWith('Удалено видеофайлов: 2')
+  })
+
+  it('does not batch delete when confirmation is cancelled', async () => {
+    videosStore.videos.value = [{ id: 17, title: 'First', accountId: 0 }]
+    confirmation.confirmAction.mockResolvedValueOnce(false)
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    wrapper.vm.selectedVideoIds = [17]
+    await wrapper.vm.deleteSelectedVideos()
+
+    expect(videosStore.removeBatch).not.toHaveBeenCalled()
+  })
+
+  it('shows a concise summary for partial batch delete results', async () => {
+    videosStore.videos.value = [
+      { id: 18, title: 'First', accountId: 0 },
+      { id: 19, title: 'Second', accountId: 0 }
+    ]
+    videosStore.removeBatch.mockResolvedValueOnce({
+      requestedCount: 2,
+      deletedIds: [18],
+      failures: [{ id: 19, reason: 'notFound', message: 'Не удалось найти видеофайл [id=19]' }]
+    })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    wrapper.vm.selectedVideoIds = [18, 19]
+    await wrapper.vm.deleteSelectedVideos()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Удалено видеофайлов: 1. Не удалось удалить: 1.'))
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось найти видеофайл [id=19]'))
+  })
+
+  it('does not hide batch delete refresh failures with a delete summary', async () => {
+    videosStore.videos.value = [
+      { id: 20, title: 'First', accountId: 0 },
+      { id: 21, title: 'Second', accountId: 0 }
+    ]
+    videosStore.removeBatch.mockResolvedValueOnce({ requestedCount: 2, deletedIds: [20, 21], failures: [] })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    alertStore.success.mockClear()
+    alertStore.error.mockClear()
+    videosStore.getAllByAccount.mockRejectedValueOnce(new Error('refresh failed'))
+
+    wrapper.vm.selectedVideoIds = [20, 21]
+    await wrapper.vm.deleteSelectedVideos()
+    await flushPromises()
+
+    expect(videosStore.removeBatch).toHaveBeenCalledWith([20, 21])
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось загрузить информацию о видеофайлах: refresh failed')
+    expect(alertStore.success).not.toHaveBeenCalled()
+    expect(alertStore.error).not.toHaveBeenCalledWith('Удалено видеофайлов: 2')
   })
 
   it('edits video title inline and saves on Enter', async () => {
