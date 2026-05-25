@@ -312,10 +312,6 @@ function removePlaylistItem(index) {
   rebuildPositions()
 }
 
-function getPlaylistItemIndex(key) {
-  return playlistItems.value.findIndex(item => item.uid === key)
-}
-
 function removeSelectedPlaylistItems() {
   if (!selectedPlaylistItemKeys.value.length) return
   const selectedKeys = new Set(selectedPlaylistItemKeys.value)
@@ -567,16 +563,16 @@ async function onSubmit(values) {
                   :item="item"
                   icon="fa-solid fa-chevron-up"
                   tooltip-text="Переместить вверх"
-                  :disabled="isSubmitting || getPlaylistItemIndex(item.key) <= 0"
-                  @click="movePlaylistItem(getPlaylistItemIndex(item.key), -1)"
+                  :disabled="isSubmitting || item.position <= 1"
+                  @click="movePlaylistItem(item.position - 1, -1)"
                 />
                 <ActionButton
                   data-test="move-down-button"
                   :item="item"
                   icon="fa-solid fa-chevron-down"
                   tooltip-text="Переместить вниз"
-                  :disabled="isSubmitting || getPlaylistItemIndex(item.key) < 0 || getPlaylistItemIndex(item.key) === playlistVideoDetails.length - 1"
-                  @click="movePlaylistItem(getPlaylistItemIndex(item.key), 1)"
+                  :disabled="isSubmitting || item.position === playlistVideoDetails.length"
+                  @click="movePlaylistItem(item.position - 1, 1)"
                 />
                 <ActionButton
                   data-test="remove-video-button"
@@ -584,7 +580,7 @@ async function onSubmit(values) {
                   icon="fa-solid fa-angle-right"
                   tooltip-text="Удалить из плейлиста"
                   :disabled="isSubmitting"
-                  @click="removePlaylistItem(getPlaylistItemIndex(item.key))"
+                  @click="removePlaylistItem(item.position - 1)"
                 />
               </div>
             </template>
