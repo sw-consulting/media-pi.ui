@@ -218,7 +218,7 @@ describe('App Logout Functionality', () => {
     await wrapper.vm.$nextTick()
 
     const appBarTitle = wrapper.find('.orange')
-    expect(appBarTitle.text()).toBe('Media Pi')
+    expect(appBarTitle.text()).toBe('ММБОКС')
   })
 })
 
