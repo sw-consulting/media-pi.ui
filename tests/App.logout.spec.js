@@ -76,7 +76,9 @@ const router = createRouter({
     { path: '/user/edit/:id', component: { template: '<div>Edit User</div>' } },
     { path: '/recover', component: { template: '<div>Recover</div>' } },
     { path: '/register', component: { template: '<div>Register</div>' } },
-    { path: '/videos', component: { template: '<div>Videos</div>' } }
+    { path: '/videos', component: { template: '<div>Videos</div>' } },
+    { path: '/playlists', component: { template: '<div>Playlists</div>' } },
+    { path: '/categories', component: { template: '<div>Categories</div>' } }
   ]
 })
 
@@ -185,6 +187,29 @@ describe('App Logout Functionality', () => {
   it('should show user name in app bar when logged in', () => {
     const appBarTitle = wrapper.find('.orange')
     expect(appBarTitle.text()).toContain('Test Role | Doe John Smith')
+  })
+
+  it('should display categories link for administrators', () => {
+    const links = wrapper.findAll('a[class="link"]')
+    const categoriesLink = links.find(link => link.text() === 'Категории')
+    expect(categoriesLink).toBeTruthy()
+  })
+
+  it('should display categories link for managers', async () => {
+    authStore.user = {
+      id: 2,
+      firstName: 'Jane',
+      lastName: 'Manager',
+      patronymic: '',
+      email: 'manager@example.com',
+      roles: [11]
+    }
+
+    await wrapper.vm.$nextTick()
+
+    const links = wrapper.findAll('a[class="link"]')
+    const categoriesLink = links.find(link => link.text() === 'Категории')
+    expect(categoriesLink).toBeTruthy()
   })
 
   it('should not show user name in app bar when logged out', async () => {
