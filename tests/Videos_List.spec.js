@@ -78,8 +78,8 @@ const globalStubs = {
   ModalWindow: {
     name: 'ModalWindow',
     props: ['modelValue', 'title'],
-    emits: ['update:modelValue'],
-    template: '<div v-if="modelValue" v-bind="$attrs"><slot /><slot name="actions" /></div>'
+    emits: ['update:modelValue', 'confirm', 'cancel'],
+    template: '<div v-if="modelValue" v-bind="$attrs" tabindex="0" @keydown.enter="$emit(\'confirm\')" @keydown.esc="$emit(\'cancel\')"><slot /><slot name="actions" /></div>'
   },
   'v-card': { template: '<div><slot /></div>' },
   'v-select': {
@@ -259,6 +259,37 @@ describe('Videos_List.vue', () => {
     expect(wrapper.find('[data-test="batch-category-dialog"]').exists()).toBe(true)
   })
 
+  it('applies batch category update with Enter in category dialog', async () => {
+    videosStore.videos.value = [{ id: 34, title: 'First', accountId: 0, categoryId: 0 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [34]
+    wrapper.vm.batchCategoryId = 3
+    wrapper.vm.batchCategoryDialog = true
+    await nextTick()
+
+    await wrapper.find('[data-test="batch-category-dialog"]').trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+
+    expect(videosStore.updateCategoryBatch).toHaveBeenCalledWith([34], 3)
+  })
+
+  it('closes batch category dialog with Escape', async () => {
+    videosStore.videos.value = [{ id: 35, title: 'First', accountId: 0, categoryId: 0 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [35]
+    wrapper.vm.batchCategoryDialog = true
+    await nextTick()
+
+    await wrapper.find('[data-test="batch-category-dialog"]').trigger('keydown', { key: 'Escape' })
+    await nextTick()
+
+    expect(wrapper.vm.batchCategoryDialog).toBe(false)
+  })
+
   it('blocks upload when user lacks permissions', async () => {
     currentUser = { roles: [], accountIds: [] }
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
@@ -435,6 +466,35 @@ describe('Videos_List.vue', () => {
     expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload)
   })
 
+  it('cancels an in-progress upload with Escape', async () => {
+    let uploadSignal
+    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+      uploadSignal = options.signal
+      return new Promise((_resolve, reject) => {
+        options.signal.addEventListener('abort', () => {
+          const error = new Error('Загрузка отменена')
+          error.name = 'AbortError'
+          reject(error)
+        })
+      })
+    })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    const uploadPromise = wrapper.vm.uploadVideos([file])
+    await nextTick()
+
+    await wrapper.find('[data-test="upload-progress"]').trigger('keydown', { key: 'Escape' })
+    await uploadPromise
+    await flushPromises()
+
+    expect(uploadSignal.aborted).toBe(true)
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
+    expect(alertStore.error).not.toHaveBeenCalled()
+  })
+
   it('allows selecting multiple files in the hidden file input', async () => {
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
@@ -468,6 +528,22 @@ describe('Videos_List.vue', () => {
 
     expect(wrapper.vm.selectedVideoIds).toEqual([12])
     expect(wrapper.find('[data-test="batch-delete-video-button"]').element.disabled).toBe(false)
+  })
+
+  it('keeps batch category update disabled when an account scope is selected', async () => {
+    currentUser = { roles: [], accountIds: [42] }
+    accountsStore.accounts.value = [{ id: 42, name: 'Account 42' }]
+    videosStore.videos.value = [{ id: 12, title: 'First', accountId: 42 }]
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="video-row-select"]').setValue(true)
+    await nextTick()
+
+    expect(wrapper.vm.selectedScope).toBe('account:42')
+    expect(wrapper.find('[data-test="batch-delete-video-button"]').element.disabled).toBe(false)
+    expect(wrapper.find('[data-test="batch-category-video-button"]').element.disabled).toBe(true)
   })
 
   it('disables table selection for a non-manageable current list', async () => {

@@ -21,7 +21,7 @@ defineProps({
   }
 })
 
-defineEmits(['update:modelValue'])
+defineEmits(['update:modelValue', 'confirm', 'cancel'])
 </script>
 
 <template>
@@ -30,8 +30,10 @@ defineEmits(['update:modelValue'])
     :width="width"
     persistent
     @update:model-value="$emit('update:modelValue', $event)"
+    @keydown.enter.prevent="$emit('confirm')"
+    @keydown.esc.prevent="$emit('cancel')"
   >
-    <v-card class="modal-window-card" :style="{ minWidth }">
+    <v-card class="modal-window-card" :style="{ minWidth }" tabindex="0">
       <v-card-title class="modal-window-title">{{ title }}</v-card-title>
       <v-card-text class="modal-window-content">
         <slot />

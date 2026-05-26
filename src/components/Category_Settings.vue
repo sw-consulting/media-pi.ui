@@ -110,7 +110,7 @@ async function onSubmit(values) {
 </script>
 
 <template>
-  <div class="settings form-3 form-compact">
+  <div class="settings form-4 form-compact">
     <h1 class="primary-heading">{{ isRegister() ? 'Новая категория' : 'Настройки категории' }}</h1>
     <hr class="hr" />
 

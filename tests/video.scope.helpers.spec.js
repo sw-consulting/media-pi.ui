@@ -25,6 +25,12 @@ describe('video.scope.helpers', () => {
       CATEGORY_NONE_SCOPE,
       'category:9'
     ])
+    expect(options.map(option => option.title)).toEqual([
+      'Account 1',
+      'Общие видеофайлы',
+      '↳ Без категории',
+      '↳ News'
+    ])
   })
 
   it('filters account scopes for manager but keeps common category scopes', () => {
@@ -39,6 +45,12 @@ describe('video.scope.helpers', () => {
       COMMON_ALL_SCOPE,
       CATEGORY_NONE_SCOPE,
       'category:9'
+    ])
+    expect(options.map(option => option.title)).toEqual([
+      'Two',
+      'Общие видеофайлы',
+      '↳ Без категории',
+      '↳ News'
     ])
   })
 

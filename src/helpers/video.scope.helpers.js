@@ -5,6 +5,7 @@ import { isAdministrator } from '@/helpers/user.helpers.js'
 
 export const COMMON_ALL_SCOPE = 'common:all'
 export const CATEGORY_NONE_SCOPE = 'category:none'
+const CATEGORY_SCOPE_PREFIX = '↳ '
 
 export function createAccountScope(accountId) {
   return `account:${accountId}`
@@ -56,12 +57,12 @@ export function createVideoScopeOptions(accounts, categories, user) {
   }
 
   options.push({ value: COMMON_ALL_SCOPE, title: 'Общие видеофайлы' })
-  options.push({ value: CATEGORY_NONE_SCOPE, title: 'Без категории' })
+  options.push({ value: CATEGORY_NONE_SCOPE, title: `${CATEGORY_SCOPE_PREFIX}Без категории` })
 
   for (const category of categories || []) {
     options.push({
       value: createCategoryScope(category.id),
-      title: category.title || `Категория ${category.id}`
+      title: `${CATEGORY_SCOPE_PREFIX}${category.title || `Категория ${category.id}`}`
     })
   }
 

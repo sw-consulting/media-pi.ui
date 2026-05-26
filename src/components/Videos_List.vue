@@ -2,7 +2,7 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { mdiMagnify } from '@mdi/js'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
@@ -50,6 +50,7 @@ const { alert } = storeToRefs(alertStore)
 
 const selectedScope = ref(props.fixedScope)
 const fileInput = ref(null)
+const uploadProgressRef = ref(null)
 const categorySaving = ref(false)
 const isUploading = ref(false)
 const uploadPhase = ref('idle')
@@ -118,7 +119,7 @@ const canManageSelectedScope = computed(() => {
 const isBusy = computed(() => loading.value || accountsLoading.value || categoriesLoading.value || isUploading.value)
 const selectedVideoCount = computed(() => selectedVideoIds.value.length)
 const canDeleteSelectedVideos = computed(() => canManageSelectedScope.value && selectedVideoCount.value > 0 && !isBusy.value && !categorySaving.value)
-const canUpdateSelectedCategory = computed(() => canDeleteSelectedVideos.value)
+const canUpdateSelectedCategory = computed(() => selectedScopeInfo.value.accountId === 0 && canDeleteSelectedVideos.value)
 const canApplyBatchCategory = computed(() => canUpdateSelectedCategory.value && typeof batchCategoryId.value === 'number')
 const tableItemsPerPage = computed({
   get: () => props.fixedScope ? localItemsPerPage.value : authStore.videos_per_page,
@@ -178,6 +179,12 @@ function cancelUpload() {
   uploadAbortController.value?.abort()
 }
 
+function handleUploadProgressKeydown(event) {
+  if (event.key !== 'Escape' || !canCancelUpload.value) return
+  event.preventDefault()
+  cancelUpload()
+}
+
 function isAbortError(err) {
   return err?.name === 'AbortError'
 }
@@ -217,6 +224,12 @@ watch(selectedScope, async () => {
   selectedVideoIds.value = []
   await refreshVideos()
 }, { immediate: true })
+
+watch(isUploading, async (visible) => {
+  if (!visible) return
+  await nextTick()
+  uploadProgressRef.value?.focus()
+})
 
 onMounted(async () => {
   try {
@@ -432,7 +445,7 @@ watch(videos, (current) => {
             v-if="!props.fixedScope"
             v-model="selectedScope"
             :items="scopeOptions"
-            label="Раздел"
+            label="Лицевой счёт или категория"
             item-title="title"
             item-value="value"
             density="compact"
@@ -452,6 +465,8 @@ watch(videos, (current) => {
             />
             <input ref="fileInput" class="d-none" type="file" accept="video/*" multiple @change="onFileChange" />
           </div>
+      </div>
+      <div class="header-actions-container">
           <div class="header-actions header-actions-group">
             <ActionButton
               data-test="batch-category-video-button"
@@ -479,6 +494,8 @@ watch(videos, (current) => {
       v-model="batchCategoryDialog"
       title="Изменение категории"
       data-test="batch-category-dialog"
+      @confirm="updateSelectedVideoCategory"
+      @cancel="closeBatchCategoryDialog"
     >
       <div class="batch-category-dialog-content">
         <p class="batch-category-message">
@@ -520,11 +537,14 @@ watch(videos, (current) => {
     </ModalWindow>
     <div
       v-if="isUploading"
+      ref="uploadProgressRef"
       class="upload-progress-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="upload-progress-title"
       data-test="upload-progress"
+      tabindex="0"
+      @keydown="handleUploadProgressKeydown"
     >
       <div class="upload-progress-card">
         <div id="upload-progress-title" class="primary-heading upload-progress-title" data-test="upload-progress-label">
