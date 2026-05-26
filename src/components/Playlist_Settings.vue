@@ -80,6 +80,7 @@ const playlistVideoHeaders = [
   { title: '', align: 'center', key: 'select', sortable: false, width: '44px' },
   { title: '#', align: 'center', key: 'position', sortable: false, width: '44px' },
   { title: 'Название', align: 'start', key: 'title', sortable: false },
+  { title: 'Категория', align: 'start', key: 'categoryName', sortable: false, width: '150px' },
   { title: 'Размер', align: 'start', key: 'fileSize', sortable: false, width: '120px' },
   { title: 'Длительность', align: 'start', key: 'duration', sortable: false, width: '130px' },
   { title: '', align: 'center', key: 'actions', sortable: false, width: '44px' }
@@ -145,6 +146,7 @@ const sortedFilteredAvailableVideos = computed(() => {
 const playlistVideoDetails = computed(() => playlistItems.value.map((item, index) => {
   const video = availableVideoMap.value.get(item.videoId)
   const title = video?.title || video?.originalFilename || `Видео #${item.videoId}`
+  const categoryId = video?.categoryId ?? 0
   return {
     key: item.uid,
     videoId: item.videoId,
@@ -153,7 +155,8 @@ const playlistVideoDetails = computed(() => playlistItems.value.map((item, index
     fileSize: video?.fileSize,
     duration: video?.duration,
     accountName: video?.accountName,
-    categoryName: video?.categoryName
+    categoryId,
+    categoryName: getCategoryTitle(categoryId, categoriesStore.categories || [])
   }
 }))
 
@@ -583,6 +586,9 @@ async function onSubmit(values) {
             </template>
             <template v-slot:[`item.fileSize`]="{ item }">
               {{ formatFileSize(item.fileSize) }}
+            </template>
+            <template v-slot:[`item.categoryName`]="{ item }">
+              <span class="playlist-account-cell">{{ item.categoryName || 'Без категории' }}</span>
             </template>
             <template v-slot:[`item.duration`]="{ item }">
               {{ formatDuration(item.duration) }}

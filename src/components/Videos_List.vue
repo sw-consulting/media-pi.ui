@@ -2,17 +2,19 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
-import { computed, onMounted, ref, watch, nextTick } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { mdiMagnify } from '@mdi/js'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
+import router from '@/router'
 import { useVideosStore } from '@/stores/videos.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
+import ModalWindow from '@/components/ModalWindow.vue'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
 import { estimateSelectWidth } from '@/helpers/account.options.js'
@@ -48,10 +50,6 @@ const { alert } = storeToRefs(alertStore)
 
 const selectedScope = ref(props.fixedScope)
 const fileInput = ref(null)
-const titleInputRef = ref(null)
-const editingVideoId = ref(null)
-const editingTitle = ref('')
-const titleSaving = ref(false)
 const categorySaving = ref(false)
 const isUploading = ref(false)
 const uploadPhase = ref('idle')
@@ -60,6 +58,7 @@ const uploadProgressIndeterminate = ref(true)
 const uploadAbortController = ref(null)
 const selectedVideoIds = ref([])
 const batchCategoryId = ref(0)
+const batchCategoryDialog = ref(false)
 const localItemsPerPage = ref(10)
 const localSearch = ref('')
 const localSortBy = ref([])
@@ -84,14 +83,27 @@ const uploadProgressText = computed(() => {
 })
 const canCancelUpload = computed(() => uploadPhase.value === 'uploading')
 
-const headers = [
+const baseHeaders = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
-  { title: 'Название', align: 'start', key: 'title', width: '38%' },
-  { title: 'Имя файла', align: 'start', key: 'originalFilename', width: '18%' },
-  { title: 'Категория', align: 'start', key: 'categoryTitle', width: '18%' },
+  { title: 'Название', align: 'start', key: 'title', width: '42%' },
+  { title: 'Имя файла', align: 'start', key: 'originalFilename', width: '22%' },
   { title: 'Размер', align: 'start', key: 'fileSize', width: '13%' },
   { title: 'Длительность', align: 'start', key: 'duration', width: '13%' },
 ]
+
+const categoryHeader = { title: 'Категория', align: 'start', key: 'categoryTitle', width: '18%' }
+const showCategoryColumn = computed(() => selectedScopeInfo.value.accountId === 0)
+const headers = computed(() => {
+  if (!showCategoryColumn.value) return baseHeaders
+  return [
+    baseHeaders[0],
+    { ...baseHeaders[1], width: '38%' },
+    { ...baseHeaders[2], width: '18%' },
+    categoryHeader,
+    baseHeaders[3],
+    baseHeaders[4],
+  ]
+})
 
 const selectWidth = computed(() => estimateSelectWidth(scopeOptions.value))
 
@@ -105,8 +117,9 @@ const canManageSelectedScope = computed(() => {
 
 const isBusy = computed(() => loading.value || accountsLoading.value || categoriesLoading.value || isUploading.value)
 const selectedVideoCount = computed(() => selectedVideoIds.value.length)
-const canDeleteSelectedVideos = computed(() => canManageSelectedScope.value && selectedVideoCount.value > 0 && !isBusy.value && !titleSaving.value && !categorySaving.value)
-const canUpdateSelectedCategory = computed(() => canDeleteSelectedVideos.value && typeof batchCategoryId.value === 'number')
+const canDeleteSelectedVideos = computed(() => canManageSelectedScope.value && selectedVideoCount.value > 0 && !isBusy.value && !categorySaving.value)
+const canUpdateSelectedCategory = computed(() => canDeleteSelectedVideos.value)
+const canApplyBatchCategory = computed(() => canUpdateSelectedCategory.value && typeof batchCategoryId.value === 'number')
 const tableItemsPerPage = computed({
   get: () => props.fixedScope ? localItemsPerPage.value : authStore.videos_per_page,
   set: value => {
@@ -275,68 +288,9 @@ function categoryTitle(categoryId) {
   return getCategoryTitle(categoryId, categories.value || [])
 }
 
-async function updateVideoCategory(item, categoryId) {
-  if (!canManageVideo(item) || categorySaving.value) return
-  categorySaving.value = true
-  try {
-    await videosStore.update(item.id, { categoryId })
-    await refreshVideos()
-  } catch (err) {
-    alertStore.error('Не удалось обновить категорию: ' + (err?.message || err))
-  } finally {
-    categorySaving.value = false
-  }
-}
-
-const isEditing = (item) => editingVideoId.value === item?.id
-
-async function startEdit(item) {
+function editVideo(item) {
   if (!canManageVideo(item)) return
-  editingVideoId.value = item.id
-  editingTitle.value = item.title || ''
-  await nextTick()
-  titleInputRef.value?.focus()
-}
-
-function cancelEdit() {
-  editingVideoId.value = null
-  editingTitle.value = ''
-}
-
-async function saveEdit(item) {
-  if (!item || titleSaving.value) return
-  const newTitle = editingTitle.value.trim()
-  if (!newTitle) {
-    alertStore.error('Название не может быть пустым')
-    return
-  }
-  // Skip API call if title hasn't changed
-  if (newTitle === item.title) {
-    cancelEdit()
-    return
-  }
-  titleSaving.value = true
-  try {
-    await videosStore.update(item.id, { title: newTitle })
-    await refreshVideos()
-    cancelEdit()
-  } catch (err) {
-    alertStore.error('Не удалось обновить название: ' + (err?.message || err))
-  } finally {
-    titleSaving.value = false
-  }
-}
-
-function handleTitleKeydown(event, item) {
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    saveEdit(item)
-  } else if (event.key === 'Escape') {
-    event.preventDefault()
-    if (!titleSaving.value) {
-      cancelEdit()
-    }
-  }
+  router.push(`/video/edit/${item.id}`)
 }
 
 async function deleteVideo(item) {
@@ -423,6 +377,7 @@ async function updateSelectedVideoCategory() {
     selectedVideoIds.value = []
     const refreshed = await refreshVideos()
     if (refreshed) {
+      batchCategoryDialog.value = false
       summarizeBatchCategoryResult(result, ids.length)
     }
   } catch (err) {
@@ -430,6 +385,17 @@ async function updateSelectedVideoCategory() {
   } finally {
     categorySaving.value = false
   }
+}
+
+function openBatchCategoryDialog() {
+  if (!canUpdateSelectedCategory.value) return
+  batchCategoryId.value = 0
+  batchCategoryDialog.value = true
+}
+
+function closeBatchCategoryDialog() {
+  if (categorySaving.value) return
+  batchCategoryDialog.value = false
 }
 
 function filterVideos(value, query, item) {
@@ -450,12 +416,6 @@ function filterVideos(value, query, item) {
 watch(videos, (current) => {
   const currentIds = new Set((current || []).map(video => video.id))
   selectedVideoIds.value = selectedVideoIds.value.filter(id => currentIds.has(id))
-
-  if (!editingVideoId.value) return
-  const exists = currentIds.has(editingVideoId.value)
-  if (!exists) {
-    cancelEdit()
-  }
 })
 </script>
 
@@ -487,31 +447,19 @@ watch(videos, (current) => {
               :item="{}"
               icon="fa-solid fa-cloud-arrow-up"
               tooltip-text="Загрузить видеофайлы"
-              :disabled="!canManageSelectedScope || isBusy || titleSaving || categorySaving"
+              :disabled="!canManageSelectedScope || isBusy || categorySaving"
               @click="triggerUpload"
             />
             <input ref="fileInput" class="d-none" type="file" accept="video/*" multiple @change="onFileChange" />
           </div>
           <div class="header-actions header-actions-group">
-            <v-select
-              v-model="batchCategoryId"
-              :items="categoryOptions"
-              label="Категория"
-              item-title="title"
-              item-value="value"
-              density="compact"
-              variant="outlined"
-              hide-details
-              :disabled="!canUpdateSelectedCategory"
-              style="width: 220px; margin-right: 8px;"
-            />
             <ActionButton
               data-test="batch-category-video-button"
               :item="{}"
-              icon="fa-solid fa-tags"
+              icon="fa-solid fa-arrows-turn-to-dots"
               tooltip-text="Изменить категорию выбранных видеофайлов"
               :disabled="!canUpdateSelectedCategory"
-              @click="updateSelectedVideoCategory"
+              @click="openBatchCategoryDialog"
             />
           </div>
           <div class="header-actions header-actions-group">
@@ -527,6 +475,49 @@ watch(videos, (current) => {
         </div>
       </div>
     </div>
+    <ModalWindow
+      v-model="batchCategoryDialog"
+      title="Изменение категории"
+      data-test="batch-category-dialog"
+    >
+      <div class="batch-category-dialog-content">
+        <p class="batch-category-message">
+          Выберите категорию для выбранных видеофайлов ({{ selectedVideoCount }}).
+        </p>
+        <v-select
+          v-model="batchCategoryId"
+          :items="categoryOptions"
+          label="Категория"
+          item-title="title"
+          item-value="value"
+          density="compact"
+          variant="outlined"
+          hide-details
+          :disabled="categorySaving"
+          data-test="batch-category-select"
+        />
+      </div>
+      <template #actions>
+        <v-btn
+          data-test="apply-batch-category-button"
+          color="primary"
+          variant="text"
+          :disabled="!canApplyBatchCategory"
+          @click="updateSelectedVideoCategory"
+        >
+          <span v-show="categorySaving" class="spinner-border spinner-border-sm mr-1"></span>
+          Применить
+        </v-btn>
+        <v-btn
+          data-test="cancel-batch-category-button"
+          variant="text"
+          :disabled="categorySaving"
+          @click="closeBatchCategoryDialog"
+        >
+          Отменить
+        </v-btn>
+      </template>
+    </ModalWindow>
     <div
       v-if="isUploading"
       class="upload-progress-overlay"
@@ -601,54 +592,12 @@ watch(videos, (current) => {
           {{ item.accountDisplay || '—' }}
         </template>
         <template v-slot:[`item.title`]="{ item }">
-          <div class="title-cell">
-            <div v-if="isEditing(item)" class="title-edit">
-              <input
-                ref="titleInputRef"
-                v-model="editingTitle"
-                class="title-input"
-                type="text"
-                data-test="edit-title-input"
-                aria-label="Название видео"
-                @keydown="handleTitleKeydown($event, item)"
-              />
-              <ActionButton
-                data-test="save-title-button"
-                :item="item"
-                icon="fa-solid fa-check-double"
-                tooltip-text="Сохранить"
-                :disabled="!canManageVideo(item) || titleSaving || isBusy"
-                @click="saveEdit(item)"
-              />
-              <ActionButton
-                data-test="cancel-title-button"
-                :item="item"
-                icon="fa-solid fa-xmark"
-                tooltip-text="Отменить"
-                :disabled="titleSaving || isBusy"
-                @click="cancelEdit"
-              />
-            </div>
-            <div v-else class="title-display">
-              <span class="title-text">{{ item.title || '—' }}</span>
-            </div>
+          <div class="title-display">
+            <span class="title-text">{{ item.title || '—' }}</span>
           </div>
         </template>
         <template v-slot:[`item.categoryTitle`]="{ item }">
-          <v-select
-            v-if="canManageVideo(item) && item.accountId === 0"
-            :model-value="item.categoryId || 0"
-            :items="categoryOptions"
-            item-title="title"
-            item-value="value"
-            density="compact"
-            variant="outlined"
-            hide-details
-            :disabled="isBusy || titleSaving || categorySaving"
-            data-test="video-category-select"
-            @update:model-value="updateVideoCategory(item, $event)"
-          />
-          <span v-else data-test="video-category-label">{{ categoryTitle(item.categoryId) }}</span>
+          <span data-test="video-category-label">{{ categoryTitle(item.categoryId) }}</span>
         </template>
         <template v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">
@@ -656,16 +605,16 @@ watch(videos, (current) => {
               data-test="edit-video-button"
               :item="item"
               icon="fa-solid fa-pen"
-              tooltip-text="Редактировать название видео"
-              :disabled="!canManageVideo(item) || isBusy || titleSaving || categorySaving"
-              @click="startEdit(item)"
+              tooltip-text="Редактировать видеофайл"
+              :disabled="!canManageVideo(item) || isBusy || categorySaving"
+              @click="editVideo"
             />
             <ActionButton
               data-test="delete-video-button"
               :item="item"
               icon="fa-solid fa-trash-can"
               tooltip-text="Удалить видеофайл"
-              :disabled="!canManageVideo(item) || isBusy || titleSaving || categorySaving"
+              :disabled="!canManageVideo(item) || isBusy || categorySaving"
               @click="deleteVideo(item)"
             />
           </div>
@@ -683,12 +632,6 @@ watch(videos, (current) => {
 </template>
 
 <style scoped>
-.title-cell {
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
 .title-display {
   display: flex;
   align-items: center;
@@ -704,20 +647,15 @@ watch(videos, (current) => {
   white-space: nowrap;
 }
 
-.title-edit {
+.batch-category-dialog-content {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.title-input {
-  flex: 1;
-  min-width: 0;
-  padding: 4px 8px;
-  border: 1px solid #666;
-  border-radius: 4px;
-  background-color: #fff;
+.batch-category-message {
+  margin: 0;
+  color: #34495e;
 }
 
 .upload-progress-overlay {

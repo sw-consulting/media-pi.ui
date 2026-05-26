@@ -54,14 +54,19 @@ const confirmation = {
   confirmAction: vi.fn(async () => true)
 }
 
+const router = vi.hoisted(() => ({
+  push: vi.fn()
+}))
+
 vi.mock('@/stores/accounts.store.js', () => ({ useAccountsStore: () => accountsStore }))
 vi.mock('@/stores/categories.store.js', () => ({ useCategoriesStore: () => categoriesStore }))
 vi.mock('@/stores/videos.store.js', () => ({ useVideosStore: () => videosStore }))
 vi.mock('@/stores/auth.store.js', () => ({ useAuthStore: () => makeAuthStore() }))
 vi.mock('@/stores/alert.store.js', () => ({ useAlertStore: () => alertStore }))
 vi.mock('@/helpers/confirmation.js', () => ({ useConfirmation: () => confirmation }))
+vi.mock('@/router', () => ({ default: router }))
 vi.mock('@sw-consulting/tooling.ui.kit', () => ({
-  ActionButton: { name: 'ActionButton', props: ['item', 'icon', 'tooltipText', 'disabled'], emits: ['click'], template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>' }
+  ActionButton: { name: 'ActionButton', props: ['item', 'icon', 'tooltipText', 'disabled'], emits: ['click'], template: '<button :disabled="disabled" @click="$emit(\'click\', item)"><slot /></button>' }
 }))
 vi.mock('@/helpers/user.helpers.js', () => ({
   isAdministrator: (u) => Array.isArray(u?.roles) && u.roles.includes(1),
@@ -70,6 +75,12 @@ vi.mock('@/helpers/user.helpers.js', () => ({
 }))
 
 const globalStubs = {
+  ModalWindow: {
+    name: 'ModalWindow',
+    props: ['modelValue', 'title'],
+    emits: ['update:modelValue'],
+    template: '<div v-if="modelValue" v-bind="$attrs"><slot /><slot name="actions" /></div>'
+  },
   'v-card': { template: '<div><slot /></div>' },
   'v-select': {
     props: ['items', 'modelValue'],
@@ -84,8 +95,13 @@ const globalStubs = {
     template: '<select @change="emitValue"><option v-for="item in items" :key="item.value" :value="item.value">{{ item.title }}</option></select>'
   },
   'v-data-table': {
-    props: ['items', 'modelValue', 'showSelect'],
+    props: ['items', 'modelValue', 'showSelect', 'headers'],
     emits: ['update:modelValue', 'update:itemsPerPage', 'update:page', 'update:sortBy'],
+    computed: {
+      hasCategoryColumn() {
+        return Array.isArray(this.headers) && this.headers.some(header => header.key === 'categoryTitle')
+      }
+    },
     methods: {
       toggleItem(id, checked) {
         const selected = Array.isArray(this.modelValue) ? [...this.modelValue] : []
@@ -96,7 +112,7 @@ const globalStubs = {
       }
     },
     template: `
-      <div class="data-table" :data-show-select="showSelect ? 'true' : 'false'">
+      <div class="data-table" :data-show-select="showSelect ? 'true' : 'false'" :data-has-category-column="hasCategoryColumn ? 'true' : 'false'">
         <div v-for="item in items" :key="item.id">
           <input
             v-if="showSelect"
@@ -107,7 +123,7 @@ const globalStubs = {
           />
           <slot name="item.actions" :item="item" />
           <slot name="item.title" :item="item" />
-          <slot name="item.categoryTitle" :item="item" />
+          <slot v-if="hasCategoryColumn" name="item.categoryTitle" :item="item" />
         </div>
         <button data-test="trigger-items-per-page" @click="$emit('update:itemsPerPage', 5)" />
         <button data-test="trigger-page" @click="$emit('update:page', 2)" />
@@ -153,24 +169,31 @@ describe('Videos_List.vue', () => {
     alertStore.clear.mockImplementation(() => {})
     confirmation.confirmDelete.mockImplementation(async () => true)
     confirmation.confirmAction.mockImplementation(async () => true)
+    router.push.mockClear()
   })
 
   it('loads videos for default and changed account selection', async () => {
     accountsStore.accounts.value = [{ id: 5, name: 'Five' }]
+    videosStore.videos.value = [{ id: 1, title: 'Account video', accountId: 5, categoryId: 0 }]
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
 
     await flushPromises()
     expect(accountsStore.getAll).toHaveBeenCalled()
     expect(videosStore.getAllByAccount).toHaveBeenCalledWith(5, {})
+    expect(wrapper.vm.showCategoryColumn).toBe(false)
+    expect(wrapper.find('.data-table').attributes('data-has-category-column')).toBe('false')
 
     wrapper.vm.selectedScope = 'common:all'
     await nextTick()
     await flushPromises()
     expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, {})
+    expect(wrapper.vm.showCategoryColumn).toBe(true)
+    expect(wrapper.find('.data-table').attributes('data-has-category-column')).toBe('true')
   })
 
   it('loads and uploads using selected category scope', async () => {
     categoriesStore.categories.value = [{ id: 4, title: 'News' }]
+    videosStore.videos.value = [{ id: 2, title: 'Category video', accountId: 0, categoryId: 4 }]
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
@@ -179,6 +202,8 @@ describe('Videos_List.vue', () => {
     await flushPromises()
 
     expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { categoryId: 4 })
+    expect(wrapper.vm.showCategoryColumn).toBe(true)
+    expect(wrapper.find('.data-table').attributes('data-has-category-column')).toBe('true')
 
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
     await wrapper.vm.uploadVideos([file])
@@ -194,14 +219,14 @@ describe('Videos_List.vue', () => {
     )
   })
 
-  it('updates a single video category through existing video update', async () => {
+  it('navigates to edit view for per-video changes', async () => {
     videosStore.videos.value = [{ id: 30, title: 'Common', accountId: 0, categoryId: 0 }]
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
-    await wrapper.vm.updateVideoCategory(videosStore.videos.value[0], 4)
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
 
-    expect(videosStore.update).toHaveBeenCalledWith(30, { categoryId: 4 })
+    expect(router.push).toHaveBeenCalledWith('/video/edit/30')
   })
 
   it('batch updates selected video category', async () => {
@@ -219,6 +244,19 @@ describe('Videos_List.vue', () => {
 
     expect(videosStore.updateCategoryBatch).toHaveBeenCalledWith([31, 32], 4)
     expect(alertStore.success).toHaveBeenCalledWith('Обновлено видеофайлов: 2')
+  })
+
+  it('opens category batch modal from the header action', async () => {
+    videosStore.videos.value = [{ id: 33, title: 'First', accountId: 0, categoryId: 0 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [33]
+    await nextTick()
+    await wrapper.find('[data-test="batch-category-video-button"]').trigger('click')
+
+    expect(wrapper.vm.batchCategoryDialog).toBe(true)
+    expect(wrapper.find('[data-test="batch-category-dialog"]').exists()).toBe(true)
   })
 
   it('blocks upload when user lacks permissions', async () => {
@@ -521,167 +559,7 @@ describe('Videos_List.vue', () => {
     expect(alertStore.error).not.toHaveBeenCalledWith('Удалено видеофайлов: 2')
   })
 
-  it('edits video title inline and saves on Enter', async () => {
-    videosStore.videos.value = [{ id: 1, title: 'Old', accountId: null }]
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
-    const input = wrapper.find('[data-test="edit-title-input"]')
-    await input.setValue('New Title')
-    await input.trigger('keydown', { key: 'Enter' })
-    await flushPromises()
-
-    expect(videosStore.update).toHaveBeenCalledWith(1, { title: 'New Title' })
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
-  })
-
-  it('cancels editing on Escape without saving', async () => {
-    videosStore.videos.value = [{ id: 2, title: 'Stay', accountId: null }]
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
-    const input = wrapper.find('[data-test="edit-title-input"]')
-    await input.setValue('Ignored')
-    await input.trigger('keydown', { key: 'Escape' })
-    await flushPromises()
-
-    expect(videosStore.update).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
-  })
-
-  it('does not cancel on Escape while saving', async () => {
-    videosStore.videos.value = [{ id: 3, title: 'Original', accountId: null }]
-    let resolveUpdate
-    videosStore.update.mockImplementation(() => new Promise(resolve => { resolveUpdate = resolve }))
-
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
-    const input = wrapper.find('[data-test="edit-title-input"]')
-    await input.setValue('Modified')
-    
-    // Start save operation (Enter key)
-    await input.trigger('keydown', { key: 'Enter' })
-    await nextTick()
-    
-    // Attempt to cancel while saving (Escape key)
-    await input.trigger('keydown', { key: 'Escape' })
-    await nextTick()
-    
-    // Should still be in edit mode
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
-    
-    // Complete the save
-    resolveUpdate()
-    await flushPromises()
-    
-    // Now should exit edit mode
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
-  })
-
-  it('disables cancel button while saving', async () => {
-    videosStore.videos.value = [{ id: 4, title: 'Test', accountId: null }]
-    let resolveUpdate
-    videosStore.update.mockImplementation(() => new Promise(resolve => { resolveUpdate = resolve }))
-
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
-    const input = wrapper.find('[data-test="edit-title-input"]')
-    await input.setValue('New Value')
-    
-    // Cancel button should be enabled before save
-    let cancelButton = wrapper.find('[data-test="cancel-title-button"]')
-    expect(cancelButton.element.disabled).toBe(false)
-    
-    // Start save operation
-    await wrapper.find('[data-test="save-title-button"]').trigger('click')
-    await nextTick()
-    
-    // Cancel button should be disabled during save
-    cancelButton = wrapper.find('[data-test="cancel-title-button"]')
-    expect(cancelButton.element.disabled).toBe(true)
-    
-    // Complete the save
-    resolveUpdate()
-    await flushPromises()
-    
-    // Edit mode should be exited
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
-  })
-
-  it('shows error and does not save when title is empty', async () => {
-    videosStore.videos.value = [{ id: 5, title: 'Original', accountId: null }]
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
-    const input = wrapper.find('[data-test="edit-title-input"]')
-    
-    // Try to save with empty title
-    await input.setValue('')
-    await wrapper.find('[data-test="save-title-button"]').trigger('click')
-    await flushPromises()
-
-    // Should show error and not call update
-    expect(alertStore.error).toHaveBeenCalledWith('Название не может быть пустым')
-    expect(videosStore.update).not.toHaveBeenCalled()
-    
-    // Should still be in edit mode
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
-  })
-
-  it('shows error and does not save when title is only whitespace', async () => {
-    videosStore.videos.value = [{ id: 6, title: 'Original', accountId: null }]
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
-    const input = wrapper.find('[data-test="edit-title-input"]')
-    
-    // Try to save with whitespace-only title
-    await input.setValue('   ')
-    await wrapper.find('[data-test="save-title-button"]').trigger('click')
-    await flushPromises()
-
-    // Should show error and not call update
-    expect(alertStore.error).toHaveBeenCalledWith('Название не может быть пустым')
-    expect(videosStore.update).not.toHaveBeenCalled()
-    
-    // Should still be in edit mode
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
-  })
-
-  it('shows error and preserves editing state when update fails', async () => {
-    videosStore.videos.value = [{ id: 7, title: 'Original', accountId: null }]
-    const errorMessage = 'Network error'
-    videosStore.update.mockRejectedValue(new Error(errorMessage))
-
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
-    const input = wrapper.find('[data-test="edit-title-input"]')
-    await input.setValue('New Title')
-    
-    await wrapper.find('[data-test="save-title-button"]').trigger('click')
-    await flushPromises()
-
-    // Should show error message
-    expect(alertStore.error).toHaveBeenCalledWith('Не удалось обновить название: ' + errorMessage)
-    
-    // Should still be in edit mode
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
-    
-    // Input should still have the edited value
-    expect(input.element.value).toBe('New Title')
-  })
-
-  it('prevents editing when user lacks permissions', async () => {
+  it('disables edit navigation when user lacks permissions', async () => {
     currentUser = { roles: [], accountIds: [99] }
     videosStore.videos.value = [{ id: 8, title: 'Video', accountId: 42 }]
     
@@ -694,44 +572,26 @@ describe('Videos_List.vue', () => {
     expect(editButton.element.disabled).toBe(true)
   })
 
-  it('allows editing when user is administrator', async () => {
+  it('allows edit navigation when user is administrator', async () => {
     currentUser = { roles: [1], accountIds: [] }
     videosStore.videos.value = [{ id: 9, title: 'Video', accountId: 42 }]
     
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
-    // Edit button should exist for administrators
     expect(wrapper.find('[data-test="edit-video-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="edit-video-button"]').element.disabled).toBe(false)
   })
 
-  it('allows editing when user has matching accountId', async () => {
+  it('allows edit navigation when user has matching accountId', async () => {
     currentUser = { roles: [], accountIds: [42] }
     videosStore.videos.value = [{ id: 10, title: 'Video', accountId: 42 }]
     
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
-    // Edit button should exist for users with matching accountId
     expect(wrapper.find('[data-test="edit-video-button"]').exists()).toBe(true)
-  })
-
-  it('cancels editing when video is removed from list', async () => {
-    videosStore.videos.value = [{ id: 11, title: 'Video to Remove', accountId: null }]
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    // Start editing
-    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(true)
-
-    // Remove the video from the list
-    videosStore.videos.value = []
-    await nextTick()
-    await flushPromises()
-
-    // Should no longer be in edit mode
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="edit-video-button"]').element.disabled).toBe(false)
   })
 
   it('filterVideos returns true for empty or null query', async () => {
@@ -771,44 +631,16 @@ describe('Videos_List.vue', () => {
     expect(wrapper.vm.filterVideos(null, 'nomatch_xyz', item)).toBe(false)
   })
 
-  it('skips API call when saving title with unchanged value', async () => {
-    videosStore.videos.value = [{ id: 40, title: 'Unchanged', accountId: null }]
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
-    const input = wrapper.find('[data-test="edit-title-input"]')
-    expect(input.element.value).toBe('Unchanged')
-
-    await wrapper.find('[data-test="save-title-button"]').trigger('click')
-    await flushPromises()
-
-    expect(videosStore.update).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
-  })
-
-  it('does not start editing when user has no permission', async () => {
+  it('does not navigate to edit view when user has no permission', async () => {
     currentUser = { roles: [], accountIds: [] }
     videosStore.videos.value = [{ id: 41, title: 'Locked', accountId: 42 }]
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
-    await wrapper.vm.startEdit(videosStore.videos.value[0])
+    await wrapper.vm.editVideo(videosStore.videos.value[0])
     await nextTick()
 
-    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
-  })
-
-  it('shows error when updateVideoCategory fails', async () => {
-    videosStore.videos.value = [{ id: 42, title: 'Common', accountId: 0, categoryId: 0 }]
-    videosStore.update.mockRejectedValueOnce(new Error('update failed'))
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.vm.updateVideoCategory(videosStore.videos.value[0], 4)
-    await flushPromises()
-
-    expect(alertStore.error).toHaveBeenCalledWith('Не удалось обновить категорию: update failed')
+    expect(router.push).not.toHaveBeenCalled()
   })
 
   it('skips upload when no files are provided', async () => {
@@ -1164,18 +996,6 @@ describe('Videos_List.vue', () => {
     expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось загрузить видеофайлы'))
   })
 
-  it('uses err object directly when updateVideoCategory error has no message', async () => {
-    videosStore.videos.value = [{ id: 120, title: 'V', accountId: 0, categoryId: 0 }]
-    videosStore.update.mockRejectedValueOnce(new Error())
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    await wrapper.vm.updateVideoCategory(videosStore.videos.value[0], 3)
-    await flushPromises()
-
-    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категорию'))
-  })
-
   it('uses err object directly when deleteSelectedVideos error has no message', async () => {
     videosStore.videos.value = [{ id: 121, title: 'V', accountId: 0 }]
     videosStore.removeBatch.mockRejectedValueOnce(new Error())
@@ -1303,6 +1123,10 @@ describe('Videos_List.vue', () => {
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
+    wrapper.vm.selectedVideoIds = [141]
+    wrapper.vm.openBatchCategoryDialog()
+    await nextTick()
+
     const vSelects = wrapper.findAllComponents(globalStubs['v-select'])
     await vSelects[1].vm.$emit('update:modelValue', 4)
     await nextTick()
@@ -1324,20 +1148,6 @@ describe('Videos_List.vue', () => {
     expect(wrapper.vm.tableSearch).toBe('findme')
   })
 
-  it('updates video category via in-row select for common videos', async () => {
-    categoriesStore.categories.value = [{ id: 3, title: 'Sports' }]
-    videosStore.videos.value = [{ id: 143, title: 'Common', accountId: 0, categoryId: 0 }]
-    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
-    await flushPromises()
-
-    const categorySelects = wrapper.findAll('[data-test="video-category-select"]')
-    categorySelects[0].element.value = '3'
-    await categorySelects[0].trigger('change')
-    await flushPromises()
-
-    expect(videosStore.update).toHaveBeenCalledWith(143, { categoryId: 3 })
-  })
-
   it('updates data table items-per-page, page, and sort-by via v-model bindings', async () => {
     videosStore.videos.value = [{ id: 144, title: 'V', accountId: 0 }]
     const wrapper = mount(VideosList, {
@@ -1356,23 +1166,25 @@ describe('Videos_List.vue', () => {
     expect(wrapper.vm.tableSortBy).toEqual([{ key: 'title', order: 'asc' }])
   })
 
-  it('categorySaving flag blocks concurrent updateVideoCategory calls', async () => {
+  it('categorySaving flag blocks closing the batch category dialog', async () => {
     videosStore.videos.value = [{ id: 150, title: 'V', accountId: 0, categoryId: 0 }]
     let resolveUpdate
-    videosStore.update.mockImplementation(() => new Promise(resolve => { resolveUpdate = resolve }))
+    videosStore.updateCategoryBatch.mockImplementation(() => new Promise(resolve => { resolveUpdate = resolve }))
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
-    const item = videosStore.videos.value[0]
-    const first = wrapper.vm.updateVideoCategory(item, 3)
+    wrapper.vm.selectedVideoIds = [150]
+    wrapper.vm.batchCategoryId = 3
+    wrapper.vm.batchCategoryDialog = true
+    const first = wrapper.vm.updateSelectedVideoCategory()
     await nextTick()
 
-    await wrapper.vm.updateVideoCategory(item, 5)
+    wrapper.vm.closeBatchCategoryDialog()
     await nextTick()
 
-    expect(videosStore.update).toHaveBeenCalledTimes(1)
+    expect(wrapper.vm.batchCategoryDialog).toBe(true)
 
-    resolveUpdate({})
+    resolveUpdate({ requestedCount: 1, updatedIds: [150], failures: [] })
     await first
     await flushPromises()
   })

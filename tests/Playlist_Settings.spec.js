@@ -183,6 +183,7 @@ const mountSettings = (props = {}) => mount({
               <slot name="item.position" :item="item" />
               <slot name="item.title" :item="item" />
               <slot name="item.accountName" :item="item" />
+              <slot name="item.categoryName" :item="item" />
               <slot name="item.fileSize" :item="item" />
               <slot name="item.duration" :item="item" />
               <slot name="item.actions" :item="item" />
@@ -314,6 +315,26 @@ describe('Playlist_Settings.vue', () => {
       { videoId: 22, position: 1 },
       { videoId: 11, position: 2 }
     ])
+  })
+
+  it('shows derived category name for videos in playlist table', async () => {
+    categoriesStore.categories = [{ id: 7, title: 'News' }]
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId === 0) {
+        return [{ id: 22, title: 'Shared', originalFilename: 'shared.mp4', fileSizeBytes: 2400, durationSeconds: 90, accountId: 0, categoryId: 7 }]
+      }
+      return []
+    })
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Shared')
+    await clickBatchAdd(wrapper)
+
+    const playlistTable = getPlaylistTable(wrapper)
+    expect(playlistTable.text()).toContain('Shared')
+    expect(playlistTable.text()).toContain('News')
   })
 
   it('batch add allows duplicate playlist entries', async () => {
