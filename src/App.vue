@@ -48,7 +48,7 @@ function getUserName() {
 
 function getUserRole() {
   if (!authStore.user || authStore.user === undefined) {
-    return 'Media Pi'
+    return 'ММБОКС'
   }
   /* getRoleName requires rolesStore.ensureLoaded */
   return getRoleName(authStore.user)
