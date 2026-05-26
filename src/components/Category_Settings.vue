@@ -10,6 +10,7 @@ import * as Yup from 'yup'
 
 import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 
 const props = defineProps({
@@ -25,8 +26,13 @@ const props = defineProps({
 
 const categoriesStore = useCategoriesStore()
 const alertStore = useAlertStore()
+const authStore = useAuthStore()
 const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(categoriesStore)
+
+if (!authStore.isAdministrator) {
+  redirectToDefaultRoute()
+}
 
 const schema = Yup.object().shape({
   title: Yup.string().trim().required('Необходимо указать название')
@@ -44,27 +50,31 @@ function getButton() {
 }
 
 if (!isRegister()) {
-  initialLoading.value = true
-  try {
-    await categoriesStore.getById(props.id)
-    const loadedCategory = categoriesStore.category
-    if (!loadedCategory) {
-      throw new Error(`Категория с ID ${props.id} не найдена`)
+  if (!props.id || isNaN(props.id)) {
+    redirectToDefaultRoute()
+  } else {
+    initialLoading.value = true
+    try {
+      await categoriesStore.getById(props.id)
+      const loadedCategory = categoriesStore.category
+      if (!loadedCategory) {
+        throw new Error(`Категория с ID ${props.id} не найдена`)
+      }
+      category.value = {
+        title: loadedCategory.title || '',
+        free: loadedCategory.free ?? true
+      }
+    } catch (err) {
+      if (err.status === 401 || err.status === 403) {
+        redirectToDefaultRoute()
+      } else if (err.status === 404) {
+        alertStore.error(`Категория с ID ${props.id} не найдена`)
+      } else {
+        alertStore.error(`Ошибка загрузки категории: ${err.message || err}`)
+      }
+    } finally {
+      initialLoading.value = false
     }
-    category.value = {
-      title: loadedCategory.title || '',
-      free: loadedCategory.free ?? true
-    }
-  } catch (err) {
-    if (err.status === 401 || err.status === 403) {
-      redirectToDefaultRoute()
-    } else if (err.status === 404) {
-      alertStore.error(`Категория с ID ${props.id} не найдена`)
-    } else {
-      alertStore.error(`Ошибка загрузки категории: ${err.message || err}`)
-    }
-  } finally {
-    initialLoading.value = false
   }
 }
 

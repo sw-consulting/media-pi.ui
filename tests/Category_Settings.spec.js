@@ -24,6 +24,8 @@ const alertStore = {
   clear: vi.fn()
 }
 
+let authStore = { isAdministrator: true }
+
 vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
   return { ...actual, storeToRefs: (store) => store }
@@ -39,6 +41,10 @@ vi.mock('@/stores/categories.store.js', () => ({
 
 vi.mock('@/stores/alert.store.js', () => ({
   useAlertStore: () => alertStore
+}))
+
+vi.mock('@/stores/auth.store.js', () => ({
+  useAuthStore: () => authStore
 }))
 
 vi.mock('@/helpers/default.route.js', () => ({
@@ -85,6 +91,7 @@ const mountSettings = (props = {}) => mount({
 
 describe('Category_Settings.vue', () => {
   beforeEach(() => {
+    authStore = { isAdministrator: true }
     categoriesStore.category = null
     categoriesStore.loading.value = false
     categoriesStore.getById = vi.fn().mockResolvedValue()
@@ -262,5 +269,37 @@ describe('Category_Settings.vue', () => {
     await wrapper.find('button.secondary').trigger('click')
 
     expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('redirects non-administrator on create', async () => {
+    authStore = { isAdministrator: false }
+
+    mountSettings({ register: true })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('redirects non-administrator on edit', async () => {
+    authStore = { isAdministrator: false }
+
+    mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('redirects when id is missing on edit', async () => {
+    mountSettings({ register: false })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('redirects when id is NaN on edit', async () => {
+    mountSettings({ register: false, id: NaN })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
   })
 })
