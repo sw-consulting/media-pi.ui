@@ -30,6 +30,11 @@ const accountsStore = {
   getAll: vi.fn(async () => accountsStore.accounts)
 }
 
+const categoriesStore = {
+  categories: [],
+  getAll: vi.fn(async () => categoriesStore.categories)
+}
+
 const alertStore = {
   alert: ref(null),
   error: vi.fn((message) => { alertStore.alert.value = { message, type: 'alert-danger' } }),
@@ -55,6 +60,10 @@ vi.mock('@/stores/videos.store.js', () => ({
 
 vi.mock('@/stores/accounts.store.js', () => ({
   useAccountsStore: () => accountsStore
+}))
+
+vi.mock('@/stores/categories.store.js', () => ({
+  useCategoriesStore: () => categoriesStore
 }))
 
 vi.mock('@/stores/auth.store.js', () => ({
@@ -254,6 +263,8 @@ describe('Playlist_Settings.vue', () => {
     })
     accountsStore.accounts = [{ id: 1, name: 'Account 1' }]
     accountsStore.getAll = vi.fn(async () => accountsStore.accounts)
+    categoriesStore.categories = []
+    categoriesStore.getAll = vi.fn(async () => categoriesStore.categories)
     alertStore.alert.value = null
     vi.clearAllMocks()
   })

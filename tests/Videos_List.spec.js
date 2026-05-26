@@ -22,6 +22,13 @@ const accountsStore = {
   getAll: vi.fn(async () => accountsStore.accounts.value)
 }
 
+const categoriesStore = {
+  categories: ref([]),
+  loading: ref(false),
+  error: ref(null),
+  getAll: vi.fn(async () => categoriesStore.categories.value)
+}
+
 const videosStore = {
   videos: ref([]),
   loading: ref(false),
@@ -31,7 +38,8 @@ const videosStore = {
   uploadFile: vi.fn(async () => ({})),
   uploadFiles: vi.fn(async () => ({})),
   remove: vi.fn(async () => ({})),
-  removeBatch: vi.fn(async () => ({ requestedCount: 0, deletedIds: [], failures: [] }))
+  removeBatch: vi.fn(async () => ({ requestedCount: 0, deletedIds: [], failures: [] })),
+  updateCategoryBatch: vi.fn(async () => ({ requestedCount: 0, updatedIds: [], failures: [] }))
 }
 
 const alertStore = {
@@ -47,6 +55,7 @@ const confirmation = {
 }
 
 vi.mock('@/stores/accounts.store.js', () => ({ useAccountsStore: () => accountsStore }))
+vi.mock('@/stores/categories.store.js', () => ({ useCategoriesStore: () => categoriesStore }))
 vi.mock('@/stores/videos.store.js', () => ({ useVideosStore: () => videosStore }))
 vi.mock('@/stores/auth.store.js', () => ({ useAuthStore: () => makeAuthStore() }))
 vi.mock('@/stores/alert.store.js', () => ({ useAlertStore: () => alertStore }))
@@ -68,7 +77,8 @@ const globalStubs = {
     methods: {
       emitValue(event) {
         const value = event?.target?.value
-        this.$emit('update:modelValue', value === 'null' ? null : Number(value))
+        const numeric = Number(value)
+        this.$emit('update:modelValue', value === 'null' ? null : (Number.isNaN(numeric) ? value : numeric))
       }
     },
     template: '<select @change="emitValue"><option v-for="item in items" :key="item.value" :value="item.value">{{ item.title }}</option></select>'
@@ -97,6 +107,7 @@ const globalStubs = {
           />
           <slot name="item.actions" :item="item" />
           <slot name="item.title" :item="item" />
+          <slot name="item.categoryTitle" :item="item" />
         </div>
       </div>
     `
@@ -122,15 +133,18 @@ describe('Videos_List.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     accountsStore.accounts.value = []
+    categoriesStore.categories.value = []
     videosStore.videos.value = []
     currentUser = { roles: [1], accountIds: [] }
     accountsStore.getAll.mockImplementation(async () => accountsStore.accounts.value)
+    categoriesStore.getAll.mockImplementation(async () => categoriesStore.categories.value)
     videosStore.getAllByAccount.mockImplementation(async () => videosStore.videos.value)
     videosStore.update.mockImplementation(async () => ({}))
     videosStore.uploadFile.mockImplementation(async () => ({}))
     videosStore.uploadFiles.mockImplementation(async () => ({}))
     videosStore.remove.mockImplementation(async () => ({}))
     videosStore.removeBatch.mockImplementation(async () => ({ requestedCount: 0, deletedIds: [], failures: [] }))
+    videosStore.updateCategoryBatch.mockImplementation(async () => ({ requestedCount: 0, updatedIds: [], failures: [] }))
     alertStore.success.mockImplementation((message) => { alertStore.alert.value = { message, type: 'alert-success' } })
     alertStore.error.mockImplementation((message) => { alertStore.alert.value = { message } })
     alertStore.clear.mockImplementation(() => {})
@@ -144,12 +158,64 @@ describe('Videos_List.vue', () => {
 
     await flushPromises()
     expect(accountsStore.getAll).toHaveBeenCalled()
-    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(5)
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(5, {})
 
-    wrapper.vm.selectedAccountId = 0
+    wrapper.vm.selectedScope = 'common:all'
     await nextTick()
     await flushPromises()
-    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0)
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, {})
+  })
+
+  it('loads and uploads using selected category scope', async () => {
+    categoriesStore.categories.value = [{ id: 4, title: 'News' }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedScope = 'category:4'
+    await nextTick()
+    await flushPromises()
+
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { categoryId: 4 })
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+
+    expect(videosStore.uploadFiles).toHaveBeenCalledWith(
+      [file],
+      0,
+      {
+        categoryId: 4,
+        onUploadProgress: expect.any(Function),
+        signal: expect.any(AbortSignal)
+      }
+    )
+  })
+
+  it('updates a single video category through existing video update', async () => {
+    videosStore.videos.value = [{ id: 30, title: 'Common', accountId: 0, categoryId: 0 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.vm.updateVideoCategory(videosStore.videos.value[0], 4)
+
+    expect(videosStore.update).toHaveBeenCalledWith(30, { categoryId: 4 })
+  })
+
+  it('batch updates selected video category', async () => {
+    videosStore.videos.value = [
+      { id: 31, title: 'First', accountId: 0, categoryId: 0 },
+      { id: 32, title: 'Second', accountId: 0, categoryId: 0 }
+    ]
+    videosStore.updateCategoryBatch = vi.fn(async () => ({ requestedCount: 2, updatedIds: [31, 32], failures: [] }))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [31, 32]
+    wrapper.vm.batchCategoryId = 4
+    await wrapper.vm.updateSelectedVideoCategory()
+
+    expect(videosStore.updateCategoryBatch).toHaveBeenCalledWith([31, 32], 4)
+    expect(alertStore.success).toHaveBeenCalledWith('Обновлено видеофайлов: 2')
   })
 
   it('blocks upload when user lacks permissions', async () => {

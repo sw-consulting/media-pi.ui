@@ -107,6 +107,18 @@ export const useVideosStore = defineStore('videos', () => {
     )
   }
 
+  async function updateCategoryBatch(ids, categoryId) {
+    return handleRequest(
+      async () => {
+        const selectedIds = Array.from(ids || [])
+        if (!selectedIds.length) throw new Error('Не выбраны видеофайлы')
+        if (typeof categoryId !== 'number') throw new Error('Не выбрана категория')
+
+        return fetchWrapper.post(`${baseUrl}/category/batch`, { ids: selectedIds, categoryId })
+      }
+    )
+  }
+
   const buildUploadOptions = (options = {}) => {
     const uploadOptions = {}
     if (typeof options.onUploadProgress === 'function') {
@@ -127,6 +139,12 @@ export const useVideosStore = defineStore('videos', () => {
     return fetchWrapper.postFile(url, formData)
   }
 
+  const appendCategoryId = (formData, options = {}) => {
+    if (Object.prototype.hasOwnProperty.call(options, 'categoryId')) {
+      formData.append('CategoryId', options.categoryId)
+    }
+  }
+
   async function uploadFile(file, accountId, title = '', options = {}) {
     return handleRequest(async () => {
       if (!file) throw new Error('Не выбран видеофайл')
@@ -136,6 +154,7 @@ export const useVideosStore = defineStore('videos', () => {
       formData.append('File', file)
       formData.append('Title', effectiveTitle)
       formData.append('AccountId', accountId)
+      appendCategoryId(formData, options)
       return postUploadFile(`${baseUrl}/upload`, formData, options)
     })
   }
@@ -152,19 +171,23 @@ export const useVideosStore = defineStore('videos', () => {
         formData.append('Titles', deriveUploadTitle(file, file.name || ''))
       })
       formData.append('AccountId', accountId)
+      appendCategoryId(formData, options)
 
       return postUploadFile(`${baseUrl}/upload/batch`, formData, options)
     })
   }
 
-  async function getAllByAccount(accountId) {
+  async function getAllByAccount(accountId, options = {}) {
     return handleRequest(
       async () => {
         if (accountId === null) {
           videos.value = []
           return videos.value
         }
-        const result = await fetchWrapper.get(`${baseUrl}/by-account/${accountId}`)
+        const query = Object.prototype.hasOwnProperty.call(options, 'categoryId')
+          ? `?categoryId=${encodeURIComponent(options.categoryId)}`
+          : ''
+        const result = await fetchWrapper.get(`${baseUrl}/by-account/${accountId}${query}`)
         videos.value = result || []
         return videos.value
       },
@@ -185,6 +208,7 @@ export const useVideosStore = defineStore('videos', () => {
     update,
     remove,
     removeBatch,
+    updateCategoryBatch,
     uploadFile,
     uploadFiles,
     getAllByAccount,

@@ -12,11 +12,13 @@ import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 import { usePlaylistsStore } from '@/stores/playlists.store.js'
 import { useVideosStore } from '@/stores/videos.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
+import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { createAccountOptions } from '@/helpers/account.options.js'
 import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
+import { getCategoryTitle } from '@/helpers/video.scope.helpers.js'
 
 const props = defineProps({
   register: {
@@ -36,6 +38,7 @@ const props = defineProps({
 const playlistsStore = usePlaylistsStore()
 const videosStore = useVideosStore()
 const accountsStore = useAccountsStore()
+const categoriesStore = useCategoriesStore()
 const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
@@ -87,6 +90,7 @@ const availableVideoHeaders = [
   { title: '', align: 'center', key: 'select', sortable: false, width: '44px' },
   { title: 'Название', align: 'start', key: 'title' },
   { title: 'Лицевой счёт', align: 'start', key: 'accountName', sortable: false, width: '150px' },
+  { title: 'Категория', align: 'start', key: 'categoryName', sortable: true, width: '150px' },
   { title: 'Размер', align: 'start', key: 'fileSize', sortable: true, sort: compareMediaNumber, width: '120px' },
   { title: 'Длительность', align: 'start', key: 'duration', sortable: true, sort: compareMediaNumber, width: '130px' }
 ]
@@ -120,7 +124,8 @@ const filteredAvailableVideos = computed(() => {
   return availableVideos.value.filter(video => [
     video.title,
     video.originalFilename,
-    video.accountName
+    video.accountName,
+    video.categoryName
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(query)))
 })
 
@@ -129,7 +134,9 @@ const sortedFilteredAvailableVideos = computed(() => {
   if (!availableSortBy.value.length) return items
   const { key, order } = availableSortBy.value[0]
   const sorted = [...items].sort((a, b) => {
-    const result = compareMediaNumber(a[key], b[key])
+    const result = key === 'fileSize' || key === 'duration'
+      ? compareMediaNumber(a[key], b[key])
+      : (a[key] || '').toString().localeCompare((b[key] || '').toString(), 'ru')
     return order === 'desc' ? -result : result
   })
   return sorted
@@ -145,7 +152,8 @@ const playlistVideoDetails = computed(() => playlistItems.value.map((item, index
     title,
     fileSize: video?.fileSize,
     duration: video?.duration,
-    accountName: video?.accountName
+    accountName: video?.accountName,
+    categoryName: video?.categoryName
   }
 }))
 
@@ -224,6 +232,8 @@ if (!props.register) {
 
 try {
   await accountsStore.getAll()
+  await categoriesStore.getAll()
+  updateAvailableCategoryNames()
 } catch (err) {
   alertStore.error(`Не удалось загрузить лицевые счета: ${err.message || err}`)
 }
@@ -266,6 +276,13 @@ function compareMediaNumber(a, b) {
   return toSortableMediaNumber(a) - toSortableMediaNumber(b)
 }
 
+function updateAvailableCategoryNames() {
+  availableVideos.value = availableVideos.value.map(video => ({
+    ...video,
+    categoryName: getCategoryTitle(video.categoryId, categoriesStore.categories || [])
+  }))
+}
+
 async function loadAvailableVideos() {
   videosLoading.value = true
   try {
@@ -286,7 +303,9 @@ async function loadAvailableVideos() {
           fileSize: video.fileSizeBytes,
           duration: video.durationSeconds,
           accountId: video.accountId,
-          accountName: accountNameById.value.get(video.accountId) || `Лицевой счёт ${video.accountId}`
+          accountName: accountNameById.value.get(video.accountId) || `Лицевой счёт ${video.accountId}`,
+          categoryId: video.categoryId || 0,
+          categoryName: getCategoryTitle(video.categoryId, categoriesStore.categories || [])
         })
       }
     }
@@ -679,6 +698,9 @@ async function onSubmit(values) {
             </template>
             <template v-slot:[`item.accountName`]="{ item }">
               <span class="playlist-account-cell">{{ item.accountName || '—' }}</span>
+            </template>
+            <template v-slot:[`item.categoryName`]="{ item }">
+              <span class="playlist-account-cell">{{ item.categoryName || 'Без категории' }}</span>
             </template>
             <template v-slot:[`item.fileSize`]="{ item }">
               {{ formatFileSize(item.fileSize) }}

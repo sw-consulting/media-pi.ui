@@ -1,5 +1,5 @@
 // Copyright (c) 2025 sw.consulting
-// This file is a part of Media Pi  frontend application
+// This file is a part of Media Pi frontend application
 
 <script setup>
 import { computed, onMounted, ref, watch, nextTick } from 'vue'
@@ -9,37 +9,68 @@ import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
 import { useVideosStore } from '@/stores/videos.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
+import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
-import { createAccountOptions, estimateSelectWidth } from '@/helpers/account.options.js'
+import { estimateSelectWidth } from '@/helpers/account.options.js'
+import {
+  createCategoryOptions,
+  createVideoScopeOptions,
+  getCategoryTitle,
+  parseVideoScope
+} from '@/helpers/video.scope.helpers.js'
+
+const props = defineProps({
+  title: {
+    type: String,
+    default: 'Видеофайлы'
+  },
+  fixedScope: {
+    type: String,
+    default: null
+  }
+})
 
 const videosStore = useVideosStore()
 const accountsStore = useAccountsStore()
+const categoriesStore = useCategoriesStore()
 const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { confirmDelete, confirmAction } = useConfirmation()
 
 const { videos, loading } = storeToRefs(videosStore)
 const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
+const { loading: categoriesLoading, categories } = storeToRefs(categoriesStore)
 const { alert } = storeToRefs(alertStore)
 
-const selectedAccountId = ref(null)
+const selectedScope = ref(props.fixedScope)
 const fileInput = ref(null)
 const titleInputRef = ref(null)
 const editingVideoId = ref(null)
 const editingTitle = ref('')
 const titleSaving = ref(false)
+const categorySaving = ref(false)
 const isUploading = ref(false)
 const uploadPhase = ref('idle')
 const uploadProgressPercent = ref(0)
 const uploadProgressIndeterminate = ref(true)
 const uploadAbortController = ref(null)
 const selectedVideoIds = ref([])
+const batchCategoryId = ref(0)
+const localItemsPerPage = ref(10)
+const localSearch = ref('')
+const localSortBy = ref([])
+const localPage = ref(1)
 
-const accountOptions = computed(() => createAccountOptions(accounts.value || [], authStore.user, { includeCommon: true }))
+const scopeOptions = computed(() => {
+  if (props.fixedScope) return []
+  return createVideoScopeOptions(accounts.value || [], categories.value || [], authStore.user)
+})
+const selectedScopeInfo = computed(() => parseVideoScope(selectedScope.value))
+const categoryOptions = computed(() => createCategoryOptions(categories.value || []))
 
 const uploadProgressTitle = computed(() => {
   if (uploadPhase.value === 'processing') return 'Обработка видеофайлов'
@@ -55,24 +86,55 @@ const canCancelUpload = computed(() => uploadPhase.value === 'uploading')
 
 const headers = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
-  { title: 'Название', align: 'start', key: 'title', width: '50%' },
-  { title: 'Имя файла', align: 'start', key: 'originalFilename', width: '19%' },
+  { title: 'Название', align: 'start', key: 'title', width: '38%' },
+  { title: 'Имя файла', align: 'start', key: 'originalFilename', width: '18%' },
+  { title: 'Категория', align: 'start', key: 'categoryTitle', width: '18%' },
   { title: 'Размер', align: 'start', key: 'fileSize', width: '13%' },
   { title: 'Длительность', align: 'start', key: 'duration', width: '13%' },
 ]
 
-const selectWidth = computed(() => estimateSelectWidth(accountOptions.value))
+const selectWidth = computed(() => estimateSelectWidth(scopeOptions.value))
 
-const canManageSelectedAccount = computed(() => {
-  if (selectedAccountId.value === 0) {
+const canManageSelectedScope = computed(() => {
+  const scope = selectedScopeInfo.value
+  if (scope.accountId === 0) {
     return isAdministrator(authStore.user)
   }
-  return canManageAccountById(authStore.user, selectedAccountId.value)
+  return canManageAccountById(authStore.user, scope.accountId)
 })
 
-const isBusy = computed(() => loading.value || accountsLoading.value || isUploading.value)
+const isBusy = computed(() => loading.value || accountsLoading.value || categoriesLoading.value || isUploading.value)
 const selectedVideoCount = computed(() => selectedVideoIds.value.length)
-const canDeleteSelectedVideos = computed(() => canManageSelectedAccount.value && selectedVideoCount.value > 0 && !isBusy.value && !titleSaving.value)
+const canDeleteSelectedVideos = computed(() => canManageSelectedScope.value && selectedVideoCount.value > 0 && !isBusy.value && !titleSaving.value && !categorySaving.value)
+const canUpdateSelectedCategory = computed(() => canDeleteSelectedVideos.value && typeof batchCategoryId.value === 'number')
+const tableItemsPerPage = computed({
+  get: () => props.fixedScope ? localItemsPerPage.value : authStore.videos_per_page,
+  set: value => {
+    if (props.fixedScope) localItemsPerPage.value = value
+    else authStore.videos_per_page = value
+  }
+})
+const tableSearch = computed({
+  get: () => props.fixedScope ? localSearch.value : authStore.videos_search,
+  set: value => {
+    if (props.fixedScope) localSearch.value = value
+    else authStore.videos_search = value
+  }
+})
+const tableSortBy = computed({
+  get: () => props.fixedScope ? localSortBy.value : authStore.videos_sort_by,
+  set: value => {
+    if (props.fixedScope) localSortBy.value = value
+    else authStore.videos_sort_by = value
+  }
+})
+const tablePage = computed({
+  get: () => props.fixedScope ? localPage.value : authStore.videos_page,
+  set: value => {
+    if (props.fixedScope) localPage.value = value
+    else authStore.videos_page = value
+  }
+})
 
 function resetUploadProgress() {
   uploadPhase.value = 'idle'
@@ -108,15 +170,26 @@ function isAbortError(err) {
 }
 
 function ensureSelection(options) {
+  if (props.fixedScope) {
+    selectedScope.value = props.fixedScope
+    return
+  }
+
   const availableValues = options.map(option => option.value)
-  if (!availableValues.includes(selectedAccountId.value)) {
-    selectedAccountId.value = availableValues.length ? availableValues[0] : null
+  if (!availableValues.includes(selectedScope.value)) {
+    selectedScope.value = availableValues.length ? availableValues[0] : null
   }
 }
 
 const refreshVideos = async () => {
   try {
-    await videosStore.getAllByAccount(selectedAccountId.value)
+    const scope = selectedScopeInfo.value
+    await videosStore.getAllByAccount(
+      scope.accountId,
+      Object.prototype.hasOwnProperty.call(scope, 'categoryId') && scope.categoryId !== undefined
+        ? { categoryId: scope.categoryId }
+        : {}
+    )
     return true
   } catch (err) {
     alertStore.error('Не удалось загрузить информацию о видеофайлах: ' + (err?.message || err))
@@ -124,19 +197,22 @@ const refreshVideos = async () => {
   }
 }
 
-watch(accountOptions, (options) => ensureSelection(options), { immediate: true })
+watch(scopeOptions, (options) => ensureSelection(options), { immediate: true })
 
-watch(selectedAccountId, async () => {
-  if (selectedAccountId.value === undefined) return
+watch(selectedScope, async () => {
+  if (selectedScope.value === undefined || selectedScope.value === null) return
   selectedVideoIds.value = []
   await refreshVideos()
 }, { immediate: true })
 
 onMounted(async () => {
   try {
-    await accountsStore.getAll()
+    if (!props.fixedScope) {
+      await accountsStore.getAll()
+    }
+    await categoriesStore.getAll()
   } catch (err) {
-    alertStore.error('Не удалось загрузить лицевые счета: ' + (err?.message || err))
+    alertStore.error('Не удалось загрузить справочники видеофайлов: ' + (err?.message || err))
   }
 })
 
@@ -149,7 +225,7 @@ function triggerUpload() {
 async function uploadVideos(files) {
   const selectedFiles = Array.from(files || []).filter(Boolean)
   if (!selectedFiles.length) return
-  if (!canManageSelectedAccount.value) {
+  if (!canManageSelectedScope.value) {
     alertStore.error('Недостаточно прав для загрузки видеофайлов в выбранный раздел')
     return
   }
@@ -159,10 +235,16 @@ async function uploadVideos(files) {
   const abortController = new AbortController()
   uploadAbortController.value = abortController
   try {
-    await videosStore.uploadFiles(selectedFiles, selectedAccountId.value, {
+    const scope = selectedScopeInfo.value
+    const uploadOptions = {
       onUploadProgress: handleUploadProgress,
       signal: abortController.signal
-    })
+    }
+    if (scope.categoryId !== undefined) {
+      uploadOptions.categoryId = scope.categoryId
+    }
+
+    await videosStore.uploadFiles(selectedFiles, scope.accountId, uploadOptions)
     uploadPhase.value = 'refreshing'
     uploadProgressIndeterminate.value = true
     await refreshVideos()
@@ -187,6 +269,23 @@ function canManageVideo(item) {
     return isAdministrator(authStore.user)
   }
   return canManageAccountById(authStore.user, item.accountId)
+}
+
+function categoryTitle(categoryId) {
+  return getCategoryTitle(categoryId, categories.value || [])
+}
+
+async function updateVideoCategory(item, categoryId) {
+  if (!canManageVideo(item) || categorySaving.value) return
+  categorySaving.value = true
+  try {
+    await videosStore.update(item.id, { categoryId })
+    await refreshVideos()
+  } catch (err) {
+    alertStore.error('Не удалось обновить категорию: ' + (err?.message || err))
+  } finally {
+    categorySaving.value = false
+  }
 }
 
 const isEditing = (item) => editingVideoId.value === item?.id
@@ -272,7 +371,7 @@ function summarizeBatchDeleteResult(result, requestedCount) {
 
 async function deleteSelectedVideos() {
   const ids = [...selectedVideoIds.value]
-  if (!ids.length || !canManageSelectedAccount.value) return
+  if (!ids.length || !canManageSelectedScope.value) return
 
   const confirmed = await confirmAction(`Удалить выбранные видеофайлы (${ids.length})?`, {
     title: 'Подтверждение удаления',
@@ -296,6 +395,43 @@ async function deleteSelectedVideos() {
   }
 }
 
+function summarizeBatchCategoryResult(result, requestedCount) {
+  const failures = Array.isArray(result?.failures) ? result.failures : []
+  const updatedIds = Array.isArray(result?.updatedIds) ? result.updatedIds : []
+  const updatedCount = updatedIds.length
+
+  if (failures.length === 0) {
+    alertStore.success(`Обновлено видеофайлов: ${updatedCount || requestedCount}`)
+    return
+  }
+
+  const failureDetails = failures
+    .slice(0, 3)
+    .map(failure => failure?.message || `id=${failure?.id}`)
+    .join('; ')
+  const remainingCount = failures.length > 3 ? `; ещё ${failures.length - 3}` : ''
+  alertStore.error(`Обновлено видеофайлов: ${updatedCount}. Не удалось обновить: ${failures.length}. ${failureDetails}${remainingCount}`)
+}
+
+async function updateSelectedVideoCategory() {
+  const ids = [...selectedVideoIds.value]
+  if (!ids.length || !canManageSelectedScope.value || typeof batchCategoryId.value !== 'number') return
+
+  categorySaving.value = true
+  try {
+    const result = await videosStore.updateCategoryBatch(ids, batchCategoryId.value)
+    selectedVideoIds.value = []
+    const refreshed = await refreshVideos()
+    if (refreshed) {
+      summarizeBatchCategoryResult(result, ids.length)
+    }
+  } catch (err) {
+    alertStore.error('Не удалось обновить категории видеофайлов: ' + (err?.message || err))
+  } finally {
+    categorySaving.value = false
+  }
+}
+
 function filterVideos(value, query, item) {
   if (!query) return true
   const rawVideo = item?.raw
@@ -306,7 +442,8 @@ function filterVideos(value, query, item) {
     rawVideo.originalFilename,
     rawVideo.fileSize,
     rawVideo.duration,
-    rawVideo.accountDisplay
+    rawVideo.accountDisplay,
+    categoryTitle(rawVideo.categoryId)
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
 }
 
@@ -325,16 +462,17 @@ watch(videos, (current) => {
 <template>
   <div class="settings table-3">
     <div class="header-with-actions">
-      <h1 class="primary-heading">Видеофайлы</h1>
+      <h1 class="primary-heading">{{ props.title }}</h1>
       <div class="header-actions-container">
         <div v-if="loading" class="header-actions header-actions-group">
           <span class="spinner-border spinner-border-m"></span>
         </div>
         <div class="header-actions header-actions-group">
           <v-select
-            v-model="selectedAccountId"
-            :items="accountOptions"
-            label="Лицевой счёт"
+            v-if="!props.fixedScope"
+            v-model="selectedScope"
+            :items="scopeOptions"
+            label="Раздел"
             item-title="title"
             item-value="value"
             density="compact"
@@ -349,10 +487,32 @@ watch(videos, (current) => {
               :item="{}"
               icon="fa-solid fa-cloud-arrow-up"
               tooltip-text="Загрузить видеофайлы"
-              :disabled="!canManageSelectedAccount || isBusy || titleSaving"
+              :disabled="!canManageSelectedScope || isBusy || titleSaving || categorySaving"
               @click="triggerUpload"
             />
             <input ref="fileInput" class="d-none" type="file" accept="video/*" multiple @change="onFileChange" />
+          </div>
+          <div class="header-actions header-actions-group">
+            <v-select
+              v-model="batchCategoryId"
+              :items="categoryOptions"
+              label="Категория"
+              item-title="title"
+              item-value="value"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :disabled="!canUpdateSelectedCategory"
+              style="width: 220px; margin-right: 8px;"
+            />
+            <ActionButton
+              data-test="batch-category-video-button"
+              :item="{}"
+              icon="fa-solid fa-tags"
+              tooltip-text="Изменить категорию выбранных видеофайлов"
+              :disabled="!canUpdateSelectedCategory"
+              @click="updateSelectedVideoCategory"
+            />
           </div>
           <div class="header-actions header-actions-group">
             <ActionButton
@@ -413,7 +573,7 @@ watch(videos, (current) => {
     <v-card>
       <div v-if="videos?.length">
         <v-text-field
-          v-model="authStore.videos_search"
+          v-model="tableSearch"
           :append-inner-icon="mdiMagnify"
           label="Поиск по любой информации о видеофайлах"
           variant="solo"
@@ -422,18 +582,18 @@ watch(videos, (current) => {
       </div>
       <v-data-table
         v-if="videos?.length"
-        v-model:items-per-page="authStore.videos_per_page"
+        v-model:items-per-page="tableItemsPerPage"
         items-per-page-text="Видеофайлов на странице"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
-        v-model:page="authStore.videos_page"
+        v-model:page="tablePage"
         v-model="selectedVideoIds"
         :headers="headers"
         :items="videos"
-        :search="authStore.videos_search"
-        v-model:sort-by="authStore.videos_sort_by"
+        :search="tableSearch"
+        v-model:sort-by="tableSortBy"
         :custom-filter="filterVideos"
-        :show-select="canManageSelectedAccount"
+        :show-select="canManageSelectedScope"
         item-value="id"
         class="elevation-1"
       >
@@ -474,6 +634,22 @@ watch(videos, (current) => {
             </div>
           </div>
         </template>
+        <template v-slot:[`item.categoryTitle`]="{ item }">
+          <v-select
+            v-if="canManageVideo(item) && item.accountId === 0"
+            :model-value="item.categoryId || 0"
+            :items="categoryOptions"
+            item-title="title"
+            item-value="value"
+            density="compact"
+            variant="outlined"
+            hide-details
+            :disabled="isBusy || titleSaving || categorySaving"
+            data-test="video-category-select"
+            @update:model-value="updateVideoCategory(item, $event)"
+          />
+          <span v-else data-test="video-category-label">{{ categoryTitle(item.categoryId) }}</span>
+        </template>
         <template v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">
             <ActionButton
@@ -481,7 +657,7 @@ watch(videos, (current) => {
               :item="item"
               icon="fa-solid fa-pen"
               tooltip-text="Редактировать название видео"
-              :disabled="!canManageVideo(item) || isBusy || titleSaving"
+              :disabled="!canManageVideo(item) || isBusy || titleSaving || categorySaving"
               @click="startEdit(item)"
             />
             <ActionButton
@@ -489,7 +665,7 @@ watch(videos, (current) => {
               :item="item"
               icon="fa-solid fa-trash-can"
               tooltip-text="Удалить видеофайл"
-              :disabled="!canManageVideo(item) || isBusy || titleSaving"
+              :disabled="!canManageVideo(item) || isBusy || titleSaving || categorySaving"
               @click="deleteVideo(item)"
             />
           </div>

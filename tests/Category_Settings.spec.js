@@ -81,6 +81,10 @@ const mountSettings = (props = {}) => mount({
       Field: {
         props: ['name'],
         template: '<input data-test="title-field" />'
+      },
+      VideosList: {
+        props: ['title', 'fixedScope'],
+        template: '<div data-test="category-videos-list"></div>'
       }
     },
     mocks: {

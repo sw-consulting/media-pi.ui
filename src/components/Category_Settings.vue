@@ -12,6 +12,8 @@ import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import VideosList from '@/components/Videos_List.vue'
+import { createCategoryScope } from '@/helpers/video.scope.helpers.js'
 
 const props = defineProps({
   register: {
@@ -174,6 +176,13 @@ async function onSubmit(values) {
       <span class="spinner-border spinner-border-lg align-center"></span>
       <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
+
+    <VideosList
+      v-if="!isRegister() && props.id"
+      class="mt-8"
+      :title="`Видео категории '${category.title || props.id}'`"
+      :fixed-scope="createCategoryScope(props.id)"
+    />
   </div>
 </template>
 
