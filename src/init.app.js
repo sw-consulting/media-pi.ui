@@ -111,6 +111,7 @@ library.add(
   faAngleRight,
   faAnglesLeft,
   faAnglesRight,
+  faFilm,
   faArrowsTurnToDots
 )
 
