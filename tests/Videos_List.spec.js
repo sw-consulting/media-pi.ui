@@ -85,7 +85,7 @@ const globalStubs = {
   },
   'v-data-table': {
     props: ['items', 'modelValue', 'showSelect'],
-    emits: ['update:modelValue'],
+    emits: ['update:modelValue', 'update:itemsPerPage', 'update:page', 'update:sortBy'],
     methods: {
       toggleItem(id, checked) {
         const selected = Array.isArray(this.modelValue) ? [...this.modelValue] : []
@@ -109,6 +109,9 @@ const globalStubs = {
           <slot name="item.title" :item="item" />
           <slot name="item.categoryTitle" :item="item" />
         </div>
+        <button data-test="trigger-items-per-page" @click="$emit('update:itemsPerPage', 5)" />
+        <button data-test="trigger-page" @click="$emit('update:page', 2)" />
+        <button data-test="trigger-sort-by" @click="$emit('update:sortBy', [{key:'title',order:'asc'}])" />
       </div>
     `
   },
@@ -729,5 +732,648 @@ describe('Videos_List.vue', () => {
 
     // Should no longer be in edit mode
     expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
+  })
+
+  it('filterVideos returns true for empty or null query', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const item = { raw: { title: 'Clip', originalFilename: 'clip.mp4', fileSize: '100MB', duration: '1:00', accountDisplay: 'Acc', categoryId: null } }
+    expect(wrapper.vm.filterVideos(null, '', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, null, item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, undefined, item)).toBe(true)
+  })
+
+  it('filterVideos returns false for null or missing item', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    expect(wrapper.vm.filterVideos(null, 'query', null)).toBe(false)
+    expect(wrapper.vm.filterVideos(null, 'query', {})).toBe(false)
+  })
+
+  it('filterVideos matches by title, filename, fileSize, duration, and accountDisplay', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const item = { raw: { title: 'MyClip', originalFilename: 'video.mp4', fileSize: '512MB', duration: '3:45', accountDisplay: 'Station-1', categoryId: null } }
+    expect(wrapper.vm.filterVideos(null, 'myclip', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, 'video.mp4', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, '512', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, '3:45', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, 'station', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, 'nomatch_xyz', item)).toBe(false)
+  })
+
+  it('filterVideos matches by category title', async () => {
+    categoriesStore.categories.value = [{ id: 7, title: 'Nature Docs' }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const item = { raw: { title: null, originalFilename: null, fileSize: null, duration: null, accountDisplay: null, categoryId: 7 } }
+    expect(wrapper.vm.filterVideos(null, 'nature', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, 'nomatch_xyz', item)).toBe(false)
+  })
+
+  it('skips API call when saving title with unchanged value', async () => {
+    videosStore.videos.value = [{ id: 40, title: 'Unchanged', accountId: null }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    const input = wrapper.find('[data-test="edit-title-input"]')
+    expect(input.element.value).toBe('Unchanged')
+
+    await wrapper.find('[data-test="save-title-button"]').trigger('click')
+    await flushPromises()
+
+    expect(videosStore.update).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
+  })
+
+  it('does not start editing when user has no permission', async () => {
+    currentUser = { roles: [], accountIds: [] }
+    videosStore.videos.value = [{ id: 41, title: 'Locked', accountId: 42 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.vm.startEdit(videosStore.videos.value[0])
+    await nextTick()
+
+    expect(wrapper.find('[data-test="edit-title-input"]').exists()).toBe(false)
+  })
+
+  it('shows error when updateVideoCategory fails', async () => {
+    videosStore.videos.value = [{ id: 42, title: 'Common', accountId: 0, categoryId: 0 }]
+    videosStore.update.mockRejectedValueOnce(new Error('update failed'))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.vm.updateVideoCategory(videosStore.videos.value[0], 4)
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось обновить категорию: update failed')
+  })
+
+  it('skips upload when no files are provided', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.vm.uploadVideos([])
+    expect(videosStore.uploadFiles).not.toHaveBeenCalled()
+
+    await wrapper.vm.uploadVideos(null)
+    expect(videosStore.uploadFiles).not.toHaveBeenCalled()
+  })
+
+  it('shows error on non-abort upload failure', async () => {
+    videosStore.uploadFiles.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось загрузить видеофайлы: network error')
+  })
+
+  it('does not delete video when confirmation is cancelled', async () => {
+    videosStore.videos.value = [{ id: 43, title: 'NotDeleted', accountId: null }]
+    confirmation.confirmDelete.mockResolvedValueOnce(false)
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.vm.deleteVideo(videosStore.videos.value[0])
+    expect(videosStore.remove).not.toHaveBeenCalled()
+  })
+
+  it('does not delete video when user has no permission', async () => {
+    currentUser = { roles: [], accountIds: [] }
+    videosStore.videos.value = [{ id: 44, title: 'Protected', accountId: 42 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.vm.deleteVideo(videosStore.videos.value[0])
+    expect(videosStore.remove).not.toHaveBeenCalled()
+    expect(confirmation.confirmDelete).not.toHaveBeenCalled()
+  })
+
+  it('shows error when deleteVideo fails', async () => {
+    videosStore.videos.value = [{ id: 45, title: 'Clip', accountId: null }]
+    videosStore.remove.mockRejectedValueOnce(new Error('delete failed'))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.vm.deleteVideo(videosStore.videos.value[0])
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось удалить видеофайл: delete failed')
+  })
+
+  it('shows error summary for partial batch category update failures', async () => {
+    videosStore.videos.value = [
+      { id: 50, title: 'First', accountId: 0, categoryId: 0 },
+      { id: 51, title: 'Second', accountId: 0, categoryId: 0 }
+    ]
+    videosStore.updateCategoryBatch.mockResolvedValueOnce({
+      requestedCount: 2,
+      updatedIds: [50],
+      failures: [{ id: 51, message: 'Не удалось обновить категорию [id=51]' }]
+    })
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [50, 51]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Обновлено видеофайлов: 1. Не удалось обновить: 1.'))
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категорию [id=51]'))
+  })
+
+  it('uses failure id when message is absent in batch category summary', async () => {
+    videosStore.videos.value = [
+      { id: 52, title: 'A', accountId: 0 },
+      { id: 53, title: 'B', accountId: 0 }
+    ]
+    videosStore.updateCategoryBatch.mockResolvedValueOnce({
+      requestedCount: 2,
+      updatedIds: [52],
+      failures: [{ id: 53 }]
+    })
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [52, 53]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('id=53'))
+  })
+
+  it('shows truncated message for batch category update with more than 3 failures', async () => {
+    videosStore.videos.value = Array.from({ length: 5 }, (_, i) => ({ id: 60 + i, title: `V${i}`, accountId: 0 }))
+    videosStore.updateCategoryBatch.mockResolvedValueOnce({
+      requestedCount: 5,
+      updatedIds: [],
+      failures: [
+        { id: 60, message: 'err1' },
+        { id: 61, message: 'err2' },
+        { id: 62, message: 'err3' },
+        { id: 63, message: 'err4' },
+        { id: 64, message: 'err5' }
+      ]
+    })
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [60, 61, 62, 63, 64]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('ещё 2'))
+  })
+
+  it('shows error when updateSelectedVideoCategory throws', async () => {
+    videosStore.videos.value = [{ id: 70, title: 'Video', accountId: 0 }]
+    videosStore.updateCategoryBatch.mockRejectedValueOnce(new Error('batch failed'))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [70]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось обновить категории видеофайлов: batch failed')
+  })
+
+  it('does not show batch category update summary when refresh fails', async () => {
+    videosStore.videos.value = [{ id: 71, title: 'Video', accountId: 0 }]
+    videosStore.updateCategoryBatch.mockResolvedValueOnce({ requestedCount: 1, updatedIds: [71], failures: [] })
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    alertStore.success.mockClear()
+    videosStore.getAllByAccount.mockRejectedValueOnce(new Error('refresh failed'))
+    wrapper.vm.selectedVideoIds = [71]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.success).not.toHaveBeenCalled()
+  })
+
+  it('uses failure id when message is absent in batch delete summary', async () => {
+    videosStore.videos.value = [
+      { id: 80, title: 'A', accountId: 0 },
+      { id: 81, title: 'B', accountId: 0 }
+    ]
+    videosStore.removeBatch.mockResolvedValueOnce({
+      requestedCount: 2,
+      deletedIds: [80],
+      failures: [{ id: 81 }]
+    })
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [80, 81]
+    await wrapper.vm.deleteSelectedVideos()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('id=81'))
+  })
+
+  it('shows truncated message for batch delete with more than 3 failures', async () => {
+    videosStore.videos.value = Array.from({ length: 5 }, (_, i) => ({ id: 90 + i, title: `V${i}`, accountId: 0 }))
+    videosStore.removeBatch.mockResolvedValueOnce({
+      requestedCount: 5,
+      deletedIds: [],
+      failures: [
+        { id: 90, message: 'err1' },
+        { id: 91, message: 'err2' },
+        { id: 92, message: 'err3' },
+        { id: 93, message: 'err4' },
+        { id: 94, message: 'err5' }
+      ]
+    })
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [90, 91, 92, 93, 94]
+    await wrapper.vm.deleteSelectedVideos()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('ещё 2'))
+  })
+
+  it('uses local pagination state and skips account load when fixedScope is provided', async () => {
+    categoriesStore.categories.value = [{ id: 5, title: 'Sports' }]
+    const wrapper = mount(VideosList, {
+      props: { fixedScope: 'common:all' },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    expect(accountsStore.getAll).not.toHaveBeenCalled()
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, {})
+
+    wrapper.vm.tableItemsPerPage = 25
+    expect(wrapper.vm.tableItemsPerPage).toBe(25)
+
+    wrapper.vm.tableSearch = 'hello'
+    expect(wrapper.vm.tableSearch).toBe('hello')
+
+    wrapper.vm.tableSortBy = [{ key: 'title', order: 'asc' }]
+    expect(wrapper.vm.tableSortBy).toEqual([{ key: 'title', order: 'asc' }])
+
+    wrapper.vm.tablePage = 3
+    expect(wrapper.vm.tablePage).toBe(3)
+  })
+
+  it('uses authStore pagination state when fixedScope is not set', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.tableItemsPerPage = 20
+    wrapper.vm.tableSearch = 'test'
+    wrapper.vm.tableSortBy = [{ key: 'duration', order: 'desc' }]
+    wrapper.vm.tablePage = 2
+
+    expect(wrapper.vm.tableItemsPerPage).toBe(20)
+    expect(wrapper.vm.tableSearch).toBe('test')
+  })
+
+  it('triggers file upload dialog when upload button is clicked', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const fileInput = wrapper.find('input[type="file"]')
+    const clickSpy = vi.spyOn(fileInput.element, 'click').mockImplementation(() => {})
+
+    await wrapper.find('[data-test="upload-video-button"]').trigger('click')
+
+    expect(clickSpy).toHaveBeenCalled()
+  })
+
+  it('shows error when deleteSelectedVideos throws', async () => {
+    videosStore.videos.value = [{ id: 100, title: 'Video', accountId: 0 }]
+    videosStore.removeBatch.mockRejectedValueOnce(new Error('batch error'))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [100]
+    await wrapper.vm.deleteSelectedVideos()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось удалить видеофайлы: batch error')
+  })
+
+  it('shows error when onMounted reference data load fails', async () => {
+    categoriesStore.getAll.mockRejectedValueOnce(new Error('load error'))
+    mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось загрузить справочники видеофайлов: load error')
+  })
+
+  it('treats upload progress with undefined percentage as indeterminate', async () => {
+    let onUploadProgress
+    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+      onUploadProgress = options.onUploadProgress
+      return new Promise(() => {})
+    })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    wrapper.vm.uploadVideos([file])
+    await nextTick()
+
+    onUploadProgress({ lengthComputable: true, percentage: undefined })
+    await nextTick()
+
+    expect(wrapper.find('[data-test="upload-progress-spinner"]').attributes('data-indeterminate')).toBe('true')
+  })
+
+  it('selects first available scope when current scope is not in options', async () => {
+    accountsStore.accounts.value = [{ id: 10, name: 'Alpha' }, { id: 20, name: 'Beta' }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.vm.selectedScope).toBe('account:10')
+  })
+
+  it('sets selectedScope to null when no scope options are available', async () => {
+    currentUser = null
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.vm.selectedScope).toBeNull()
+  })
+
+  it('canManageVideo returns false for null or undefined item', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    expect(wrapper.vm.canManageVideo(null)).toBe(false)
+    expect(wrapper.vm.canManageVideo(undefined)).toBe(false)
+  })
+
+  it('uses fallback title when deleting video with no title or filename', async () => {
+    videosStore.videos.value = [{ id: 110, accountId: null }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.vm.deleteVideo(videosStore.videos.value[0])
+    await flushPromises()
+
+    expect(confirmation.confirmDelete).toHaveBeenCalledWith('видеофайл', 'видеофайл')
+    expect(videosStore.remove).toHaveBeenCalledWith(110)
+  })
+
+  it('uses err object directly when error has no message in refresh', async () => {
+    videosStore.getAllByAccount.mockRejectedValueOnce(new Error())
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedScope = 'common:all'
+    await nextTick()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось загрузить информацию о видеофайлах'))
+  })
+
+  it('uses err object directly when onMounted load error has no message', async () => {
+    categoriesStore.getAll.mockRejectedValueOnce(new Error())
+    mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось загрузить справочники видеофайлов'))
+  })
+
+  it('uses err object directly when upload error has no message', async () => {
+    videosStore.uploadFiles.mockRejectedValueOnce(new Error())
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось загрузить видеофайлы'))
+  })
+
+  it('uses err object directly when updateVideoCategory error has no message', async () => {
+    videosStore.videos.value = [{ id: 120, title: 'V', accountId: 0, categoryId: 0 }]
+    videosStore.update.mockRejectedValueOnce(new Error())
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.vm.updateVideoCategory(videosStore.videos.value[0], 3)
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категорию'))
+  })
+
+  it('uses err object directly when deleteSelectedVideos error has no message', async () => {
+    videosStore.videos.value = [{ id: 121, title: 'V', accountId: 0 }]
+    videosStore.removeBatch.mockRejectedValueOnce(new Error())
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [121]
+    await wrapper.vm.deleteSelectedVideos()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось удалить видеофайлы'))
+  })
+
+  it('uses err object directly when updateSelectedVideoCategory error has no message', async () => {
+    videosStore.videos.value = [{ id: 122, title: 'V', accountId: 0 }]
+    videosStore.updateCategoryBatch.mockRejectedValueOnce(new Error())
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [122]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категории видеофайлов'))
+  })
+
+  it('handles null result from removeBatch gracefully', async () => {
+    videosStore.videos.value = [{ id: 130, title: 'V', accountId: 0 }]
+    videosStore.removeBatch.mockResolvedValueOnce(null)
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [130]
+    await wrapper.vm.deleteSelectedVideos()
+    await flushPromises()
+
+    expect(alertStore.success).toHaveBeenCalledWith('Удалено видеофайлов: 1')
+  })
+
+  it('handles null result from updateCategoryBatch gracefully', async () => {
+    videosStore.videos.value = [{ id: 131, title: 'V', accountId: 0 }]
+    videosStore.updateCategoryBatch.mockResolvedValueOnce(null)
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [131]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.success).toHaveBeenCalledWith('Обновлено видеофайлов: 1')
+  })
+
+  it('returns early from updateSelectedVideoCategory when ids are empty', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = []
+    await wrapper.vm.updateSelectedVideoCategory()
+
+    expect(videosStore.updateCategoryBatch).not.toHaveBeenCalled()
+  })
+
+  it('returns early from updateSelectedVideoCategory when batchCategoryId is not a number', async () => {
+    videosStore.videos.value = [{ id: 132, title: 'V', accountId: 0 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [132]
+    wrapper.vm.batchCategoryId = 'not-a-number'
+    await wrapper.vm.updateSelectedVideoCategory()
+
+    expect(videosStore.updateCategoryBatch).not.toHaveBeenCalled()
+  })
+
+  it('returns early from deleteSelectedVideos when ids are empty', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = []
+    await wrapper.vm.deleteSelectedVideos()
+
+    expect(confirmation.confirmAction).not.toHaveBeenCalled()
+  })
+
+  it('deletes selected videos via button click in the table row', async () => {
+    videosStore.videos.value = [{ id: 140, title: 'Clickable', accountId: null }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="delete-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(videosStore.remove).toHaveBeenCalledWith(140)
+  })
+
+  it('clears the alert when close button is clicked', async () => {
+    alertStore.alert.value = { message: 'some error', type: 'alert-danger' }
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const closeBtn = wrapper.find('.btn-link.close')
+    await closeBtn.trigger('click')
+
+    expect(alertStore.clear).toHaveBeenCalled()
+  })
+
+  it('updates selectedScope via select element change', async () => {
+    accountsStore.accounts.value = [{ id: 5, name: 'Five' }]
+    categoriesStore.categories.value = [{ id: 3, title: 'Sports' }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const selects = wrapper.findAll('select')
+    const scopeSelect = selects[0]
+    await scopeSelect.setValue('common:all')
+
+    expect(wrapper.vm.selectedScope).toBe('common:all')
+  })
+
+  it('updates batchCategoryId via select element change', async () => {
+    categoriesStore.categories.value = [{ id: 4, title: 'News' }]
+    videosStore.videos.value = [{ id: 141, title: 'V', accountId: 0, categoryId: 0 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const vSelects = wrapper.findAllComponents(globalStubs['v-select'])
+    await vSelects[1].vm.$emit('update:modelValue', 4)
+    await nextTick()
+
+    expect(wrapper.vm.batchCategoryId).toBe(4)
+  })
+
+  it('updates tableSearch via text field input', async () => {
+    videosStore.videos.value = [{ id: 142, title: 'Searchable', accountId: null }]
+    const wrapper = mount(VideosList, {
+      props: { fixedScope: 'common:all' },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    const input = wrapper.find('input:not([type="file"]):not([type="checkbox"])')
+    await input.setValue('findme')
+
+    expect(wrapper.vm.tableSearch).toBe('findme')
+  })
+
+  it('updates video category via in-row select for common videos', async () => {
+    categoriesStore.categories.value = [{ id: 3, title: 'Sports' }]
+    videosStore.videos.value = [{ id: 143, title: 'Common', accountId: 0, categoryId: 0 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const categorySelects = wrapper.findAll('[data-test="video-category-select"]')
+    categorySelects[0].element.value = '3'
+    await categorySelects[0].trigger('change')
+    await flushPromises()
+
+    expect(videosStore.update).toHaveBeenCalledWith(143, { categoryId: 3 })
+  })
+
+  it('updates data table items-per-page, page, and sort-by via v-model bindings', async () => {
+    videosStore.videos.value = [{ id: 144, title: 'V', accountId: 0 }]
+    const wrapper = mount(VideosList, {
+      props: { fixedScope: 'common:all' },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="trigger-items-per-page"]').trigger('click')
+    await wrapper.find('[data-test="trigger-page"]').trigger('click')
+    await wrapper.find('[data-test="trigger-sort-by"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.vm.tableItemsPerPage).toBe(5)
+    expect(wrapper.vm.tablePage).toBe(2)
+    expect(wrapper.vm.tableSortBy).toEqual([{ key: 'title', order: 'asc' }])
+  })
+
+  it('categorySaving flag blocks concurrent updateVideoCategory calls', async () => {
+    videosStore.videos.value = [{ id: 150, title: 'V', accountId: 0, categoryId: 0 }]
+    let resolveUpdate
+    videosStore.update.mockImplementation(() => new Promise(resolve => { resolveUpdate = resolve }))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const item = videosStore.videos.value[0]
+    const first = wrapper.vm.updateVideoCategory(item, 3)
+    await nextTick()
+
+    await wrapper.vm.updateVideoCategory(item, 5)
+    await nextTick()
+
+    expect(videosStore.update).toHaveBeenCalledTimes(1)
+
+    resolveUpdate({})
+    await first
+    await flushPromises()
   })
 })
