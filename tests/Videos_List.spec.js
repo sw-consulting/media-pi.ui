@@ -219,6 +219,17 @@ describe('Videos_List.vue', () => {
     )
   })
 
+  it('shows dash for account-linked video category labels', async () => {
+    videosStore.videos.value = [{ id: 3, title: 'Account video', accountId: 5, categoryId: 0 }]
+    const wrapper = mount(VideosList, {
+      props: { fixedScope: 'common:all' },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="video-category-label"]').text()).toBe('-')
+  })
+
   it('navigates to edit view for per-video changes', async () => {
     videosStore.videos.value = [{ id: 30, title: 'Common', accountId: 0, categoryId: 0 }]
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })

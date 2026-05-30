@@ -79,7 +79,12 @@ vi.mock('@/helpers/default.route.js', () => ({
 }))
 
 vi.mock('@sw-consulting/tooling.ui.kit', () => ({
-  ActionButton: { name: 'ActionButton', props: ['item', 'disabled'], emits: ['click'], template: '<button :disabled="disabled" @click="$emit(\'click\', item)"></button>' }
+  ActionButton: {
+    name: 'ActionButton',
+    props: ['item', 'icon', 'iconSize', 'tooltipText', 'disabled', 'variant'],
+    emits: ['click'],
+    template: '<button :data-icon="icon" :data-icon-size="iconSize" :data-tooltip="tooltipText" :data-variant="variant" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
+  }
 }))
 
 const mountSettings = (props = {}) => mount({
@@ -94,7 +99,7 @@ const mountSettings = (props = {}) => mount({
   global: {
     stubs: {
       Form: {
-        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" /></form>',
+        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" /></form>',
         props: ['validationSchema', 'initialValues'],
         emits: ['submit'],
         data() {
@@ -104,6 +109,9 @@ const mountSettings = (props = {}) => mount({
           }
         },
         methods: {
+          handleSubmit(submit) {
+            return submit({ ...this.initialValues, ...(props.submitValues || {}) })
+          },
           onSubmit() {
             this.$emit('submit', { ...this.initialValues, ...(props.submitValues || {}) })
           }
@@ -184,8 +192,7 @@ const mountSettings = (props = {}) => mount({
               <slot name="item.title" :item="item" />
               <slot name="item.accountName" :item="item" />
               <slot name="item.categoryName" :item="item" />
-              <slot name="item.fileSize" :item="item" />
-              <slot name="item.duration" :item="item" />
+              <slot name="item.mediaInfo" :item="item" />
               <slot name="item.actions" :item="item" />
             </div>
           </div>
@@ -337,6 +344,22 @@ describe('Playlist_Settings.vue', () => {
     expect(playlistTable.text()).toContain('News')
   })
 
+  it('shows dash as category for account-linked videos', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableRow = findRowByTextAndSelector(wrapper, '[data-test="available-video-select"]', 'Video 1')
+    expect(availableRow).toBeTruthy()
+    expect(availableRow.findAll('.playlist-account-cell').map(cell => cell.text())).toContain('-')
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistRow = findRowByTextAndSelector(wrapper, '[data-test="playlist-row-select"]', 'Video 1')
+    expect(playlistRow).toBeTruthy()
+    expect(playlistRow.find('.playlist-account-cell').text()).toBe('-')
+  })
+
   it('batch add allows duplicate playlist entries', async () => {
     const wrapper = mountSettings({
       accountId: 1,
@@ -450,7 +473,7 @@ describe('Playlist_Settings.vue', () => {
     expect(submittingWrapper.find('[data-test="available-select-all"]').element.disabled).toBe(true)
   })
 
-  it('sorts available videos by file size as numbers', async () => {
+  it('sorts available videos by media size first', async () => {
     videosStore.getAllByAccount = vi.fn(async (accountId) => {
       if (accountId !== 1) return []
       return [
@@ -463,7 +486,12 @@ describe('Playlist_Settings.vue', () => {
     const wrapper = mountSettings({ accountId: 1 })
     await flushPromises()
 
-    await sortAvailableTableBy(wrapper, 'fileSize')
+    const sortButton = getAvailableTable(wrapper).find('[data-test="sort-mediaInfo"]')
+    expect(sortButton.exists()).toBe(true)
+    expect(sortButton.text()).toContain('Размер')
+    expect(sortButton.text()).toContain('Длительность')
+
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
 
     expect(getAvailableTableTitles(wrapper)).toEqual([
       'Nine Hundred B',
@@ -472,20 +500,20 @@ describe('Playlist_Settings.vue', () => {
     ])
   })
 
-  it('sorts available videos by duration as seconds', async () => {
+  it('sorts available videos by duration when media sizes match', async () => {
     videosStore.getAllByAccount = vi.fn(async (accountId) => {
       if (accountId !== 1) return []
       return [
         { id: 41, title: 'Long', originalFilename: 'long.mp4', fileSizeBytes: 100, durationSeconds: 600, accountId: 1 },
-        { id: 42, title: 'Short', originalFilename: 'short.mp4', fileSizeBytes: 200, durationSeconds: 5, accountId: 1 },
-        { id: 43, title: 'Medium', originalFilename: 'medium.mp4', fileSizeBytes: 300, durationSeconds: 120, accountId: 1 }
+        { id: 42, title: 'Short', originalFilename: 'short.mp4', fileSizeBytes: 100, durationSeconds: 5, accountId: 1 },
+        { id: 43, title: 'Medium', originalFilename: 'medium.mp4', fileSizeBytes: 100, durationSeconds: 120, accountId: 1 }
       ]
     })
 
     const wrapper = mountSettings({ accountId: 1 })
     await flushPromises()
 
-    await sortAvailableTableBy(wrapper, 'duration')
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
 
     expect(getAvailableTableTitles(wrapper)).toEqual([
       'Short',
@@ -710,8 +738,30 @@ describe('Playlist_Settings.vue', () => {
     const wrapper = mountSettings({ accountId: 1 })
     await flushPromises()
 
-    await wrapper.find('button.secondary').trigger('click')
+    await wrapper.find('[data-test="cancel-playlist-button"]').trigger('click')
     expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('uses header ActionButtons for save and cancel actions', async () => {
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Header Save' } })
+    await flushPromises()
+
+    const saveButton = wrapper.find('[data-test="save-playlist-button"]')
+    const cancelButton = wrapper.find('[data-test="cancel-playlist-button"]')
+
+    expect(saveButton.attributes('data-icon')).toBe('fa-solid fa-check-double')
+    expect(saveButton.attributes('data-icon-size')).toBe('2x')
+    expect(saveButton.attributes('data-tooltip')).toBe('Создать')
+    expect(saveButton.attributes('data-variant')).toBeUndefined()
+    expect(cancelButton.attributes('data-icon')).toBe('fa-solid fa-xmark')
+    expect(cancelButton.attributes('data-icon-size')).toBe('2x')
+    expect(cancelButton.attributes('data-tooltip')).toBe('Отменить')
+    expect(cancelButton.attributes('data-variant')).toBeUndefined()
+
+    await saveButton.trigger('click')
+    await flushPromises()
+
+    expect(playlistsStore.create).toHaveBeenCalledWith(expect.objectContaining({ title: 'Header Save' }))
   })
 
   it('dismisses alert via close button', async () => {
@@ -878,9 +928,9 @@ describe('Playlist_Settings.vue', () => {
     const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Desc Sorted' } })
     await flushPromises()
 
-    // Click sort-fileSize twice: first asc then desc
-    await sortAvailableTableBy(wrapper, 'fileSize')
-    await sortAvailableTableBy(wrapper, 'fileSize')
+    // Click sort-mediaInfo twice: first asc then desc
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
 
     // Select all visible and batch-add
     await wrapper.find('[data-test="available-select-all"]').setValue(true)
@@ -1199,7 +1249,7 @@ describe('Playlist_Settings.vue', () => {
     await flushPromises()
 
     // Sorting should not throw even with a non-numeric fileSize
-    await sortAvailableTableBy(wrapper, 'fileSize')
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
     expect(getAvailableTableTitles(wrapper)).toHaveLength(2)
   })
 

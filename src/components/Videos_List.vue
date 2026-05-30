@@ -21,7 +21,7 @@ import { estimateSelectWidth } from '@/helpers/account.options.js'
 import {
   createCategoryOptions,
   createVideoScopeOptions,
-  getCategoryTitle,
+  getVideoCategoryTitle,
   parseVideoScope
 } from '@/helpers/video.scope.helpers.js'
 
@@ -297,8 +297,8 @@ function canManageVideo(item) {
   return canManageAccountById(authStore.user, item.accountId)
 }
 
-function categoryTitle(categoryId) {
-  return getCategoryTitle(categoryId, categories.value || [])
+function videoCategoryTitle(video) {
+  return getVideoCategoryTitle(video, categories.value || [])
 }
 
 function editVideo(item) {
@@ -422,7 +422,7 @@ function filterVideos(value, query, item) {
     rawVideo.fileSize,
     rawVideo.duration,
     rawVideo.accountDisplay,
-    categoryTitle(rawVideo.categoryId)
+    videoCategoryTitle(rawVideo)
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
 }
 
@@ -617,7 +617,7 @@ watch(videos, (current) => {
           </div>
         </template>
         <template v-slot:[`item.categoryTitle`]="{ item }">
-          <span data-test="video-category-label">{{ categoryTitle(item.categoryId) }}</span>
+          <span data-test="video-category-label">{{ videoCategoryTitle(item) }}</span>
         </template>
         <template v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">

@@ -92,3 +92,10 @@ export function getCategoryTitle(categoryId, categories) {
   const category = (categories || []).find(item => item.id === id)
   return category?.title || `Категория #${id}`
 }
+
+export function getVideoCategoryTitle(video, categories) {
+  const accountId = Number(video?.accountId || 0)
+  if (accountId !== 0) return '-'
+
+  return getCategoryTitle(video?.categoryId, categories)
+}

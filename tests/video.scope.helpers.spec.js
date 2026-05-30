@@ -8,6 +8,7 @@ import {
   createCategoryOptions,
   createVideoScopeOptions,
   getCategoryTitle,
+  getVideoCategoryTitle,
   parseVideoScope
 } from '@/helpers/video.scope.helpers.js'
 
@@ -71,5 +72,13 @@ describe('video.scope.helpers', () => {
     expect(getCategoryTitle(0, categories)).toBe('Без категории')
     expect(getCategoryTitle(7, categories)).toBe('Sport')
     expect(getCategoryTitle(8, categories)).toBe('Категория #8')
+  })
+
+  it('shows dash as video category title for account-linked videos', () => {
+    const categories = [{ id: 7, title: 'Sport' }]
+
+    expect(getVideoCategoryTitle({ accountId: 5, categoryId: 0 }, categories)).toBe('-')
+    expect(getVideoCategoryTitle({ accountId: 0, categoryId: 0 }, categories)).toBe('Без категории')
+    expect(getVideoCategoryTitle({ accountId: 0, categoryId: 7 }, categories)).toBe('Sport')
   })
 })
