@@ -76,11 +76,21 @@ const schema = Yup.object().shape({
   title: Yup.string().trim().required('Необходимо указать описание')
 })
 
+const scopeHeader = {
+  title: 'Лицевой счёт\nКатегория',
+  align: 'start',
+  key: 'scopeName',
+  sortable: true,
+  sort: compareScopeName,
+  width: '160px',
+  headerProps: { class: 'playlist-scope-header' }
+}
+
 const playlistVideoHeaders = [
-  { title: '', align: 'center', key: 'select', sortable: false, width: '44px' },
-  { title: '#', align: 'center', key: 'position', sortable: false, width: '44px' },
+  { title: '', align: 'center', key: 'select', sortable: false },
+  { title: '#', align: 'center', key: 'position', sortable: false },
   { title: 'Название', align: 'start', key: 'title', sortable: false },
-  { title: 'Категория', align: 'start', key: 'categoryName', sortable: false, width: '150px' },
+  { ...scopeHeader },
   {
     title: 'Размер\nДлительность',
     align: 'start',
@@ -90,15 +100,14 @@ const playlistVideoHeaders = [
     width: '140px',
     headerProps: { class: 'playlist-media-info-header' }
   },
-  { title: '', align: 'center', key: 'actions', sortable: false, width: '44px' }
+  { title: '', align: 'center', key: 'actions', sortable: false }
 ]
 
 const availableVideoHeaders = [
-  { title: '', align: 'center', key: 'actions', sortable: false, width: '44px' },
-  { title: '', align: 'center', key: 'select', sortable: false, width: '44px' },
+  { title: '', align: 'center', key: 'actions', sortable: false },
+  { title: '', align: 'center', key: 'select', sortable: false },
   { title: 'Название', align: 'start', key: 'title' },
-  { title: 'Лицевой счёт', align: 'start', key: 'accountName', sortable: false, width: '150px' },
-  { title: 'Категория', align: 'start', key: 'categoryName', sortable: true, width: '150px' },
+  { ...scopeHeader },
   {
     title: 'Размер\nДлительность',
     align: 'start',
@@ -139,8 +148,7 @@ const filteredAvailableVideos = computed(() => {
   return availableVideos.value.filter(video => [
     video.title,
     video.originalFilename,
-    video.accountName,
-    video.categoryName
+    video.scopeName
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(query)))
 })
 
@@ -151,7 +159,7 @@ const sortedFilteredAvailableVideos = computed(() => {
   const sorted = [...items].sort((a, b) => {
     const result = key === 'mediaInfo'
       ? compareMediaInfo(a.mediaInfo, b.mediaInfo)
-      : (a[key] || '').toString().localeCompare((b[key] || '').toString(), 'ru')
+      : compareDisplayText(a[key], b[key])
     return order === 'desc' ? -result : result
   })
   return sorted
@@ -171,7 +179,8 @@ const playlistVideoDetails = computed(() => playlistItems.value.map((item, index
     mediaInfo: createMediaInfo(video?.fileSize, video?.duration),
     accountName: video?.accountName,
     categoryId,
-    categoryName: getVideoCategoryTitle(video, categoriesStore.categories || [])
+    categoryName: getVideoCategoryTitle(video, categoriesStore.categories || []),
+    scopeName: getVideoScopeName(video)
   }
 }))
 
@@ -306,10 +315,35 @@ function compareMediaInfo(a, b) {
   return compareMediaNumber(a?.duration, b?.duration)
 }
 
+function compareDisplayText(a, b) {
+  return (a || '').toString().localeCompare((b || '').toString(), 'ru')
+}
+
+function compareScopeName(a, b) {
+  return compareDisplayText(a, b)
+}
+
+function getVideoScopeName(video) {
+  if (!video) return 'Общие файлы'
+
+  const accountId = Number(video.accountId ?? 0)
+  if (accountId !== 0) {
+    return video.accountName || accountNameById.value.get(accountId) || `Лицевой счёт ${accountId}`
+  }
+
+  const categoryId = Number(video.categoryId ?? 0)
+  if (Number.isFinite(categoryId) && categoryId !== 0) {
+    return getVideoCategoryTitle(video, categoriesStore.categories || [])
+  }
+
+  return 'Общие файлы'
+}
+
 function updateAvailableCategoryNames() {
   availableVideos.value = availableVideos.value.map(video => ({
     ...video,
-    categoryName: getVideoCategoryTitle(video, categoriesStore.categories || [])
+    categoryName: getVideoCategoryTitle(video, categoriesStore.categories || []),
+    scopeName: getVideoScopeName(video)
   }))
 }
 
@@ -326,7 +360,7 @@ async function loadAvailableVideos() {
     for (const accountId of accountIds) {
       const items = await videosStore.getAllByAccount(accountId)
       for (const video of items || []) {
-        collected.push({
+        const loadedVideo = {
           id: video.id,
           title: video.title,
           originalFilename: video.originalFilename,
@@ -337,6 +371,10 @@ async function loadAvailableVideos() {
           categoryId: video.categoryId || 0,
           mediaInfo: createMediaInfo(video.fileSizeBytes, video.durationSeconds),
           categoryName: getVideoCategoryTitle(video, categoriesStore.categories || [])
+        }
+        collected.push({
+          ...loadedVideo,
+          scopeName: getVideoScopeName(loadedVideo)
         })
       }
     }
@@ -635,8 +673,8 @@ async function onSubmit(values) {
                 <div class="playlist-video-title">{{ item.title }}</div>
               </div>
             </template>
-            <template v-slot:[`item.categoryName`]="{ item }">
-              <span class="playlist-account-cell">{{ item.categoryName || 'Без категории' }}</span>
+            <template v-slot:[`item.scopeName`]="{ item }">
+              <span class="playlist-scope-cell">{{ item.scopeName }}</span>
             </template>
             <template v-slot:[`item.mediaInfo`]="{ item }">
               <div class="playlist-media-info-cell">
@@ -753,11 +791,8 @@ async function onSubmit(values) {
                 </div>
               </div>
             </template>
-            <template v-slot:[`item.accountName`]="{ item }">
-              <span class="playlist-account-cell">{{ item.accountName || '—' }}</span>
-            </template>
-            <template v-slot:[`item.categoryName`]="{ item }">
-              <span class="playlist-account-cell">{{ item.categoryName || 'Без категории' }}</span>
+            <template v-slot:[`item.scopeName`]="{ item }">
+              <span class="playlist-scope-cell">{{ item.scopeName }}</span>
             </template>
             <template v-slot:[`item.mediaInfo`]="{ item }">
               <div class="playlist-media-info-cell">
@@ -899,7 +934,7 @@ async function onSubmit(values) {
   justify-content: center;
 }
 
-.playlist-account-cell {
+.playlist-scope-cell {
   color: #6c7a89;
 }
 
@@ -918,6 +953,16 @@ async function onSubmit(values) {
 }
 
 :deep(.playlist-media-info-header .v-data-table-header__content > span) {
+  white-space: pre-line;
+  line-height: 1.05;
+}
+
+:deep(.playlist-scope-header .v-data-table-header__content) {
+  align-items: center;
+  gap: 4px;
+}
+
+:deep(.playlist-scope-header .v-data-table-header__content > span) {
   white-space: pre-line;
   line-height: 1.05;
 }

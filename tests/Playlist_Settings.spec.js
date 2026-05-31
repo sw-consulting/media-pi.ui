@@ -180,6 +180,7 @@ const mountSettings = (props = {}) => mount({
                   @click="toggleSort(header)"
                 >
                   {{ header.title }}
+                  <span v-if="header.sortable !== false" data-test="sort-arrow">↕</span>
                 </button>
               </template>
               <slot name="header.select" />
@@ -190,8 +191,7 @@ const mountSettings = (props = {}) => mount({
               <slot name="item.select" :item="item" />
               <slot name="item.position" :item="item" />
               <slot name="item.title" :item="item" />
-              <slot name="item.accountName" :item="item" />
-              <slot name="item.categoryName" :item="item" />
+              <slot name="item.scopeName" :item="item" />
               <slot name="item.mediaInfo" :item="item" />
               <slot name="item.actions" :item="item" />
             </div>
@@ -246,6 +246,14 @@ function getAvailableTableTitles(wrapper) {
 
 async function sortAvailableTableBy(wrapper, key) {
   const sortButton = getAvailableTable(wrapper).find(`[data-test="sort-${key}"]`)
+  expect(sortButton.exists()).toBe(true)
+  expect(sortButton.element.disabled).toBe(false)
+  await sortButton.trigger('click')
+  await flushPromises()
+}
+
+async function sortPlaylistTableBy(wrapper, key) {
+  const sortButton = getPlaylistTable(wrapper).find(`[data-test="sort-${key}"]`)
   expect(sortButton.exists()).toBe(true)
   expect(sortButton.element.disabled).toBe(false)
   await sortButton.trigger('click')
@@ -324,7 +332,7 @@ describe('Playlist_Settings.vue', () => {
     ])
   })
 
-  it('shows derived category name for videos in playlist table', async () => {
+  it('shows derived category name in the combined scope column', async () => {
     categoriesStore.categories = [{ id: 7, title: 'News' }]
     videosStore.getAllByAccount = vi.fn(async (accountId) => {
       if (accountId === 0) {
@@ -344,20 +352,87 @@ describe('Playlist_Settings.vue', () => {
     expect(playlistTable.text()).toContain('News')
   })
 
-  it('shows dash as category for account-linked videos', async () => {
+  it('shows account name or common files in the combined scope column', async () => {
     const wrapper = mountSettings({ accountId: 1 })
     await flushPromises()
 
     const availableRow = findRowByTextAndSelector(wrapper, '[data-test="available-video-select"]', 'Video 1')
     expect(availableRow).toBeTruthy()
-    expect(availableRow.findAll('.playlist-account-cell').map(cell => cell.text())).toContain('-')
+    expect(availableRow.find('.playlist-scope-cell').text()).toBe('Account 1')
+
+    const commonRow = findRowByTextAndSelector(wrapper, '[data-test="available-video-select"]', 'Shared')
+    expect(commonRow).toBeTruthy()
+    expect(commonRow.find('.playlist-scope-cell').text()).toBe('Общие файлы')
 
     await selectAvailableVideo(wrapper, 'Video 1')
     await clickBatchAdd(wrapper)
 
     const playlistRow = findRowByTextAndSelector(wrapper, '[data-test="playlist-row-select"]', 'Video 1')
     expect(playlistRow).toBeTruthy()
-    expect(playlistRow.find('.playlist-account-cell').text()).toBe('-')
+    expect(playlistRow.find('.playlist-scope-cell').text()).toBe('Account 1')
+  })
+
+  it('shows sortable combined scope headers in both tables', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const playlistScopeSort = getPlaylistTable(wrapper).find('[data-test="sort-scopeName"]')
+    const availableScopeSort = getAvailableTable(wrapper).find('[data-test="sort-scopeName"]')
+
+    expect(playlistScopeSort.exists()).toBe(true)
+    expect(playlistScopeSort.element.disabled).toBe(false)
+    expect(playlistScopeSort.text()).toContain('Лицевой счёт')
+    expect(playlistScopeSort.text()).toContain('Категория')
+    expect(playlistScopeSort.find('[data-test="sort-arrow"]').exists()).toBe(true)
+
+    expect(availableScopeSort.exists()).toBe(true)
+    expect(availableScopeSort.element.disabled).toBe(false)
+    expect(availableScopeSort.text()).toContain('Лицевой счёт')
+    expect(availableScopeSort.text()).toContain('Категория')
+    expect(availableScopeSort.find('[data-test="sort-arrow"]').exists()).toBe(true)
+  })
+
+  it('sorts both tables by the displayed combined scope value', async () => {
+    accountsStore.accounts = [{ id: 1, name: 'Я счёт' }]
+    categoriesStore.categories = [{ id: 7, title: 'А категория' }]
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId === 0) {
+        return [
+          { id: 22, title: 'Common scoped', originalFilename: 'common.mp4', fileSizeBytes: 2400, durationSeconds: 90, accountId: 0, categoryId: 0 },
+          { id: 23, title: 'Category scoped', originalFilename: 'category.mp4', fileSizeBytes: 1800, durationSeconds: 75, accountId: 0, categoryId: 7 }
+        ]
+      }
+      if (accountId === 1) {
+        return [{ id: 11, title: 'Account scoped', originalFilename: 'account.mp4', fileSizeBytes: 1200, durationSeconds: 60, accountId: 1 }]
+      }
+      return []
+    })
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await wrapper.find('[data-test="available-select-all"]').setValue(true)
+    await clickBatchAdd(wrapper)
+
+    expect(getPlaylistTable(wrapper).findAll('.playlist-video-title').map(item => item.text())).toEqual([
+      'Common scoped',
+      'Category scoped',
+      'Account scoped'
+    ])
+
+    await sortPlaylistTableBy(wrapper, 'scopeName')
+    expect(getPlaylistTable(wrapper).findAll('.playlist-video-title').map(item => item.text())).toEqual([
+      'Category scoped',
+      'Common scoped',
+      'Account scoped'
+    ])
+
+    await sortAvailableTableBy(wrapper, 'scopeName')
+    expect(getAvailableTableTitles(wrapper)).toEqual([
+      'Category scoped',
+      'Common scoped',
+      'Account scoped'
+    ])
   })
 
   it('batch add allows duplicate playlist entries', async () => {

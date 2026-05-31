@@ -55,15 +55,6 @@ function getUserRole() {
 }
 
  
-/*
-<v-list-item>
-          <RouterLink to="/register" class="link">Регистрация</RouterLink>
-        </v-list-item>
-        <v-list-item>
-          <RouterLink to="/recover" class="link">Восстановление пароля</RouterLink>
-        </v-list-item>
-*/
- 
 </script>
 
 <template>
