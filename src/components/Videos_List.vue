@@ -487,6 +487,8 @@ watch(videos, (current) => {
               @click="openBatchCategoryDialog"
             />
           </div>
+      </div>
+      <div class="header-actions-container">
           <div class="header-actions header-actions-group">
             <ActionButton
               data-test="batch-delete-video-button"

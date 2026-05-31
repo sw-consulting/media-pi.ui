@@ -182,11 +182,6 @@ async function onSubmit(values) {
       {{ alert.message }}
     </div>
 
-    <div v-if="loading || initialLoading" class="text-center m-5">
-      <span class="spinner-border spinner-border-lg align-center"></span>
-      <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
-    </div>
-
     <VideosList
       v-if="!isRegister() && props.id"
       class="mt-8"
