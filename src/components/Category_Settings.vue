@@ -31,6 +31,7 @@ const categoriesStore = useCategoriesStore()
 const alertStore = useAlertStore()
 const authStore = useAuthStore()
 const { alert } = storeToRefs(alertStore)
+const { loading } = storeToRefs(categoriesStore)
 
 if (!authStore.isAdministrator) {
   redirectToDefaultRoute()
@@ -184,6 +185,11 @@ async function onSubmit(values) {
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
+    </div>
+
+    <div v-if="loading || initialLoading" class="text-center m-5">
+      <span class="spinner-border spinner-border-lg align-center"></span>
+      <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
 
     <VideosList
