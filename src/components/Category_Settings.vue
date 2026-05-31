@@ -13,7 +13,9 @@ import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import VideosList from '@/components/Videos_List.vue'
+import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 import { createCategoryScope } from '@/helpers/video.scope.helpers.js'
 
 const props = defineProps({
@@ -43,6 +45,10 @@ const schema = Yup.object().shape({
 
 const category = ref({ title: '', free: true })
 const initialLoading = ref(false)
+const playlistImpactDialog = ref(false)
+const playlistImpact = ref(null)
+const pendingCategoryPayload = ref(null)
+const categoryForceSaving = ref(false)
 const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'
 const categoryTitleText = computed(() => (
@@ -88,20 +94,23 @@ if (!isRegister()) {
   }
 }
 
-async function onSubmit(values) {
+async function saveCategoryPayload(payload, forcePlaylistCleanup = false) {
   try {
-    const payload = {
-      title: values.title.trim(),
-      free: category.value.free
-    }
-
     if (isRegister()) {
       await categoriesStore.create(payload)
     } else {
-      await categoriesStore.update(props.id, payload)
+      const updatePayload = { ...payload }
+      if (forcePlaylistCleanup) updatePayload.forcePlaylistCleanup = true
+      await categoriesStore.update(props.id, updatePayload)
     }
     router.go(-1)
   } catch (err) {
+    if (isPlaylistAccessImpactError(err) && !forcePlaylistCleanup) {
+      playlistImpact.value = err.data
+      pendingCategoryPayload.value = payload
+      playlistImpactDialog.value = true
+      return
+    }
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
     } else if (err.status === 404) {
@@ -114,6 +123,30 @@ async function onSubmit(values) {
       alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} категории: ${err.message || err}`)
     }
   }
+}
+
+async function onSubmit(values) {
+  const payload = {
+    title: values.title.trim(),
+    free: category.value.free
+  }
+  await saveCategoryPayload(payload)
+}
+
+async function confirmPlaylistCleanup() {
+  if (!pendingCategoryPayload.value) return
+  categoryForceSaving.value = true
+  try {
+    await saveCategoryPayload(pendingCategoryPayload.value, true)
+  } finally {
+    categoryForceSaving.value = false
+  }
+}
+
+function cancelPlaylistCleanup() {
+  if (categoryForceSaving.value) return
+  playlistImpactDialog.value = false
+  pendingCategoryPayload.value = null
 }
 </script>
 
@@ -198,6 +231,14 @@ async function onSubmit(values) {
       title="Видеофайлы"
       embedded
       :fixed-scope="createCategoryScope(props.id)"
+    />
+
+    <PlaylistAccessImpactDialog
+      v-model="playlistImpactDialog"
+      :impact="playlistImpact"
+      :saving="categoryForceSaving"
+      @confirm="confirmPlaylistCleanup"
+      @cancel="cancelPlaylistCleanup"
     />
   </div>
 </template>

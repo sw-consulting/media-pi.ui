@@ -368,7 +368,10 @@ async function loadAvailableVideos() {
 
     const collected = []
     for (const accountId of accountIds) {
-      const items = await videosStore.getAllByAccount(accountId)
+      const options = accountId === 0 && currentAccountId
+        ? { availableForAccountId: currentAccountId }
+        : {}
+      const items = await videosStore.getAllByAccount(accountId, options)
       for (const video of items || []) {
         const loadedVideo = {
           id: video.id,

@@ -297,6 +297,48 @@ describe('Videos_List.vue', () => {
     expect(alertStore.success).toHaveBeenCalledWith('Обновлено видеофайлов: 2')
   })
 
+  it('lists affected playlists before retrying batch category update with force cleanup', async () => {
+    videosStore.videos.value = [{ id: 31, title: 'First', accountId: 0, categoryId: 0 }]
+    videosStore.updateCategoryBatch = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 2,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            {
+              playlistId: 11,
+              title: 'Morning',
+              filename: 'morning.m3u',
+              accountId: 1,
+              accountName: 'Cafe',
+              removedItemCount: 2
+            }
+          ]
+        }
+      })
+      .mockResolvedValueOnce({ requestedCount: 1, updatedIds: [31], failures: [] })
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [31]
+    wrapper.vm.batchCategoryId = 4
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(videosStore.updateCategoryBatch).toHaveBeenCalledWith([31], 4)
+    expect(wrapper.find('[data-test="playlist-impact-list"]').text()).toContain('Cafe / Morning')
+    expect(wrapper.find('[data-test="playlist-impact-list"]').text()).toContain('morning.m3u')
+
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(videosStore.updateCategoryBatch).toHaveBeenLastCalledWith([31], 4, {
+      forcePlaylistCleanup: true
+    })
+  })
+
   it('opens category batch modal from the header action', async () => {
     videosStore.videos.value = [{ id: 33, title: 'First', accountId: 0, categoryId: 0 }]
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
@@ -1335,5 +1377,135 @@ describe('Videos_List.vue', () => {
     resolveUpdate({ requestedCount: 1, updatedIds: [150], failures: [] })
     await first
     await flushPromises()
+  })
+})
+
+describe('Videos_List.vue - playlist impact and v-model coverage', () => {
+  beforeEach(() => {
+    currentUser = { id: 1, roles: [1], accountIds: [], isAdministrator: true }
+    videosStore.videos.value = [{ id: 31, title: 'First', accountId: 0, categoryId: 0 }]
+    categoriesStore.categories.value = [{ id: 3, title: 'Sports' }, { id: 4, title: 'News' }]
+    videosStore.updateCategoryBatch = vi.fn().mockResolvedValue({ requestedCount: 1, updatedIds: [31], failures: [] })
+    vi.clearAllMocks()
+  })
+
+  it('cancelPlaylistCleanup closes impact dialog when not saving', async () => {
+    videosStore.updateCategoryBatch = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 1,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+          ]
+        }
+      })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [31]
+    wrapper.vm.batchCategoryId = 4
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    await wrapper.find('[data-test="cancel-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(false)
+    expect(videosStore.updateCategoryBatch).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancelPlaylistCleanup does nothing while categorySaving is true', async () => {
+    let resolveUpdate
+    videosStore.updateCategoryBatch = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 1,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+          ]
+        }
+      })
+      .mockReturnValueOnce(new Promise(resolve => { resolveUpdate = resolve }))
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [31]
+    wrapper.vm.batchCategoryId = 4
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    // Trigger confirm (starts saving, sets categorySaving=true)
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    // Emit cancel directly from PlaylistAccessImpactDialog to test cancelPlaylistCleanup guard
+    const impactDialog = wrapper.findComponent({ name: 'PlaylistAccessImpactDialog' })
+    await impactDialog.vm.$emit('cancel')
+    await flushPromises()
+
+    // Dialog still showing because cancelPlaylistCleanup guard blocked it
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    resolveUpdate({ requestedCount: 1, updatedIds: [31], failures: [] })
+    await flushPromises()
+  })
+
+  it('v-model on batchCategoryDialog closes it on update:modelValue false', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [31]
+    await nextTick()
+    await wrapper.find('[data-test="batch-category-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.batchCategoryDialog).toBe(true)
+
+    const batchDialog = wrapper.findComponent({ name: 'ModalWindow' })
+    await batchDialog.vm.$emit('update:modelValue', false)
+    await flushPromises()
+
+    expect(wrapper.vm.batchCategoryDialog).toBe(false)
+  })
+
+  it('v-model on PlaylistAccessImpactDialog closes it on update:modelValue false', async () => {
+    videosStore.updateCategoryBatch = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 1,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+          ]
+        }
+      })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [31]
+    wrapper.vm.batchCategoryId = 4
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    const impactDialog = wrapper.findComponent({ name: 'PlaylistAccessImpactDialog' })
+    await impactDialog.vm.$emit('update:modelValue', false)
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(false)
   })
 })

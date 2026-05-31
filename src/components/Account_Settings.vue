@@ -7,6 +7,7 @@ import router from '@/router'
 import { storeToRefs } from 'pinia'
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useUsersStore } from '@/stores/users.store.js'
@@ -14,7 +15,9 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { UserRoleConstants } from '@/helpers/user.helpers.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
+import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 
 
 const props = defineProps({
@@ -48,6 +51,15 @@ const schema = Yup.object().shape({
 let account = ref({ name: '', managers: [''] })
 const { loading } = storeToRefs(accountsStore) 
 const initialLoading = ref(false)
+const subscriptionsData = ref({ subscriptions: [], availableCategories: [] })
+const subscriptionRows = ref([])
+const newSubscription = ref({ categoryId: '', startDate: '', endDate: '' })
+const subscriptionSaving = ref(false)
+const playlistImpactDialog = ref(false)
+const playlistImpact = ref(null)
+const pendingSubscriptionSave = ref(null)
+const faCheckDouble = 'fa-solid fa-check-double'
+const faXmark = 'fa-solid fa-xmark'
 
 if (!isRegister()) {
   initialLoading.value = true
@@ -69,7 +81,8 @@ if (!isRegister()) {
     account.value = {
       name: loadedAccount.name || '',
       managers: filteredManagers
-    }
+    };
+    await loadSubscriptions()
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
@@ -103,6 +116,13 @@ const managerOptions = computed(() => {
     }))
 })
 
+const availableCategoryOptions = computed(() => (
+  subscriptionsData.value.availableCategories || []
+).map(category => ({
+  value: category.id,
+  text: category.title || `Категория ${category.id}`
+})))
+
 const selectedManagerNames = computed(() => {
    return canEditManagers() ? [] : (usersStore.users || [])
 })
@@ -115,8 +135,98 @@ function canEditManagers() {
   return authStore.isAdministrator
 }
 
+function canEditSubscriptions() {
+  return authStore.isAdministrator
+}
+
 function getButton() {
   return isRegister() ? 'Создать' : 'Сохранить'
+}
+
+function isPaidCategory(category) {
+  return category?.free !== true && category?.categoryFree !== true
+}
+
+function applySubscriptionsData(data) {
+  const normalizedData = data || { subscriptions: [], availableCategories: [] }
+  subscriptionsData.value = {
+    subscriptions: normalizedData.subscriptions || [],
+    availableCategories: (normalizedData.availableCategories || []).filter(isPaidCategory)
+  }
+  subscriptionRows.value = (subscriptionsData.value.subscriptions || []).filter(isPaidCategory).map(item => ({
+    ...item,
+    startDate: item.startDate || '',
+    endDate: item.endDate || ''
+  }))
+  const firstAvailable = (subscriptionsData.value.availableCategories || [])[0]
+  newSubscription.value = {
+    categoryId: firstAvailable?.id || '',
+    startDate: '',
+    endDate: ''
+  }
+}
+
+async function loadSubscriptions() {
+  if (isRegister() || !props.id) return
+  const data = await accountsStore.getSubscriptions(props.id)
+  applySubscriptionsData(data)
+}
+
+async function saveSubscriptionPayload(categoryId, payload, forcePlaylistCleanup = false) {
+  subscriptionSaving.value = true
+  try {
+    const data = await accountsStore.upsertSubscription(props.id, categoryId, {
+      ...payload,
+      ...(forcePlaylistCleanup ? { forcePlaylistCleanup: true } : {})
+    })
+    applySubscriptionsData(data)
+    playlistImpactDialog.value = false
+    pendingSubscriptionSave.value = null
+  } catch (err) {
+    if (isPlaylistAccessImpactError(err) && !forcePlaylistCleanup) {
+      playlistImpact.value = err.data
+      pendingSubscriptionSave.value = { categoryId, payload }
+      playlistImpactDialog.value = true
+      return
+    }
+    alertStore.error(`Ошибка при сохранении подписки: ${err.message || err}`)
+  } finally {
+    subscriptionSaving.value = false
+  }
+}
+
+async function saveSubscription(row) {
+  if (!row?.categoryId || !row.startDate || !row.endDate) {
+    alertStore.error('Укажите даты подписки')
+    return
+  }
+  await saveSubscriptionPayload(row.categoryId, {
+    startDate: row.startDate,
+    endDate: row.endDate
+  })
+}
+
+async function addSubscription() {
+  if (!newSubscription.value.categoryId || !newSubscription.value.startDate || !newSubscription.value.endDate) {
+    alertStore.error('Выберите категорию и даты подписки')
+    return
+  }
+  await saveSubscriptionPayload(newSubscription.value.categoryId, {
+    startDate: newSubscription.value.startDate,
+    endDate: newSubscription.value.endDate
+  })
+}
+
+async function confirmPlaylistCleanup() {
+  const pending = pendingSubscriptionSave.value
+  if (!pending) return
+  await saveSubscriptionPayload(pending.categoryId, pending.payload, true)
+}
+
+function cancelPlaylistCleanup() {
+  if (subscriptionSaving.value) return
+  playlistImpactDialog.value = false
+  pendingSubscriptionSave.value = null
 }
 
 async function onSubmit(values) {
@@ -153,16 +263,39 @@ async function onSubmit(values) {
 </script>
 
 <template>
-  <div class="settings form-2 form-compact">
-    <h1 class="primary-heading">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
-    <hr class="hr" />
-
+  <div class="settings form-3 form-compact">
     <Form
       :validation-schema="schema"
       :initial-values="account"
       @submit="onSubmit"
-      v-slot="{ errors, isSubmitting }"
+      v-slot="{ errors, isSubmitting, handleSubmit }"
     >
+      <div class="header-with-actions">
+        <h1 class="primary-heading">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
+        <div class="header-actions-container">
+          <div class="header-actions header-actions-group">
+            <ActionButton
+              data-test="save-account-button"
+              :item="{}"
+              :icon="faCheckDouble"
+              icon-size="2x"
+              :tooltip-text="getButton()"
+              :disabled="isSubmitting"
+              @click="handleSubmit(onSubmit)"
+            />
+            <ActionButton
+              data-test="cancel-account-button"
+              :item="{}"
+              :icon="faXmark"
+              icon-size="2x"
+              tooltip-text="Отменить"
+              @click="router.go(-1)"
+            />
+          </div>
+        </div>
+      </div>
+      <hr class="hr" />
+
       <div class="form-group">
         <label for="name" class="label">Название:</label>
         <Field name="name" type="text" id="name" :disabled="isSubmitting"
@@ -193,20 +326,84 @@ async function onSubmit(values) {
         </ul>
       </div>
 
-      <div class="form-group mt-8">
-        <button class="button primary" type="submit" :disabled="isSubmitting">
-          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
-            {{ getButton() }}
-        </button>
-        <button
-          class="button secondary"
-          type="button"
-          @click="$router.go(-1)"
-        >
-          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
-          Отменить
-        </button>
+      <div v-if="!isRegister()" class="subscriptions-section">
+        <h2 class="secondary-heading">Подписки</h2>
+
+        <div v-if="subscriptionRows.length" class="subscriptions-list">
+          <div
+            v-for="row in subscriptionRows"
+            :key="row.categoryId"
+            class="subscription-row"
+            data-test="subscription-row"
+          >
+            <div class="subscription-category">
+              <div class="subscription-title">{{ row.categoryTitle || `Категория ${row.categoryId}` }}</div>
+              <div class="subscription-state">{{ row.isActive ? 'Активна' : 'Не активна' }}</div>
+            </div>
+            <input
+              v-model="row.startDate"
+              data-test="subscription-start-date"
+              type="date"
+              class="form-control input subscription-date"
+              :disabled="!canEditSubscriptions() || subscriptionSaving"
+            />
+            <input
+              v-model="row.endDate"
+              data-test="subscription-end-date"
+              type="date"
+              class="form-control input subscription-date"
+              :disabled="!canEditSubscriptions() || subscriptionSaving"
+            />
+            <button
+              v-if="canEditSubscriptions()"
+              data-test="save-subscription-button"
+              type="button"
+              class="button secondary subscription-save"
+              :disabled="subscriptionSaving"
+              @click="saveSubscription(row)"
+            >
+              Сохранить
+            </button>
+          </div>
+        </div>
+        <div v-else class="subscriptions-empty">Нет подписок</div>
+
+        <div v-if="canEditSubscriptions() && availableCategoryOptions.length" class="subscription-row subscription-new">
+          <select
+            v-model="newSubscription.categoryId"
+            data-test="new-subscription-category"
+            class="form-control input subscription-category-select"
+            :disabled="subscriptionSaving"
+          >
+            <option value="">Выберите категорию</option>
+            <option v-for="option in availableCategoryOptions" :key="option.value" :value="option.value">
+              {{ option.text }}
+            </option>
+          </select>
+          <input
+            v-model="newSubscription.startDate"
+            data-test="new-subscription-start-date"
+            type="date"
+            class="form-control input subscription-date"
+            :disabled="subscriptionSaving"
+          />
+          <input
+            v-model="newSubscription.endDate"
+            data-test="new-subscription-end-date"
+            type="date"
+            class="form-control input subscription-date"
+            :disabled="subscriptionSaving"
+          />
+          <button
+            data-test="add-subscription-button"
+            type="button"
+            class="button secondary subscription-save"
+            :disabled="subscriptionSaving"
+            @click="addSubscription"
+          >
+            Добавить
+          </button>
+        </div>
       </div>
 
       <!-- Form validation errors -->
@@ -225,6 +422,77 @@ async function onSubmit(values) {
       <span class="spinner-border spinner-border-lg align-center"></span>
       <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
+
+    <PlaylistAccessImpactDialog
+      v-model="playlistImpactDialog"
+      :impact="playlistImpact"
+      :saving="subscriptionSaving"
+      @confirm="confirmPlaylistCleanup"
+      @cancel="cancelPlaylistCleanup"
+    />
     
   </div>
 </template>
+
+<style scoped>
+.subscriptions-section {
+  margin-top: 1.5rem;
+}
+
+.subscriptions-section .secondary-heading {
+  margin-bottom: 0.75rem;
+}
+
+.subscriptions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.subscription-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 150px 150px 110px;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.subscription-category {
+  min-width: 0;
+}
+
+.subscription-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subscription-state {
+  color: #5c6f7f;
+  font-size: 0.85rem;
+}
+
+.subscription-date,
+.subscription-category-select {
+  min-width: 0;
+}
+
+.subscription-save {
+  justify-self: start;
+}
+
+.subscription-new {
+  margin-top: 0.75rem;
+}
+
+.subscriptions-empty {
+  color: #5c6f7f;
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 760px) {
+  .subscription-row {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

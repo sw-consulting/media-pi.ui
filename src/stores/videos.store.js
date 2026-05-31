@@ -107,14 +107,22 @@ export const useVideosStore = defineStore('videos', () => {
     )
   }
 
-  async function updateCategoryBatch(ids, categoryId) {
+  async function updateCategoryBatch(ids, categoryId, options = {}) {
     return handleRequest(
       async () => {
         const selectedIds = Array.from(ids || [])
         if (!selectedIds.length) throw new Error('Не выбраны видеофайлы')
         if (typeof categoryId !== 'number') throw new Error('Не выбрана категория')
 
-        return fetchWrapper.post(`${baseUrl}/category/batch`, { ids: selectedIds, categoryId })
+        const payload = {
+          ids: selectedIds,
+          categoryId
+        }
+        if (options.forcePlaylistCleanup) {
+          payload.forcePlaylistCleanup = true
+        }
+
+        return fetchWrapper.post(`${baseUrl}/category/batch`, payload)
       }
     )
   }
@@ -184,9 +192,14 @@ export const useVideosStore = defineStore('videos', () => {
           videos.value = []
           return videos.value
         }
-        const query = Object.prototype.hasOwnProperty.call(options, 'categoryId')
-          ? `?categoryId=${encodeURIComponent(options.categoryId)}`
-          : ''
+        const params = new URLSearchParams()
+        if (Object.prototype.hasOwnProperty.call(options, 'categoryId')) {
+          params.set('categoryId', options.categoryId)
+        }
+        if (Object.prototype.hasOwnProperty.call(options, 'availableForAccountId')) {
+          params.set('availableForAccountId', options.availableForAccountId)
+        }
+        const query = params.toString() ? `?${params.toString()}` : ''
         const result = await fetchWrapper.get(`${baseUrl}/by-account/${accountId}${query}`)
         videos.value = result || []
         return videos.value

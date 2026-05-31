@@ -11,6 +11,7 @@ const baseUrl = `${apiUrl}/accounts`
 export const useAccountsStore = defineStore('accounts', () => {
   const accounts = ref([])
   const account = ref(null)
+  const subscriptions = ref({ subscriptions: [], availableCategories: [] })
   const loading = ref(false)
   const error = ref(null)
 
@@ -65,6 +66,22 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
+  async function getSubscriptions(id) {
+    loading.value = true
+    error.value = null
+    try {
+      const result = await fetchWrapper.get(`${baseUrl}/${id}/subscriptions`)
+      subscriptions.value = result || { subscriptions: [], availableCategories: [] }
+      return subscriptions.value
+    } catch (err) {
+      error.value = err
+      subscriptions.value = { subscriptions: [], availableCategories: [] }
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function getByManager(userId) {
     loading.value = true
     error.value = null
@@ -94,6 +111,20 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
+  async function upsertSubscription(accountId, categoryId, params) {
+    loading.value = true
+    error.value = null
+    try {
+      await fetchWrapper.put(`${baseUrl}/${accountId}/subscriptions/${categoryId}`, params)
+      return await getSubscriptions(accountId)
+    } catch (err) {
+      error.value = err
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function deleteAccount(id) {
     loading.value = true
     error.value = null
@@ -111,14 +142,17 @@ export const useAccountsStore = defineStore('accounts', () => {
   return {
     accounts,
     account,
+    subscriptions,
     loading,
     error,
     getAccountById,
     add,
     getAll,
     getById,
+    getSubscriptions,
     getByManager,
     update,
+    upsertSubscription,
     delete: deleteAccount
   }
 })

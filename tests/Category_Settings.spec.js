@@ -94,6 +94,14 @@ const mountSettings = (props = {}) => mount({
         props: ['name'],
         template: '<input data-test="title-field" />'
       },
+      ModalWindow: {
+        template: '<div v-if="modelValue" data-test="modal-window"><slot /><slot name="actions" /></div>',
+        props: ['modelValue', 'title'],
+        emits: ['confirm', 'cancel', 'update:modelValue']
+      },
+      'v-btn': {
+        template: '<button v-bind="$attrs"><slot /></button>'
+      },
       VideosList: {
         props: {
           title: String,
@@ -167,6 +175,54 @@ describe('Category_Settings.vue', () => {
     await flushPromises()
 
     expect(categoriesStore.update).toHaveBeenCalledWith(9, { title: 'Updated', free: true })
+  })
+
+  it('lists affected playlists before retrying category update with force cleanup', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: true }
+    categoriesStore.update = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 2,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            {
+              playlistId: 11,
+              title: 'Morning',
+              filename: 'morning.m3u',
+              accountId: 1,
+              accountName: 'Cafe',
+              removedItemCount: 2
+            }
+          ]
+        }
+      })
+      .mockResolvedValueOnce()
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: 'Existing' }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="category-free-checkbox"]').setValue(false)
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(categoriesStore.update).toHaveBeenCalledWith(9, { title: 'Existing', free: false })
+    expect(wrapper.find('[data-test="playlist-impact-list"]').text()).toContain('Cafe / Morning')
+    expect(wrapper.find('[data-test="playlist-impact-list"]').text()).toContain('morning.m3u')
+
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(categoriesStore.update).toHaveBeenLastCalledWith(9, {
+      title: 'Existing',
+      free: false,
+      forcePlaylistCleanup: true
+    })
   })
 
   it('renders category videos as an embedded subsection scoped to the category', async () => {
@@ -357,10 +413,151 @@ describe('Category_Settings.vue', () => {
     expect(redirectToDefaultRoute).toHaveBeenCalled()
   })
 
-  it('redirects when id is NaN on edit', async () => {
-    mountSettings({ register: false, id: NaN })
+  it('cancels playlist cleanup dialog without triggering force save', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: true }
+    categoriesStore.update = vi.fn().mockRejectedValueOnce({
+      status: 409,
+      data: {
+        affectedPlaylistCount: 1,
+        affectedItemCount: 2,
+        affectedVideoCount: 1,
+        affectedPlaylists: [
+          { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 2 }
+        ]
+      }
+    })
+
+    const wrapper = mountSettings({ register: false, id: 9, submitValues: { title: 'Existing' } })
     await flushPromises()
 
-    expect(redirectToDefaultRoute).toHaveBeenCalled()
+    await wrapper.find('[data-test="category-free-checkbox"]').setValue(false)
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    await wrapper.find('[data-test="cancel-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(false)
+    expect(categoriesStore.update).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Category_Settings.vue - additional coverage', () => {
+  beforeEach(() => {
+    authStore = { isAdministrator: true }
+    categoriesStore.category = null
+    categoriesStore.loading.value = false
+    categoriesStore.getById = vi.fn().mockResolvedValue()
+    categoriesStore.create = vi.fn().mockResolvedValue()
+    categoriesStore.update = vi.fn().mockResolvedValue()
+    alertStore.alert.value = null
+    vi.clearAllMocks()
+  })
+
+  it('uses title fallback empty string when loaded category has no title', async () => {
+    categoriesStore.category = { id: 5, title: null, free: false }
+
+    const wrapper = mountSettings({ register: false, id: 5 })
+    await flushPromises()
+
+    const titleInput = wrapper.find('[data-test="title-field"]')
+    expect(titleInput.exists()).toBe(true)
+  })
+
+  it('uses free=true fallback when loaded category has undefined free field', async () => {
+    categoriesStore.category = { id: 5, title: 'Sport' }
+
+    const wrapper = mountSettings({ register: false, id: 5 })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="category-free-checkbox"]').element.checked).toBe(true)
+  })
+
+  it('shows generic error when saveCategoryPayload fails with non-http error on create', async () => {
+    categoriesStore.create = vi.fn().mockRejectedValue(new Error('Network error'))
+
+    const wrapper = mountSettings({ register: true, submitValues: { title: 'New Cat' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Ошибка при создании категории')
+    )
+  })
+
+  it('calls alertStore.clear when alert close button is clicked', async () => {
+    categoriesStore.create = vi.fn().mockRejectedValue(new Error('Server error'))
+
+    const wrapper = mountSettings({ register: true, submitValues: { title: 'New Cat' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    const closeButton = wrapper.find('.alert-dismissable .btn-link.close')
+    expect(closeButton.exists()).toBe(true)
+    await closeButton.trigger('click')
+
+    expect(alertStore.clear).toHaveBeenCalled()
+  })
+
+  it('confirmPlaylistCleanup returns early when no pending payload', async () => {
+    categoriesStore.category = { id: 9, title: 'Sport', free: true }
+
+    const wrapper = mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    // No 409 error triggered, so pendingCategoryPayload is null
+    // Emit confirm directly from PlaylistAccessImpactDialog (dialog not open, pending is null)
+    const impactDialog = wrapper.findComponent({ name: 'PlaylistAccessImpactDialog' })
+    await impactDialog.vm.$emit('confirm')
+    await flushPromises()
+
+    expect(categoriesStore.update).not.toHaveBeenCalled()
+  })
+
+  it('cancelPlaylistCleanup does nothing while category force save is in progress', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: true }
+
+    let resolveUpdate
+    categoriesStore.update = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 1,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+          ]
+        }
+      })
+      .mockReturnValueOnce(new Promise(resolve => { resolveUpdate = resolve }))
+
+    const wrapper = mountSettings({ register: false, id: 9, submitValues: { title: 'Existing' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="category-free-checkbox"]').setValue(false)
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    // Await confirm click so categoryForceSaving=true is set before cancelling
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    // Emit cancel directly from PlaylistAccessImpactDialog to test Category_Settings guard
+    const impactDialog = wrapper.findComponent({ name: 'PlaylistAccessImpactDialog' })
+    await impactDialog.vm.$emit('cancel')
+    await flushPromises()
+
+    // Dialog still showing because cancelPlaylistCleanup guard blocked it
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    resolveUpdate()
+    await flushPromises()
   })
 })

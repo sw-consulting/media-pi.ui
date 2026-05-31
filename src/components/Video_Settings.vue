@@ -15,6 +15,8 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
 import { createCategoryOptions } from '@/helpers/video.scope.helpers.js'
+import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
+import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 
 const props = defineProps({
   id: {
@@ -38,6 +40,10 @@ const schema = Yup.object().shape({
 const video = ref({ title: '', categoryId: 0, accountId: 0 })
 const categoryId = ref(0)
 const initialLoading = ref(false)
+const playlistImpactDialog = ref(false)
+const playlistImpact = ref(null)
+const pendingVideoPayload = ref(null)
+const forceSaving = ref(false)
 
 const categoryOptions = computed(() => createCategoryOptions(categories.value || []))
 const isCommonVideo = computed(() => (video.value?.accountId ?? 0) === 0)
@@ -85,17 +91,19 @@ if (!props.id || isNaN(props.id)) {
   }
 }
 
-async function onSubmit(values) {
+async function saveVideoPayload(payload, forcePlaylistCleanup = false) {
   try {
-    const payload = {
-      title: values.title.trim()
-    }
-    if (isCommonVideo.value) {
-      payload.categoryId = categoryId.value
-    }
-    await videosStore.update(props.id, payload)
+    const updatePayload = { ...payload }
+    if (forcePlaylistCleanup) updatePayload.forcePlaylistCleanup = true
+    await videosStore.update(props.id, updatePayload)
     router.go(-1)
   } catch (err) {
+    if (isPlaylistAccessImpactError(err) && !forcePlaylistCleanup) {
+      playlistImpact.value = err.data
+      pendingVideoPayload.value = payload
+      playlistImpactDialog.value = true
+      return
+    }
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
     } else if (err.status === 404) {
@@ -106,6 +114,32 @@ async function onSubmit(values) {
       alertStore.error(`Ошибка при обновлении видеофайла: ${err.message || err}`)
     }
   }
+}
+
+async function onSubmit(values) {
+  const payload = {
+    title: values.title.trim()
+  }
+  if (isCommonVideo.value) {
+    payload.categoryId = categoryId.value
+  }
+  await saveVideoPayload(payload)
+}
+
+async function confirmPlaylistCleanup() {
+  if (!pendingVideoPayload.value) return
+  forceSaving.value = true
+  try {
+    await saveVideoPayload(pendingVideoPayload.value, true)
+  } finally {
+    forceSaving.value = false
+  }
+}
+
+function cancelPlaylistCleanup() {
+  if (forceSaving.value) return
+  playlistImpactDialog.value = false
+  pendingVideoPayload.value = null
 }
 </script>
 
@@ -177,5 +211,13 @@ async function onSubmit(values) {
       <span class="spinner-border spinner-border-lg align-center"></span>
       <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
+
+    <PlaylistAccessImpactDialog
+      v-model="playlistImpactDialog"
+      :impact="playlistImpact"
+      :saving="forceSaving"
+      @confirm="confirmPlaylistCleanup"
+      @cancel="cancelPlaylistCleanup"
+    />
   </div>
 </template>
