@@ -74,6 +74,7 @@
 .table-3,
 .form-4 {
   width: 100%;
+  max-width: 4096px;
   margin: 0;
   padding: 0;
 }
