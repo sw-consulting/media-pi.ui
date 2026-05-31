@@ -172,6 +172,46 @@ describe('Videos_List.vue', () => {
     router.push.mockClear()
   })
 
+  it('renders as a top-level list by default', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const heading = wrapper.find('[data-test="videos-list-heading"]')
+
+    expect(wrapper.classes()).not.toContain('videos-list-embedded')
+    expect(heading.exists()).toBe(true)
+    expect(heading.element.tagName).toBe('H1')
+    expect(heading.classes()).toContain('primary-heading')
+    expect(wrapper.find('[data-test="videos-list-subheading"]').exists()).toBe(false)
+    expect(wrapper.find('hr.hr').exists()).toBe(true)
+    expect(wrapper.find('.videos-list-subsection-divider').exists()).toBe(false)
+  })
+
+  it('renders embedded mode as a subordinate subsection', async () => {
+    const wrapper = mount(VideosList, {
+      props: {
+        title: 'Видеофайлы',
+        embedded: true,
+        fixedScope: 'category:9'
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    const heading = wrapper.find('[data-test="videos-list-subheading"]')
+
+    expect(wrapper.classes()).toContain('videos-list-embedded')
+    expect(heading.exists()).toBe(true)
+    expect(heading.element.tagName).toBe('H2')
+    expect(heading.classes()).toContain('secondary-heading')
+    expect(heading.text()).toBe('Видеофайлы')
+    expect(wrapper.find('[data-test="videos-list-heading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="videos-list-subtitle"]').exists()).toBe(false)
+    expect(wrapper.find('hr.hr').exists()).toBe(false)
+    expect(wrapper.find('.videos-list-subsection-divider').exists()).toBe(true)
+    expect(wrapper.find('.videos-list-card-embedded').exists()).toBe(true)
+  })
+
   it('loads videos for default and changed account selection', async () => {
     accountsStore.accounts.value = [{ id: 5, name: 'Five' }]
     videosStore.videos.value = [{ id: 1, title: 'Account video', accountId: 5, categoryId: 0 }]
@@ -948,6 +988,27 @@ describe('Videos_List.vue', () => {
 
     wrapper.vm.tablePage = 3
     expect(wrapper.vm.tablePage).toBe(3)
+  })
+
+  it('keeps fixed-scope pagination local in embedded mode', async () => {
+    const wrapper = mount(VideosList, {
+      props: { fixedScope: 'category:5', embedded: true },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    expect(accountsStore.getAll).not.toHaveBeenCalled()
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { categoryId: 5 })
+
+    wrapper.vm.tableItemsPerPage = 15
+    wrapper.vm.tableSearch = 'clip'
+    wrapper.vm.tableSortBy = [{ key: 'title', order: 'asc' }]
+    wrapper.vm.tablePage = 4
+
+    expect(wrapper.vm.tableItemsPerPage).toBe(15)
+    expect(wrapper.vm.tableSearch).toBe('clip')
+    expect(wrapper.vm.tableSortBy).toEqual([{ key: 'title', order: 'asc' }])
+    expect(wrapper.vm.tablePage).toBe(4)
   })
 
   it('uses authStore pagination state when fixedScope is not set', async () => {

@@ -30,6 +30,10 @@ const props = defineProps({
     type: String,
     default: 'Видеофайлы'
   },
+  embedded: {
+    type: Boolean,
+    default: false
+  },
   fixedScope: {
     type: String,
     default: null
@@ -433,9 +437,24 @@ watch(videos, (current) => {
 </script>
 
 <template>
-  <div class="settings table-3">
-    <div class="header-with-actions">
-      <h1 class="primary-heading">{{ props.title }}</h1>
+  <div class="settings table-3" :class="{ 'videos-list-embedded': props.embedded }">
+    <div class="header-with-actions" :class="{ 'videos-list-subsection-header': props.embedded }">
+      <div class="videos-list-title">
+        <h2
+          v-if="props.embedded"
+          class="secondary-heading"
+          data-test="videos-list-subheading"
+        >
+          {{ props.title }}
+        </h2>
+        <h1
+          v-else
+          class="primary-heading"
+          data-test="videos-list-heading"
+        >
+          {{ props.title }}
+        </h1>
+      </div>
       <div class="header-actions-container">
         <div v-if="loading" class="header-actions header-actions-group">
           <span class="spinner-border spinner-border-m"></span>
@@ -591,15 +610,17 @@ watch(videos, (current) => {
         </v-btn>
       </div>
     </div>
-    <hr class="hr" />
+    <hr v-if="!props.embedded" class="hr" />
+    <div v-else class="videos-list-subsection-divider"></div>
 
-    <v-card>
+    <v-card :class="{ 'videos-list-card-embedded': props.embedded }">
       <div v-if="videos?.length">
         <v-text-field
           v-model="tableSearch"
           :append-inner-icon="mdiMagnify"
           label="Поиск по любой информации о видеофайлах"
           variant="solo"
+          :density="props.embedded ? 'compact' : undefined"
           hide-details
         />
       </div>
@@ -618,6 +639,7 @@ watch(videos, (current) => {
         :custom-filter="filterVideos"
         :show-select="canManageSelectedScope"
         item-value="id"
+        :density="props.embedded ? 'compact' : undefined"
         class="elevation-1"
       >
         <template v-slot:[`item.accountDisplay`]="{ item }">
@@ -677,6 +699,57 @@ watch(videos, (current) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.videos-list-title {
+  min-width: 0;
+}
+
+.videos-list-title .primary-heading,
+.videos-list-title .secondary-heading {
+  margin: 0;
+}
+
+.videos-list-embedded {
+  margin-top: 1.5rem;
+}
+
+.videos-list-embedded .videos-list-subsection-header {
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 8px;
+}
+
+.videos-list-embedded .header-actions {
+  gap: 0.125rem;
+  padding: 0.25rem;
+  border-color: #d0d7de;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.videos-list-subsection-divider {
+  height: 1px;
+  margin: 0 0 12px;
+  background: #e0e0e0;
+}
+
+.videos-list-card-embedded {
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.videos-list-embedded :deep(.v-data-table thead th),
+.videos-list-embedded :deep(.v-data-table-server thead th),
+.videos-list-embedded :deep(.v-table thead th),
+.videos-list-embedded :deep(.v-table > .v-table__wrapper > table > thead > tr > th) {
+  font-size: 0.9rem !important;
+}
+
+.videos-list-embedded :deep(.v-data-table__td) {
+  font-size: 0.875rem;
 }
 
 .batch-category-dialog-content {

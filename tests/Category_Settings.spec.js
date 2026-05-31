@@ -95,8 +95,12 @@ const mountSettings = (props = {}) => mount({
         template: '<input data-test="title-field" />'
       },
       VideosList: {
-        props: ['title', 'fixedScope'],
-        template: '<div data-test="category-videos-list"></div>'
+        props: {
+          title: String,
+          embedded: Boolean,
+          fixedScope: String
+        },
+        template: '<div data-test="category-videos-list" :data-title="title" :data-embedded="embedded ? \'true\' : \'false\'" :data-fixed-scope="fixedScope"></div>'
       }
     },
     mocks: {
@@ -163,6 +167,25 @@ describe('Category_Settings.vue', () => {
     await flushPromises()
 
     expect(categoriesStore.update).toHaveBeenCalledWith(9, { title: 'Updated', free: true })
+  })
+
+  it('renders category videos as an embedded subsection scoped to the category', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: true }
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9
+    })
+    await flushPromises()
+
+    const videosList = wrapper.find('[data-test="category-videos-list"]')
+
+    expect(wrapper.find('.primary-heading').text()).toBe("Настройки категории 'Existing'")
+    expect(videosList.exists()).toBe(true)
+    expect(videosList.attributes('data-title')).toBe('Видеофайлы')
+    expect(videosList.attributes('data-subtitle')).toBeUndefined()
+    expect(videosList.attributes('data-embedded')).toBe('true')
+    expect(videosList.attributes('data-fixed-scope')).toBe('category:9')
   })
 
   it('redirects on 401 or 403 load error', async () => {

@@ -2,7 +2,7 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import router from '@/router'
 import { storeToRefs } from 'pinia'
 import { Form, Field } from 'vee-validate'
@@ -45,6 +45,11 @@ const category = ref({ title: '', free: true })
 const initialLoading = ref(false)
 const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'
+const categoryTitleText = computed(() => (
+  isRegister()
+    ? 'Новая категория'
+    : `Настройки категории '${category.value.title || `Категория #${props.id}`}'`
+))
 
 function isRegister() {
   return props.register
@@ -121,7 +126,7 @@ async function onSubmit(values) {
       v-slot="{ errors, isSubmitting, handleSubmit }"
     >
       <div class="header-with-actions">
-        <h1 class="primary-heading">{{ isRegister() ? 'Новая категория' : 'Настройки категории' }}</h1>
+        <h1 class="primary-heading">{{ categoryTitleText }}</h1>
         <div class="header-actions-container">
           <div class="header-actions header-actions-group">
             <ActionButton
@@ -185,7 +190,8 @@ async function onSubmit(values) {
     <VideosList
       v-if="!isRegister() && props.id"
       class="mt-8"
-      :title="`Видео категории '${category.title || props.id}'`"
+      title="Видеофайлы"
+      embedded
       :fixed-scope="createCategoryScope(props.id)"
     />
   </div>
