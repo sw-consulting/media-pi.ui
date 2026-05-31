@@ -123,7 +123,7 @@ function getUserRole() {
 
 <style scoped>
 .vvv {
-  width: 90vw;
+  width: 96vw;
   margin: 1rem;
   min-width: 480px;
 }

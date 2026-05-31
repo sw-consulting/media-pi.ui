@@ -88,8 +88,8 @@ const scopeHeader = {
 
 const playlistVideoHeaders = [
   { title: '', align: 'center', key: 'select', sortable: false },
-  { title: '#', align: 'center', key: 'position', sortable: false },
-  { title: 'Название', align: 'start', key: 'title', sortable: false },
+  { title: '#', align: 'center', key: 'position' },
+  { title: 'Название', align: 'start', key: 'title' },
   { ...scopeHeader },
   {
     title: 'Размер\nДлительность',
