@@ -31,7 +31,6 @@ const categoriesStore = useCategoriesStore()
 const alertStore = useAlertStore()
 const authStore = useAuthStore()
 const { alert } = storeToRefs(alertStore)
-const { loading } = storeToRefs(categoriesStore)
 
 if (!authStore.isAdministrator) {
   redirectToDefaultRoute()
