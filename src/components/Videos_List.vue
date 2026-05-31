@@ -440,9 +440,8 @@ watch(videos, (current) => {
         <div v-if="loading" class="header-actions header-actions-group">
           <span class="spinner-border spinner-border-m"></span>
         </div>
-        <div class="header-actions header-actions-group">
-          <v-select
-            v-if="!props.fixedScope"
+        <div v-if="!props.fixedScope" class="header-actions header-actions-group">
+          <v-select            
             v-model="selectedScope"
             :items="scopeOptions"
             label="Лицевой счёт или категория"
@@ -466,6 +465,17 @@ watch(videos, (current) => {
             <input ref="fileInput" class="d-none" type="file" accept="video/*" multiple @change="onFileChange" />
           </div>
       </div>
+          <div v-else class="header-actions header-actions-group">
+            <ActionButton
+              data-test="upload-video-button"
+              :item="{}"
+              icon="fa-solid fa-cloud-arrow-up"
+              tooltip-text="Загрузить видеофайлы"
+              :disabled="!canManageSelectedScope || isBusy || categorySaving"
+              @click="triggerUpload"
+            />
+          </div>
+
       <div class="header-actions-container">
           <div class="header-actions header-actions-group">
             <ActionButton
