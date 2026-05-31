@@ -493,6 +493,7 @@ watch(videos, (current) => {
               :disabled="!canManageSelectedScope || isBusy || categorySaving"
               @click="triggerUpload"
             />
+            <input ref="fileInput" class="d-none" type="file" accept="video/*" multiple @change="onFileChange" />
           </div>
 
       <div class="header-actions-container">
