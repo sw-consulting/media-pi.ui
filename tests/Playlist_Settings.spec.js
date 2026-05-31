@@ -149,9 +149,14 @@ const mountSettings = (props = {}) => mount({
             const header = (this.headers || []).find(item => item.key === this.sortKey)
             const sorted = [...(this.items || [])]
             sorted.sort((a, b) => {
-              const compare = header?.sort
-                ? header.sort(a?.[this.sortKey], b?.[this.sortKey])
-                : String(a?.[this.sortKey] ?? '').localeCompare(String(b?.[this.sortKey] ?? ''))
+              let compare
+              if (header?.sortRaw) {
+                compare = header.sortRaw(a, b)
+              } else if (header?.sort) {
+                compare = header.sort(a?.[this.sortKey], b?.[this.sortKey])
+              } else {
+                compare = String(a?.[this.sortKey] ?? '').localeCompare(String(b?.[this.sortKey] ?? ''))
+              }
               return this.sortOrder === 'desc' ? -compare : compare
             })
             return sorted

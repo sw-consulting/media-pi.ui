@@ -81,15 +81,15 @@ const scopeHeader = {
   align: 'start',
   key: 'scopeName',
   sortable: true,
-  sort: compareScopeName,
+  sortRaw: compareScopeName,
   width: '160px',
   headerProps: { class: 'playlist-scope-header' }
 }
 
 const playlistVideoHeaders = [
-  { title: '', align: 'center', key: 'select', sortable: false },
-  { title: '#', align: 'center', key: 'position' },
-  { title: 'Название', align: 'start', key: 'title' },
+  { title: '', align: 'center', key: 'select', sortable: false, width: '44px' },
+  { title: '#', align: 'center', key: 'position', sortable: false, width: '44px' },
+  { title: 'Название', align: 'start', key: 'title', sortable: false },
   { ...scopeHeader },
   {
     title: 'Размер\nДлительность',
@@ -100,12 +100,12 @@ const playlistVideoHeaders = [
     width: '140px',
     headerProps: { class: 'playlist-media-info-header' }
   },
-  { title: '', align: 'center', key: 'actions', sortable: false }
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '44px' }
 ]
 
 const availableVideoHeaders = [
-  { title: '', align: 'center', key: 'actions', sortable: false },
-  { title: '', align: 'center', key: 'select', sortable: false },
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '44px' },
+  { title: '', align: 'center', key: 'select', sortable: false, width: '44px' },
   { title: 'Название', align: 'start', key: 'title' },
   { ...scopeHeader },
   {
@@ -159,7 +159,9 @@ const sortedFilteredAvailableVideos = computed(() => {
   const sorted = [...items].sort((a, b) => {
     const result = key === 'mediaInfo'
       ? compareMediaInfo(a.mediaInfo, b.mediaInfo)
-      : compareDisplayText(a[key], b[key])
+      : key === 'scopeName'
+        ? compareScopeName(a, b)
+        : compareDisplayText(a[key], b[key])
     return order === 'desc' ? -result : result
   })
   return sorted
@@ -320,14 +322,22 @@ function compareDisplayText(a, b) {
 }
 
 function compareScopeName(a, b) {
-  return compareDisplayText(a, b)
+  return compareDisplayText(getScopeSortValue(a), getScopeSortValue(b))
+}
+
+function getScopeSortValue(value) {
+  if (value && typeof value === 'object') {
+    return getVideoScopeName(value)
+  }
+
+  return value || ''
 }
 
 function getVideoScopeName(video) {
   if (!video) return 'Общие файлы'
 
   const accountId = Number(video.accountId ?? 0)
-  if (accountId !== 0) {
+  if (Number.isFinite(accountId) && accountId !== 0) {
     return video.accountName || accountNameById.value.get(accountId) || `Лицевой счёт ${accountId}`
   }
 
