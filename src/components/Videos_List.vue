@@ -14,7 +14,9 @@ import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
+import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import ModalWindow from '@/components/ModalWindow.vue'
+import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
 import { estimateSelectWidth } from '@/helpers/account.options.js'
@@ -64,6 +66,9 @@ const uploadAbortController = ref(null)
 const selectedVideoIds = ref([])
 const batchCategoryId = ref(0)
 const batchCategoryDialog = ref(false)
+const playlistImpactDialog = ref(false)
+const playlistImpact = ref(null)
+const pendingCategoryUpdate = ref(null)
 const localItemsPerPage = ref(10)
 const localSearch = ref('')
 const localSortBy = ref([])
@@ -398,10 +403,44 @@ async function updateSelectedVideoCategory() {
       summarizeBatchCategoryResult(result, ids.length)
     }
   } catch (err) {
+    if (isPlaylistAccessImpactError(err)) {
+      playlistImpact.value = err.data
+      pendingCategoryUpdate.value = { ids, categoryId: batchCategoryId.value }
+      playlistImpactDialog.value = true
+      return
+    }
     alertStore.error('Не удалось обновить категории видеофайлов: ' + (err?.message || err))
   } finally {
     categorySaving.value = false
   }
+}
+
+async function confirmPlaylistCleanup() {
+  const pending = pendingCategoryUpdate.value
+  if (!pending) return
+
+  categorySaving.value = true
+  try {
+    const result = await videosStore.updateCategoryBatch(pending.ids, pending.categoryId, { forcePlaylistCleanup: true })
+    selectedVideoIds.value = []
+    const refreshed = await refreshVideos()
+    if (refreshed) {
+      batchCategoryDialog.value = false
+      playlistImpactDialog.value = false
+      pendingCategoryUpdate.value = null
+      summarizeBatchCategoryResult(result, pending.ids.length)
+    }
+  } catch (err) {
+    alertStore.error('Не удалось обновить категории видеофайлов: ' + (err?.message || err))
+  } finally {
+    categorySaving.value = false
+  }
+}
+
+function cancelPlaylistCleanup() {
+  if (categorySaving.value) return
+  playlistImpactDialog.value = false
+  pendingCategoryUpdate.value = null
 }
 
 function openBatchCategoryDialog() {
@@ -567,6 +606,13 @@ watch(videos, (current) => {
         </v-btn>
       </template>
     </ModalWindow>
+    <PlaylistAccessImpactDialog
+      v-model="playlistImpactDialog"
+      :impact="playlistImpact"
+      :saving="categorySaving"
+      @confirm="confirmPlaylistCleanup"
+      @cancel="cancelPlaylistCleanup"
+    />
     <div
       v-if="isUploading"
       ref="uploadProgressRef"

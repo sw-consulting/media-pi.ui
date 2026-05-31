@@ -96,6 +96,14 @@ const mountSettings = (props = {}) => mount({
         props: ['items', 'modelValue'],
         emits: ['update:modelValue'],
         template: '<select data-test="video-category-select" :value="modelValue" @change="$emit(\'update:modelValue\', Number($event.target.value))"><option v-for="item in items" :key="item.value" :value="item.value">{{ item.title }}</option></select>'
+      },
+      ModalWindow: {
+        template: '<div v-if="modelValue" data-test="modal-window"><slot /><slot name="actions" /></div>',
+        props: ['modelValue', 'title'],
+        emits: ['confirm', 'cancel', 'update:modelValue']
+      },
+      'v-btn': {
+        template: '<button v-bind="$attrs"><slot /></button>'
       }
     },
     mocks: {
@@ -145,6 +153,47 @@ describe('Video_Settings.vue', () => {
     expect(videosStore.update).toHaveBeenCalledWith(10, { title: 'Renamed' })
   })
 
+  it('lists affected playlists before retrying common video update with force cleanup', async () => {
+    videosStore.update = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 1,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            {
+              playlistId: 11,
+              title: 'Morning',
+              filename: 'morning.m3u',
+              accountId: 1,
+              accountName: 'Cafe',
+              removedItemCount: 1
+            }
+          ]
+        }
+      })
+      .mockResolvedValueOnce()
+    const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="video-category-select"]').setValue('4')
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(videosStore.update).toHaveBeenCalledWith(10, { title: 'Updated Clip', categoryId: 4 })
+    expect(wrapper.find('[data-test="playlist-impact-list"]').text()).toContain('Cafe / Morning')
+
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(videosStore.update).toHaveBeenLastCalledWith(10, {
+      title: 'Updated Clip',
+      categoryId: 4,
+      forcePlaylistCleanup: true
+    })
+  })
+
   it('redirects when current user cannot manage the video', async () => {
     authStore = { user: { roles: [], accountIds: [99] } }
     videosStore.video.value = { id: 10, title: 'Locked', accountId: 42, categoryId: 0 }
@@ -164,5 +213,236 @@ describe('Video_Settings.vue', () => {
     await flushPromises()
 
     expect(alertStore.error).toHaveBeenCalledWith('Видеофайл с ID 10 не найден')
+  })
+
+  it('redirects when id is NaN', async () => {
+    mountSettings({ id: NaN })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('redirects when load returns 401 error', async () => {
+    const error = new Error('Unauthorized')
+    error.status = 401
+    videosStore.getById = vi.fn().mockRejectedValue(error)
+
+    mountSettings()
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('shows generic error when video load fails with non-http error', async () => {
+    const error = new Error('Network failure')
+    videosStore.getById = vi.fn().mockRejectedValue(error)
+
+    mountSettings()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Ошибка загрузки видеофайла: Network failure')
+  })
+
+  it('calls router.go(-1) when cancel button is clicked', async () => {
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    const cancelButton = wrapper.findAll('button[type="button"]')
+      .find(btn => btn.text().includes('Отменить'))
+    expect(cancelButton).toBeTruthy()
+    await cancelButton.trigger('click')
+
+    expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('calls alertStore.clear when alert close button is clicked', async () => {
+    const error = new Error('Server error')
+    videosStore.getById = vi.fn().mockRejectedValue(error)
+
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    const closeButton = wrapper.find('.alert-dismissable .btn-link.close')
+    expect(closeButton.exists()).toBe(true)
+    await closeButton.trigger('click')
+
+    expect(alertStore.clear).toHaveBeenCalled()
+  })
+
+  it('cancelPlaylistCleanup does nothing while force save is in progress', async () => {
+    let resolveUpdate
+    videosStore.update = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 1,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+          ]
+        }
+      })
+      .mockReturnValueOnce(new Promise(resolve => { resolveUpdate = resolve }))
+
+    const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="video-category-select"]').setValue('4')
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    // Await confirm click so forceSaving=true is set synchronously before cancelling
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    // Now forceSaving=true; emit cancel directly from PlaylistAccessImpactDialog (bypassing its guard)
+    // to test Video_Settings' own cancelPlaylistCleanup guard
+    const impactDialog = wrapper.findComponent({ name: 'PlaylistAccessImpactDialog' })
+    await impactDialog.vm.$emit('cancel')
+    await flushPromises()
+
+    // Dialog still showing because cancelPlaylistCleanup guard blocked it (forceSaving=true)
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    resolveUpdate()
+    await flushPromises()
+  })
+
+  it('v-model on PlaylistAccessImpactDialog closes dialog on update:modelValue false', async () => {
+    videosStore.update = vi.fn().mockRejectedValueOnce({
+      status: 409,
+      data: {
+        affectedPlaylistCount: 1,
+        affectedItemCount: 1,
+        affectedVideoCount: 1,
+        affectedPlaylists: [
+          { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+        ]
+      }
+    })
+
+    const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="video-category-select"]').setValue('4')
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    // Emit update:modelValue false from PlaylistAccessImpactDialog to test v-model handler in Video_Settings
+    const impactDialog = wrapper.findComponent({ name: 'PlaylistAccessImpactDialog' })
+    await impactDialog.vm.$emit('update:modelValue', false)
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(false)
+  })
+})
+
+describe('Video_Settings.vue - additional branch coverage', () => {
+  beforeEach(() => {
+    authStore = { user: { roles: [1], accountIds: [] } }
+    videosStore.video.value = { id: 10, title: 'Clip', accountId: 0, categoryId: 3 }
+    videosStore.loading.value = false
+    videosStore.getById = vi.fn().mockResolvedValue()
+    videosStore.update = vi.fn().mockResolvedValue()
+    categoriesStore.categories.value = [{ id: 3, title: 'Sports' }, { id: 4, title: 'News' }]
+    categoriesStore.getAll = vi.fn().mockResolvedValue()
+    alertStore.alert.value = null
+    vi.clearAllMocks()
+  })
+
+  it('handles null categories gracefully', async () => {
+    categoriesStore.categories.value = null
+    const wrapper = mountSettings({ submitValues: { title: 'Clip' } })
+    await flushPromises()
+
+    // isCommonVideo=true, category options should be empty but not crash
+    expect(wrapper.find('[data-test="video-category-select"]').exists()).toBe(true)
+  })
+
+  it('handles video with undefined accountId as common video', async () => {
+    videosStore.video.value = { id: 10, title: 'Clip', categoryId: 3 }
+    const wrapper = mountSettings({ submitValues: { title: 'Clip' } })
+    await flushPromises()
+
+    // accountId is undefined → isCommonVideo = (undefined ?? 0 === 0) = true
+    expect(wrapper.find('[data-test="video-category-select"]').exists()).toBe(true)
+  })
+
+  it('handles video with null title using empty string fallback', async () => {
+    videosStore.video.value = { id: 10, title: null, accountId: 0, categoryId: 3 }
+    mountSettings()
+    await flushPromises()
+
+    expect(videosStore.getById).toHaveBeenCalledWith(10)
+  })
+
+  it('handles generic error without message property in load', async () => {
+    videosStore.getById = vi.fn().mockRejectedValue({ status: 500 })
+    mountSettings()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      expect.stringContaining('Ошибка загрузки видеофайла')
+    )
+  })
+
+  it('handles 401 error in saveVideoPayload', async () => {
+    videosStore.update = vi.fn().mockRejectedValue({ status: 401 })
+    const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('handles 404 error in saveVideoPayload', async () => {
+    videosStore.update = vi.fn().mockRejectedValue({ status: 404 })
+    const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Видеофайл с ID 10 не найден')
+  })
+
+  it('handles 422 error in saveVideoPayload', async () => {
+    videosStore.update = vi.fn().mockRejectedValue({ status: 422 })
+    const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Проверьте корректность введённых данных')
+  })
+
+  it('handles generic error in saveVideoPayload', async () => {
+    videosStore.update = vi.fn().mockRejectedValue(new Error('Save failed'))
+    const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Ошибка при обновлении видеофайла: Save failed')
+  })
+
+  it('confirmPlaylistCleanup does nothing when no pending payload', async () => {
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    // No 409 error triggered, pendingVideoPayload is null
+    // Emit confirm from PlaylistAccessImpactDialog directly
+    const impactDialog = wrapper.findComponent({ name: 'PlaylistAccessImpactDialog' })
+    await impactDialog.vm.$emit('confirm')
+    await flushPromises()
+
+    expect(videosStore.update).not.toHaveBeenCalled()
   })
 })

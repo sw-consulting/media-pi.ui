@@ -136,6 +136,15 @@ describe('videos.store', () => {
     expect(result).toEqual(response)
   })
 
+  it('updateCategoryBatch forwards force cleanup option', async () => {
+    fetchWrapper.post.mockResolvedValueOnce({ requestedCount: 1, updatedIds: [1], failures: [] })
+
+    const store = useVideosStore()
+    await store.updateCategoryBatch([1], 5, { forcePlaylistCleanup: true })
+
+    expect(fetchWrapper.post).toHaveBeenCalledWith(expect.stringContaining('/videos/category/batch'), { ids: [1], categoryId: 5, forcePlaylistCleanup: true })
+  })
+
   it('updateCategoryBatch requires a numeric category id', async () => {
     const store = useVideosStore()
 
@@ -286,6 +295,15 @@ describe('videos.store', () => {
     await store.getAllByAccount(0, { categoryId: 7 })
 
     expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/videos/by-account/0?categoryId=7'))
+  })
+
+  it('getAllByAccount includes availableForAccountId query when provided', async () => {
+    const store = useVideosStore()
+    fetchWrapper.get.mockResolvedValueOnce([])
+
+    await store.getAllByAccount(0, { availableForAccountId: 12 })
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/videos/by-account/0?availableForAccountId=12'))
   })
 
   it('getAllByAccount handles errors by clearing collection', async () => {

@@ -58,6 +58,36 @@ describe('accounts.store', () => {
     expect(store.account).toEqual(mockAccounts[0])
   })
 
+  it('getSubscriptions loads account subscriptions', async () => {
+    const store = useAccountsStore()
+    const payload = {
+      subscriptions: [{ categoryId: 7, categoryTitle: 'Paid' }],
+      availableCategories: [{ id: 8, title: 'Other' }]
+    }
+    fetchWrapper.get.mockResolvedValueOnce(payload)
+
+    const result = await store.getSubscriptions(1)
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith('http://localhost:8080/api/accounts/1/subscriptions')
+    expect(result).toEqual(payload)
+    expect(store.subscriptions).toEqual(payload)
+  })
+
+  it('upsertSubscription puts account category subscription and refreshes', async () => {
+    const store = useAccountsStore()
+    const refreshed = { subscriptions: [], availableCategories: [] }
+    fetchWrapper.put.mockResolvedValueOnce({})
+    fetchWrapper.get.mockResolvedValueOnce(refreshed)
+
+    const result = await store.upsertSubscription(1, 7, { startDate: '2026-06-01', endDate: '2026-06-30' })
+
+    expect(fetchWrapper.put).toHaveBeenCalledWith(
+      'http://localhost:8080/api/accounts/1/subscriptions/7',
+      { startDate: '2026-06-01', endDate: '2026-06-30' }
+    )
+    expect(result).toEqual(refreshed)
+  })
+
   it('update calls fetchWrapper.put', async () => {
     const store = useAccountsStore()
     fetchWrapper.put.mockResolvedValueOnce({})
@@ -195,6 +225,50 @@ describe('accounts.store', () => {
 
     expect(store.error).toBe(null)
   })
+
+  it('getSubscriptions throws error and resets subscriptions when fetch fails', async () => {
+    const store = useAccountsStore()
+    const mockError = new Error('GetSubscriptions failed')
+    fetchWrapper.get.mockRejectedValueOnce(mockError)
+
+    await expect(store.getSubscriptions(1)).rejects.toThrow('GetSubscriptions failed')
+    expect(store.error).toBe(mockError)
+    expect(store.subscriptions).toEqual({ subscriptions: [], availableCategories: [] })
+    expect(store.loading).toBe(false)
+  })
+
+  it('upsertSubscription throws error and sets error state when put fails', async () => {
+    const store = useAccountsStore()
+    const mockError = new Error('UpsertSubscription failed')
+    fetchWrapper.put.mockRejectedValueOnce(mockError)
+
+    await expect(store.upsertSubscription(1, 7, { startDate: '2026-06-01' })).rejects.toThrow('UpsertSubscription failed')
+    expect(store.error).toBe(mockError)
+    expect(store.loading).toBe(false)
+  })
 })
 
+describe('accounts.store - additional coverage', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('getAccountById returns null when accounts is not an array', () => {
+    const store = useAccountsStore()
+    store.$patch({ accounts: {} })
+
+    expect(store.getAccountById(1)).toBeNull()
+  })
+
+  it('getSubscriptions stores fallback when fetch returns null', async () => {
+    const store = useAccountsStore()
+    fetchWrapper.get.mockResolvedValueOnce(null)
+
+    const result = await store.getSubscriptions(1)
+
+    expect(result).toEqual({ subscriptions: [], availableCategories: [] })
+    expect(store.subscriptions).toEqual({ subscriptions: [], availableCategories: [] })
+  })
+})
 
