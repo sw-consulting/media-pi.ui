@@ -30,6 +30,11 @@ const accountsStore = {
   getAll: vi.fn(async () => accountsStore.accounts)
 }
 
+const categoriesStore = {
+  categories: [],
+  getAll: vi.fn(async () => categoriesStore.categories)
+}
+
 const alertStore = {
   alert: ref(null),
   error: vi.fn((message) => { alertStore.alert.value = { message, type: 'alert-danger' } }),
@@ -57,6 +62,10 @@ vi.mock('@/stores/accounts.store.js', () => ({
   useAccountsStore: () => accountsStore
 }))
 
+vi.mock('@/stores/categories.store.js', () => ({
+  useCategoriesStore: () => categoriesStore
+}))
+
 vi.mock('@/stores/auth.store.js', () => ({
   useAuthStore: () => authStore
 }))
@@ -70,7 +79,12 @@ vi.mock('@/helpers/default.route.js', () => ({
 }))
 
 vi.mock('@sw-consulting/tooling.ui.kit', () => ({
-  ActionButton: { name: 'ActionButton', props: ['item', 'disabled'], emits: ['click'], template: '<button :disabled="disabled" @click="$emit(\'click\', item)"></button>' }
+  ActionButton: {
+    name: 'ActionButton',
+    props: ['item', 'icon', 'iconSize', 'tooltipText', 'disabled', 'variant'],
+    emits: ['click'],
+    template: '<button :data-icon="icon" :data-icon-size="iconSize" :data-tooltip="tooltipText" :data-variant="variant" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
+  }
 }))
 
 const mountSettings = (props = {}) => mount({
@@ -85,7 +99,7 @@ const mountSettings = (props = {}) => mount({
   global: {
     stubs: {
       Form: {
-        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" /></form>',
+        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" /></form>',
         props: ['validationSchema', 'initialValues'],
         emits: ['submit'],
         data() {
@@ -95,6 +109,9 @@ const mountSettings = (props = {}) => mount({
           }
         },
         methods: {
+          handleSubmit(submit) {
+            return submit({ ...this.initialValues, ...(props.submitValues || {}) })
+          },
           onSubmit() {
             this.$emit('submit', { ...this.initialValues, ...(props.submitValues || {}) })
           }
@@ -132,9 +149,14 @@ const mountSettings = (props = {}) => mount({
             const header = (this.headers || []).find(item => item.key === this.sortKey)
             const sorted = [...(this.items || [])]
             sorted.sort((a, b) => {
-              const compare = header?.sort
-                ? header.sort(a?.[this.sortKey], b?.[this.sortKey])
-                : String(a?.[this.sortKey] ?? '').localeCompare(String(b?.[this.sortKey] ?? ''))
+              let compare
+              if (header?.sortRaw) {
+                compare = header.sortRaw(a, b)
+              } else if (header?.sort) {
+                compare = header.sort(a?.[this.sortKey], b?.[this.sortKey])
+              } else {
+                compare = String(a?.[this.sortKey] ?? '').localeCompare(String(b?.[this.sortKey] ?? ''))
+              }
               return this.sortOrder === 'desc' ? -compare : compare
             })
             return sorted
@@ -163,6 +185,7 @@ const mountSettings = (props = {}) => mount({
                   @click="toggleSort(header)"
                 >
                   {{ header.title }}
+                  <span v-if="header.sortable !== false" data-test="sort-arrow">↕</span>
                 </button>
               </template>
               <slot name="header.select" />
@@ -173,9 +196,8 @@ const mountSettings = (props = {}) => mount({
               <slot name="item.select" :item="item" />
               <slot name="item.position" :item="item" />
               <slot name="item.title" :item="item" />
-              <slot name="item.accountName" :item="item" />
-              <slot name="item.fileSize" :item="item" />
-              <slot name="item.duration" :item="item" />
+              <slot name="item.scopeName" :item="item" />
+              <slot name="item.mediaInfo" :item="item" />
               <slot name="item.actions" :item="item" />
             </div>
           </div>
@@ -235,6 +257,14 @@ async function sortAvailableTableBy(wrapper, key) {
   await flushPromises()
 }
 
+async function sortPlaylistTableBy(wrapper, key) {
+  const sortButton = getPlaylistTable(wrapper).find(`[data-test="sort-${key}"]`)
+  expect(sortButton.exists()).toBe(true)
+  expect(sortButton.element.disabled).toBe(false)
+  await sortButton.trigger('click')
+  await flushPromises()
+}
+
 describe('Playlist_Settings.vue', () => {
   beforeEach(() => {
     authStore = { user: { roles: [1], accountIds: [] } }
@@ -254,6 +284,8 @@ describe('Playlist_Settings.vue', () => {
     })
     accountsStore.accounts = [{ id: 1, name: 'Account 1' }]
     accountsStore.getAll = vi.fn(async () => accountsStore.accounts)
+    categoriesStore.categories = []
+    categoriesStore.getAll = vi.fn(async () => categoriesStore.categories)
     alertStore.alert.value = null
     vi.clearAllMocks()
   })
@@ -302,6 +334,109 @@ describe('Playlist_Settings.vue', () => {
     expect(callArg.items).toEqual([
       { videoId: 22, position: 1 },
       { videoId: 11, position: 2 }
+    ])
+  })
+
+  it('shows derived category name in the combined scope column', async () => {
+    categoriesStore.categories = [{ id: 7, title: 'News' }]
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId === 0) {
+        return [{ id: 22, title: 'Shared', originalFilename: 'shared.mp4', fileSizeBytes: 2400, durationSeconds: 90, accountId: 0, categoryId: 7 }]
+      }
+      return []
+    })
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Shared')
+    await clickBatchAdd(wrapper)
+
+    const playlistTable = getPlaylistTable(wrapper)
+    expect(playlistTable.text()).toContain('Shared')
+    expect(playlistTable.text()).toContain('News')
+  })
+
+  it('shows account name or common files in the combined scope column', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableRow = findRowByTextAndSelector(wrapper, '[data-test="available-video-select"]', 'Video 1')
+    expect(availableRow).toBeTruthy()
+    expect(availableRow.find('.playlist-scope-cell').text()).toBe('Account 1')
+
+    const commonRow = findRowByTextAndSelector(wrapper, '[data-test="available-video-select"]', 'Shared')
+    expect(commonRow).toBeTruthy()
+    expect(commonRow.find('.playlist-scope-cell').text()).toBe('Общие файлы')
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistRow = findRowByTextAndSelector(wrapper, '[data-test="playlist-row-select"]', 'Video 1')
+    expect(playlistRow).toBeTruthy()
+    expect(playlistRow.find('.playlist-scope-cell').text()).toBe('Account 1')
+  })
+
+  it('shows sortable combined scope headers in both tables', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const playlistScopeSort = getPlaylistTable(wrapper).find('[data-test="sort-scopeName"]')
+    const availableScopeSort = getAvailableTable(wrapper).find('[data-test="sort-scopeName"]')
+
+    expect(playlistScopeSort.exists()).toBe(true)
+    expect(playlistScopeSort.element.disabled).toBe(false)
+    expect(playlistScopeSort.text()).toContain('Лицевой счёт')
+    expect(playlistScopeSort.text()).toContain('Категория')
+    expect(playlistScopeSort.find('[data-test="sort-arrow"]').exists()).toBe(true)
+
+    expect(availableScopeSort.exists()).toBe(true)
+    expect(availableScopeSort.element.disabled).toBe(false)
+    expect(availableScopeSort.text()).toContain('Лицевой счёт')
+    expect(availableScopeSort.text()).toContain('Категория')
+    expect(availableScopeSort.find('[data-test="sort-arrow"]').exists()).toBe(true)
+  })
+
+  it('sorts both tables by the displayed combined scope value', async () => {
+    accountsStore.accounts = [{ id: 1, name: 'Я счёт' }]
+    categoriesStore.categories = [{ id: 7, title: 'А категория' }]
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId === 0) {
+        return [
+          { id: 22, title: 'Common scoped', originalFilename: 'common.mp4', fileSizeBytes: 2400, durationSeconds: 90, accountId: 0, categoryId: 0 },
+          { id: 23, title: 'Category scoped', originalFilename: 'category.mp4', fileSizeBytes: 1800, durationSeconds: 75, accountId: 0, categoryId: 7 }
+        ]
+      }
+      if (accountId === 1) {
+        return [{ id: 11, title: 'Account scoped', originalFilename: 'account.mp4', fileSizeBytes: 1200, durationSeconds: 60, accountId: 1 }]
+      }
+      return []
+    })
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await wrapper.find('[data-test="available-select-all"]').setValue(true)
+    await clickBatchAdd(wrapper)
+
+    expect(getPlaylistTable(wrapper).findAll('.playlist-video-title').map(item => item.text())).toEqual([
+      'Common scoped',
+      'Category scoped',
+      'Account scoped'
+    ])
+
+    await sortPlaylistTableBy(wrapper, 'scopeName')
+    expect(getPlaylistTable(wrapper).findAll('.playlist-video-title').map(item => item.text())).toEqual([
+      'Category scoped',
+      'Common scoped',
+      'Account scoped'
+    ])
+
+    await sortAvailableTableBy(wrapper, 'scopeName')
+    expect(getAvailableTableTitles(wrapper)).toEqual([
+      'Category scoped',
+      'Common scoped',
+      'Account scoped'
     ])
   })
 
@@ -418,7 +553,7 @@ describe('Playlist_Settings.vue', () => {
     expect(submittingWrapper.find('[data-test="available-select-all"]').element.disabled).toBe(true)
   })
 
-  it('sorts available videos by file size as numbers', async () => {
+  it('sorts available videos by media size first', async () => {
     videosStore.getAllByAccount = vi.fn(async (accountId) => {
       if (accountId !== 1) return []
       return [
@@ -431,7 +566,12 @@ describe('Playlist_Settings.vue', () => {
     const wrapper = mountSettings({ accountId: 1 })
     await flushPromises()
 
-    await sortAvailableTableBy(wrapper, 'fileSize')
+    const sortButton = getAvailableTable(wrapper).find('[data-test="sort-mediaInfo"]')
+    expect(sortButton.exists()).toBe(true)
+    expect(sortButton.text()).toContain('Размер')
+    expect(sortButton.text()).toContain('Длительность')
+
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
 
     expect(getAvailableTableTitles(wrapper)).toEqual([
       'Nine Hundred B',
@@ -440,20 +580,20 @@ describe('Playlist_Settings.vue', () => {
     ])
   })
 
-  it('sorts available videos by duration as seconds', async () => {
+  it('sorts available videos by duration when media sizes match', async () => {
     videosStore.getAllByAccount = vi.fn(async (accountId) => {
       if (accountId !== 1) return []
       return [
         { id: 41, title: 'Long', originalFilename: 'long.mp4', fileSizeBytes: 100, durationSeconds: 600, accountId: 1 },
-        { id: 42, title: 'Short', originalFilename: 'short.mp4', fileSizeBytes: 200, durationSeconds: 5, accountId: 1 },
-        { id: 43, title: 'Medium', originalFilename: 'medium.mp4', fileSizeBytes: 300, durationSeconds: 120, accountId: 1 }
+        { id: 42, title: 'Short', originalFilename: 'short.mp4', fileSizeBytes: 100, durationSeconds: 5, accountId: 1 },
+        { id: 43, title: 'Medium', originalFilename: 'medium.mp4', fileSizeBytes: 100, durationSeconds: 120, accountId: 1 }
       ]
     })
 
     const wrapper = mountSettings({ accountId: 1 })
     await flushPromises()
 
-    await sortAvailableTableBy(wrapper, 'duration')
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
 
     expect(getAvailableTableTitles(wrapper)).toEqual([
       'Short',
@@ -678,8 +818,30 @@ describe('Playlist_Settings.vue', () => {
     const wrapper = mountSettings({ accountId: 1 })
     await flushPromises()
 
-    await wrapper.find('button.secondary').trigger('click')
+    await wrapper.find('[data-test="cancel-playlist-button"]').trigger('click')
     expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('uses header ActionButtons for save and cancel actions', async () => {
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Header Save' } })
+    await flushPromises()
+
+    const saveButton = wrapper.find('[data-test="save-playlist-button"]')
+    const cancelButton = wrapper.find('[data-test="cancel-playlist-button"]')
+
+    expect(saveButton.attributes('data-icon')).toBe('fa-solid fa-check-double')
+    expect(saveButton.attributes('data-icon-size')).toBe('2x')
+    expect(saveButton.attributes('data-tooltip')).toBe('Создать')
+    expect(saveButton.attributes('data-variant')).toBeUndefined()
+    expect(cancelButton.attributes('data-icon')).toBe('fa-solid fa-xmark')
+    expect(cancelButton.attributes('data-icon-size')).toBe('2x')
+    expect(cancelButton.attributes('data-tooltip')).toBe('Отменить')
+    expect(cancelButton.attributes('data-variant')).toBeUndefined()
+
+    await saveButton.trigger('click')
+    await flushPromises()
+
+    expect(playlistsStore.create).toHaveBeenCalledWith(expect.objectContaining({ title: 'Header Save' }))
   })
 
   it('dismisses alert via close button', async () => {
@@ -846,9 +1008,9 @@ describe('Playlist_Settings.vue', () => {
     const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Desc Sorted' } })
     await flushPromises()
 
-    // Click sort-fileSize twice: first asc then desc
-    await sortAvailableTableBy(wrapper, 'fileSize')
-    await sortAvailableTableBy(wrapper, 'fileSize')
+    // Click sort-mediaInfo twice: first asc then desc
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
 
     // Select all visible and batch-add
     await wrapper.find('[data-test="available-select-all"]').setValue(true)
@@ -1167,7 +1329,7 @@ describe('Playlist_Settings.vue', () => {
     await flushPromises()
 
     // Sorting should not throw even with a non-numeric fileSize
-    await sortAvailableTableBy(wrapper, 'fileSize')
+    await sortAvailableTableBy(wrapper, 'mediaInfo')
     expect(getAvailableTableTitles(wrapper)).toHaveLength(2)
   })
 

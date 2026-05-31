@@ -125,6 +125,24 @@ describe('videos.store', () => {
     expect(fetchWrapper.post).not.toHaveBeenCalled()
   })
 
+  it('updateCategoryBatch posts selected ids and required category id', async () => {
+    const response = { requestedCount: 2, updatedIds: [1, 2], failures: [] }
+    fetchWrapper.post.mockResolvedValueOnce(response)
+
+    const store = useVideosStore()
+    const result = await store.updateCategoryBatch([1, 2], 0)
+
+    expect(fetchWrapper.post).toHaveBeenCalledWith(expect.stringContaining('/videos/category/batch'), { ids: [1, 2], categoryId: 0 })
+    expect(result).toEqual(response)
+  })
+
+  it('updateCategoryBatch requires a numeric category id', async () => {
+    const store = useVideosStore()
+
+    await expect(store.updateCategoryBatch([1], null)).rejects.toThrow('Не выбрана категория')
+    expect(fetchWrapper.post).not.toHaveBeenCalled()
+  })
+
   it('uploadFile posts to /videos/upload with File, Title and AccountId (new signature)', async () => {
     const appendSpy = vi.fn()
     const mockFormData = vi.fn(() => ({
@@ -165,6 +183,23 @@ describe('videos.store', () => {
     expect(appendSpy).toHaveBeenCalledWith('Files', file2)
     expect(appendSpy).toHaveBeenCalledWith('Titles', 'two.mp4')
     expect(appendSpy).toHaveBeenCalledWith('AccountId', 0)
+  })
+
+  it('uploadFiles appends CategoryId only when provided in options', async () => {
+    const appendSpy = vi.fn()
+    const mockFormData = vi.fn(() => ({
+      append: appendSpy
+    }))
+    global.FormData = mockFormData
+
+    fetchWrapper.postFile.mockResolvedValueOnce({})
+
+    const store = useVideosStore()
+    const file = new File(['one'], 'one.mp4', { type: 'video/mp4' })
+
+    await store.uploadFiles([file], 0, { categoryId: 5 })
+
+    expect(appendSpy).toHaveBeenCalledWith('CategoryId', 5)
   })
 
   it('uploadFiles forwards upload progress callback', async () => {
@@ -234,6 +269,15 @@ describe('videos.store', () => {
 
     expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/videos/by-account/42'))
     expect(store.videos).toEqual(mockVideos)
+  })
+
+  it('getAllByAccount includes category query when provided', async () => {
+    fetchWrapper.get.mockResolvedValueOnce(mockVideos)
+
+    const store = useVideosStore()
+    await store.getAllByAccount(0, { categoryId: 7 })
+
+    expect(fetchWrapper.get).toHaveBeenCalledWith(expect.stringContaining('/videos/by-account/0?categoryId=7'))
   })
 
   it('getAllByAccount handles errors by clearing collection', async () => {

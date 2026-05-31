@@ -48,21 +48,12 @@ function getUserName() {
 
 function getUserRole() {
   if (!authStore.user || authStore.user === undefined) {
-    return 'Media Pi'
+    return 'ММБОКС'
   }
   /* getRoleName requires rolesStore.ensureLoaded */
   return getRoleName(authStore.user)
 }
 
- 
-/*
-<v-list-item>
-          <RouterLink to="/register" class="link">Регистрация</RouterLink>
-        </v-list-item>
-        <v-list-item>
-          <RouterLink to="/recover" class="link">Восстановление пароля</RouterLink>
-        </v-list-item>
-*/
  
 </script>
 
@@ -89,10 +80,10 @@ function getUserRole() {
           <RouterLink to="/videos" class="link">Видеофайлы</RouterLink>
         </v-list-item>
         <v-list-item v-if="authStore.isAdministrator || authStore.isManager">
-          <RouterLink to="/playlists" class="link">Плейлисты</RouterLink>
+          <RouterLink to="/categories" class="link">Категории</RouterLink>
         </v-list-item>
         <v-list-item v-if="authStore.isAdministrator || authStore.isManager">
-          <RouterLink to="/categories" class="link">Категории</RouterLink>
+          <RouterLink to="/playlists" class="link">Плейлисты</RouterLink>
         </v-list-item>
         <v-list-item v-if="!authStore.isAdministrator">
           <RouterLink :to="'/user/edit/' + authStore.user.id" class="link">Настройки</RouterLink>
@@ -132,7 +123,7 @@ function getUserRole() {
 
 <style scoped>
 .vvv {
-  width: 90vw;
+  width: 96vw;
   margin: 1rem;
   min-width: 480px;
 }

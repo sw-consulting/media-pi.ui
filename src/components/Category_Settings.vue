@@ -2,16 +2,19 @@
 // This file is a part of Media Pi frontend application
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import router from '@/router'
 import { storeToRefs } from 'pinia'
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
 import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import VideosList from '@/components/Videos_List.vue'
+import { createCategoryScope } from '@/helpers/video.scope.helpers.js'
 
 const props = defineProps({
   register: {
@@ -40,6 +43,13 @@ const schema = Yup.object().shape({
 
 const category = ref({ title: '', free: true })
 const initialLoading = ref(false)
+const faCheckDouble = 'fa-solid fa-check-double'
+const faXmark = 'fa-solid fa-xmark'
+const categoryTitleText = computed(() => (
+  isRegister()
+    ? 'Новая категория'
+    : `Настройки категории '${category.value.title || `Категория #${props.id}`}'`
+))
 
 function isRegister() {
   return props.register
@@ -108,16 +118,39 @@ async function onSubmit(values) {
 </script>
 
 <template>
-  <div class="settings form-3 form-compact">
-    <h1 class="primary-heading">{{ isRegister() ? 'Новая категория' : 'Настройки категории' }}</h1>
-    <hr class="hr" />
-
+  <div class="settings form-4 form-compact">
     <Form
       :validation-schema="schema"
       :initial-values="category"
       @submit="onSubmit"
-      v-slot="{ errors, isSubmitting }"
+      v-slot="{ errors, isSubmitting, handleSubmit }"
     >
+      <div class="header-with-actions">
+        <h1 class="primary-heading">{{ categoryTitleText }}</h1>
+        <div class="header-actions-container">
+          <div class="header-actions header-actions-group">
+            <ActionButton
+              data-test="save-category-button"
+              :item="{}"
+              :icon="faCheckDouble"
+              icon-size="2x"
+              :tooltip-text="getButton()"
+              :disabled="isSubmitting"
+              @click="handleSubmit(onSubmit)"
+            />
+            <ActionButton
+              data-test="cancel-category-button"
+              :item="{}"
+              :icon="faXmark"
+              icon-size="2x"
+              tooltip-text="Отменить"
+              @click="$router.go(-1)"
+            />
+          </div>
+        </div>
+      </div>
+      <hr class="hr" />
+
       <div class="form-group">
         <label for="title" class="label">Название:</label>
         <Field
@@ -146,22 +179,6 @@ async function onSubmit(values) {
         </div>
       </div>
 
-      <div class="form-group mt-8">
-        <button class="button primary" type="submit" :disabled="isSubmitting">
-          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
-          {{ getButton() }}
-        </button>
-        <button
-          class="button secondary"
-          type="button"
-          @click="$router.go(-1)"
-        >
-          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
-          Отменить
-        </button>
-      </div>
-
       <div v-if="errors.title" class="alert alert-danger mt-3 mb-0">{{ errors.title }}</div>
     </Form>
 
@@ -174,6 +191,14 @@ async function onSubmit(values) {
       <span class="spinner-border spinner-border-lg align-center"></span>
       <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
+
+    <VideosList
+      v-if="!isRegister() && props.id"
+      class="mt-8"
+      title="Видеофайлы"
+      embedded
+      :fixed-scope="createCategoryScope(props.id)"
+    />
   </div>
 </template>
 

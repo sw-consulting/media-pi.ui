@@ -121,6 +121,12 @@ const router = createRouter({
       component: () => import('@/views/Videos_View.vue')
     },
     {
+      path: '/video/edit/:id',
+      name: 'Настройки видеофайла',
+      component: () => import('@/views/Video_EditView.vue'),
+      props: true
+    },
+    {
       path: '/playlists',
       name: 'Плейлисты',
       component: () => import('@/views/Playlists_View.vue')

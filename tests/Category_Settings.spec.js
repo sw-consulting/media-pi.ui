@@ -51,6 +51,15 @@ vi.mock('@/helpers/default.route.js', () => ({
   redirectToDefaultRoute: vi.fn()
 }))
 
+vi.mock('@sw-consulting/tooling.ui.kit', () => ({
+  ActionButton: {
+    name: 'ActionButton',
+    props: ['item', 'icon', 'iconSize', 'tooltipText', 'disabled', 'variant'],
+    emits: ['click'],
+    template: '<button :data-icon="icon" :data-icon-size="iconSize" :data-tooltip="tooltipText" :data-variant="variant" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
+  }
+}))
+
 const mountSettings = (props = {}) => mount({
   template: '<Suspense><CategorySettings v-bind="$attrs" /></Suspense>',
   components: { CategorySettings },
@@ -63,7 +72,7 @@ const mountSettings = (props = {}) => mount({
   global: {
     stubs: {
       Form: {
-        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" /></form>',
+        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" /></form>',
         props: ['validationSchema', 'initialValues'],
         emits: ['submit'],
         data() {
@@ -73,6 +82,9 @@ const mountSettings = (props = {}) => mount({
           }
         },
         methods: {
+          handleSubmit(submit) {
+            return submit({ ...this.initialValues, ...(props.submitValues || {}) })
+          },
           onSubmit() {
             this.$emit('submit', { ...this.initialValues, ...(props.submitValues || {}) })
           }
@@ -81,6 +93,14 @@ const mountSettings = (props = {}) => mount({
       Field: {
         props: ['name'],
         template: '<input data-test="title-field" />'
+      },
+      VideosList: {
+        props: {
+          title: String,
+          embedded: Boolean,
+          fixedScope: String
+        },
+        template: '<div data-test="category-videos-list" :data-title="title" :data-embedded="embedded ? \'true\' : \'false\'" :data-fixed-scope="fixedScope"></div>'
       }
     },
     mocks: {
@@ -147,6 +167,25 @@ describe('Category_Settings.vue', () => {
     await flushPromises()
 
     expect(categoriesStore.update).toHaveBeenCalledWith(9, { title: 'Updated', free: true })
+  })
+
+  it('renders category videos as an embedded subsection scoped to the category', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: true }
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9
+    })
+    await flushPromises()
+
+    const videosList = wrapper.find('[data-test="category-videos-list"]')
+
+    expect(wrapper.find('.primary-heading').text()).toBe("Настройки категории 'Existing'")
+    expect(videosList.exists()).toBe(true)
+    expect(videosList.attributes('data-title')).toBe('Видеофайлы')
+    expect(videosList.attributes('data-subtitle')).toBeUndefined()
+    expect(videosList.attributes('data-embedded')).toBe('true')
+    expect(videosList.attributes('data-fixed-scope')).toBe('category:9')
   })
 
   it('redirects on 401 or 403 load error', async () => {
@@ -266,9 +305,31 @@ describe('Category_Settings.vue', () => {
     const wrapper = mountSettings()
     await flushPromises()
 
-    await wrapper.find('button.secondary').trigger('click')
+    await wrapper.find('[data-test="cancel-category-button"]').trigger('click')
 
     expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('uses header ActionButtons for save and cancel actions', async () => {
+    const wrapper = mountSettings({ submitValues: { title: 'Header Category' } })
+    await flushPromises()
+
+    const saveButton = wrapper.find('[data-test="save-category-button"]')
+    const cancelButton = wrapper.find('[data-test="cancel-category-button"]')
+
+    expect(saveButton.attributes('data-icon')).toBe('fa-solid fa-check-double')
+    expect(saveButton.attributes('data-icon-size')).toBe('2x')
+    expect(saveButton.attributes('data-tooltip')).toBe('Создать')
+    expect(saveButton.attributes('data-variant')).toBeUndefined()
+    expect(cancelButton.attributes('data-icon')).toBe('fa-solid fa-xmark')
+    expect(cancelButton.attributes('data-icon-size')).toBe('2x')
+    expect(cancelButton.attributes('data-tooltip')).toBe('Отменить')
+    expect(cancelButton.attributes('data-variant')).toBeUndefined()
+
+    await saveButton.trigger('click')
+    await flushPromises()
+
+    expect(categoriesStore.create).toHaveBeenCalledWith({ title: 'Header Category', free: true })
   })
 
   it('redirects non-administrator on create', async () => {

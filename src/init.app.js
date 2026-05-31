@@ -54,7 +54,8 @@ import {
   faAngleRight,
   faAnglesLeft,
   faAnglesRight,
-  faFilm
+  faFilm,
+  faArrowsTurnToDots
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -110,7 +111,8 @@ library.add(
   faAngleRight,
   faAnglesLeft,
   faAnglesRight,
-  faFilm
+  faFilm,
+  faArrowsTurnToDots
 )
 
 import 'vuetify/styles'
