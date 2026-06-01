@@ -88,6 +88,21 @@ describe('accounts.store', () => {
     expect(result).toEqual(refreshed)
   })
 
+  it('deleteSubscription deletes account category subscription and refreshes', async () => {
+    const store = useAccountsStore()
+    const refreshed = { subscriptions: [], availableCategories: [] }
+    fetchWrapper.delete.mockResolvedValueOnce({})
+    fetchWrapper.get.mockResolvedValueOnce(refreshed)
+
+    const result = await store.deleteSubscription(1, 7, { forcePlaylistCleanup: true })
+
+    expect(fetchWrapper.delete).toHaveBeenCalledWith(
+      'http://localhost:8080/api/accounts/1/subscriptions/7',
+      { forcePlaylistCleanup: true }
+    )
+    expect(result).toEqual(refreshed)
+  })
+
   it('update calls fetchWrapper.put', async () => {
     const store = useAccountsStore()
     fetchWrapper.put.mockResolvedValueOnce({})
@@ -243,6 +258,16 @@ describe('accounts.store', () => {
     fetchWrapper.put.mockRejectedValueOnce(mockError)
 
     await expect(store.upsertSubscription(1, 7, { startDate: '2026-06-01' })).rejects.toThrow('UpsertSubscription failed')
+    expect(store.error).toBe(mockError)
+    expect(store.loading).toBe(false)
+  })
+
+  it('deleteSubscription throws error and sets error state when delete fails', async () => {
+    const store = useAccountsStore()
+    const mockError = new Error('DeleteSubscription failed')
+    fetchWrapper.delete.mockRejectedValueOnce(mockError)
+
+    await expect(store.deleteSubscription(1, 7)).rejects.toThrow('DeleteSubscription failed')
     expect(store.error).toBe(mockError)
     expect(store.loading).toBe(false)
   })

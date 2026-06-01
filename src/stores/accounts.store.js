@@ -125,6 +125,20 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
+  async function deleteSubscription(accountId, categoryId, params = {}) {
+    loading.value = true
+    error.value = null
+    try {
+      await fetchWrapper.delete(`${baseUrl}/${accountId}/subscriptions/${categoryId}`, params)
+      return await getSubscriptions(accountId)
+    } catch (err) {
+      error.value = err
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function deleteAccount(id) {
     loading.value = true
     error.value = null
@@ -153,6 +167,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     getByManager,
     update,
     upsertSubscription,
+    deleteSubscription,
     delete: deleteAccount
   }
 })

@@ -44,6 +44,10 @@ export const useAuthStore = defineStore('auth', () => {
   const categories_search = ref('')
   const categories_sort_by = ref([])
   const categories_page = ref(1)
+  const subscriptions_per_page = ref(10)
+  const subscriptions_search = ref('')
+  const subscriptions_sort_by = ref([])
+  const subscriptions_page = ref(1)
   const returnUrl = ref(null)
   const re_jwt = ref(null)
   const re_tgt = ref(null)
@@ -234,6 +238,10 @@ export const useAuthStore = defineStore('auth', () => {
     categories_search,
     categories_sort_by,
     categories_page,
+    subscriptions_per_page,
+    subscriptions_search,
+    subscriptions_sort_by,
+    subscriptions_page,
     returnUrl,
     re_jwt,
     re_tgt,
