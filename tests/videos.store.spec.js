@@ -145,9 +145,11 @@ describe('videos.store', () => {
 
   it('uploadFile posts to /videos/upload with File, Title and AccountId (new signature)', async () => {
     const appendSpy = vi.fn()
-    const mockFormData = vi.fn(() => ({
-      append: appendSpy
-    }))
+    const mockFormData = vi.fn(function () {
+      return {
+        append: appendSpy
+      }
+    })
     global.FormData = mockFormData
 
     fetchWrapper.postFile.mockResolvedValueOnce({})
@@ -164,9 +166,11 @@ describe('videos.store', () => {
 
   it('uploadFiles posts to /videos/upload/batch with Files, Titles and AccountId', async () => {
     const appendSpy = vi.fn()
-    const mockFormData = vi.fn(() => ({
-      append: appendSpy
-    }))
+    const mockFormData = vi.fn(function () {
+      return {
+        append: appendSpy
+      }
+    })
     global.FormData = mockFormData
 
     fetchWrapper.postFile.mockResolvedValueOnce({})
@@ -187,9 +191,11 @@ describe('videos.store', () => {
 
   it('uploadFiles appends CategoryId only when provided in options', async () => {
     const appendSpy = vi.fn()
-    const mockFormData = vi.fn(() => ({
-      append: appendSpy
-    }))
+    const mockFormData = vi.fn(function () {
+      return {
+        append: appendSpy
+      }
+    })
     global.FormData = mockFormData
 
     fetchWrapper.postFile.mockResolvedValueOnce({})
@@ -204,9 +210,11 @@ describe('videos.store', () => {
 
   it('uploadFiles forwards upload progress callback', async () => {
     const appendSpy = vi.fn()
-    const mockFormData = vi.fn(() => ({
-      append: appendSpy
-    }))
+    const mockFormData = vi.fn(function () {
+      return {
+        append: appendSpy
+      }
+    })
     global.FormData = mockFormData
 
     fetchWrapper.postFile.mockResolvedValueOnce({})
@@ -237,7 +245,7 @@ describe('videos.store', () => {
 
   it('uploadFile derives title from file name when title empty', async () => {
     const appendSpy = vi.fn()
-    const mockFormData = vi.fn(() => ({ append: appendSpy }))
+    const mockFormData = vi.fn(function () { return { append: appendSpy } })
     global.FormData = mockFormData
     fetchWrapper.postFile.mockResolvedValueOnce({})
     const store = useVideosStore()
@@ -253,7 +261,7 @@ describe('videos.store', () => {
 
   it('uploadFile allows empty title when file has no name (stores empty Title)', async () => {
     const appendSpy = vi.fn()
-    const mockFormData = vi.fn(() => ({ append: appendSpy }))
+    const mockFormData = vi.fn(function () { return { append: appendSpy } })
     global.FormData = mockFormData
     const store = useVideosStore()
     const file = new Blob(['data']) // no name property to derive from

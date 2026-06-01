@@ -61,13 +61,17 @@ describe('fetchWrapper', () => {
     }
     
     // Mock global constructors for lint compliance
-    global.FormData = vi.fn(() => ({
-      append: vi.fn()
-    }))
-    global.Blob = vi.fn((content, options) => ({
-      type: options?.type || 'application/octet-stream',
-      size: content?.[0]?.length || 0
-    }))
+    global.FormData = vi.fn(function () {
+      return {
+        append: vi.fn()
+      }
+    })
+    global.Blob = vi.fn(function (content, options) {
+      return {
+        type: options?.type || 'application/octet-stream',
+        size: content?.[0]?.length || 0
+      }
+    })
     
     // Mock console.log for logging tests
     vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -209,7 +213,7 @@ describe('fetchWrapper', () => {
         this.onload()
       })
     }
-    global.window.XMLHttpRequest = vi.fn(() => xhr)
+    global.window.XMLHttpRequest = vi.fn(function () { return xhr })
     global.fetch = vi.fn()
 
     const result = await fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress })
@@ -241,7 +245,7 @@ describe('fetchWrapper', () => {
         this.onload()
       })
     }
-    global.window.XMLHttpRequest = vi.fn(() => xhr)
+    global.window.XMLHttpRequest = vi.fn(function () { return xhr })
 
     const result = await fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress })
 
@@ -262,7 +266,7 @@ describe('fetchWrapper', () => {
       setRequestHeader: vi.fn(),
       send: vi.fn()
     }
-    global.window.XMLHttpRequest = vi.fn(() => xhr)
+    global.window.XMLHttpRequest = vi.fn(function () { return xhr })
 
     const request = fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress: vi.fn() })
     xhr.onerror()
@@ -282,7 +286,7 @@ describe('fetchWrapper', () => {
       }),
       send: vi.fn()
     }
-    global.window.XMLHttpRequest = vi.fn(() => xhr)
+    global.window.XMLHttpRequest = vi.fn(function () { return xhr })
 
     const request = fetchWrapper.postFile(`${baseUrl}/upload`, formData, {
       onUploadProgress: vi.fn(),
@@ -312,7 +316,7 @@ describe('fetchWrapper', () => {
         this.onload()
       })
     }
-    global.window.XMLHttpRequest = vi.fn(() => xhr)
+    global.window.XMLHttpRequest = vi.fn(function () { return xhr })
 
     try {
       await fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress: vi.fn() })
@@ -717,4 +721,3 @@ describe('fetchWrapper', () => {
     }
   }) 
 })
-
