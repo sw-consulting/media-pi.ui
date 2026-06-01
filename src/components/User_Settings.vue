@@ -9,6 +9,7 @@ import router from '@/router'
 import { storeToRefs } from 'pinia'
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 import { useUsersStore } from '@/stores/users.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
@@ -25,6 +26,8 @@ const rolesStore = useRolesStore()
 const accountsStore = useAccountsStore()
 const usersStore = useUsersStore()
 const authStore = useAuthStore()
+const faCheckDouble = 'fa-solid fa-check-double'
+const faXmark = 'fa-solid fa-xmark'
 
 
 const props = defineProps({
@@ -265,14 +268,38 @@ function onSubmit(values) {
 
 <template>
   <div class="settings form-2 form-compact">
-    <h1 class="primary-heading">{{ getTitle() }}</h1>
-    <hr class="hr" />
     <Form
       @submit="onSubmit"
       :initial-values="user"
       :validation-schema="schema"
-      v-slot="{ errors, isSubmitting }"
+      v-slot="{ errors, isSubmitting, handleSubmit }"
     >
+      <div class="header-with-actions">
+        <h1 class="primary-heading">{{ getTitle() }}</h1>
+        <div class="header-actions-container">
+          <div class="header-actions header-actions-group">
+            <ActionButton
+              data-test="save-user-button"
+              :item="{}"
+              :icon="faCheckDouble"
+              icon-size="2x"
+              :tooltip-text="getButton()"
+              :disabled="isSubmitting"
+              @click="handleSubmit(onSubmit)"
+            />
+            <ActionButton
+              data-test="cancel-user-button"
+              :item="{}"
+              :icon="faXmark"
+              icon-size="2x"
+              tooltip-text="Отменить"
+              @click="redirectToReturnRoute"
+            />
+          </div>
+        </div>
+      </div>
+      <hr class="hr" />
+
       <div class="form-group">
         <label for="lastName" class="label">Фамилия:</label>
         <Field  name="lastName" id="lastName" type="text" class="form-control input"
@@ -367,22 +394,6 @@ function onSubmit(values) {
           </li>
         </ul>
      </div>
-      <div class="form-group mt-8">
-        <button class="button primary" type="submit" :disabled="isSubmitting">
-          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
-            {{ getButton() }}
-        </button>
-        <button
-          class="button secondary"
-          type="button"
-          @click="redirectToReturnRoute()"
-        >
-          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
-          Отменить
-        </button>
-      </div>
-
       <div v-if="errors.lastName" class="alert alert-danger mt-3 mb-0">{{ errors.lastName }}</div>
       <div v-if="errors.firstName" class="alert alert-danger mt-3 mb-0">{{ errors.firstName }}</div>
       <div v-if="errors.patronymic" class="alert alert-danger mt-3 mb-0">

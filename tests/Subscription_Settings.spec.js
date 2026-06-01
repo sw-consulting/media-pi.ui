@@ -12,7 +12,9 @@ const routerGo = vi.hoisted(() => vi.fn())
 
 let authStore
 const accountsStore = {
+  account: ref(null),
   loading: ref(false),
+  getById: vi.fn(),
   getSubscriptions: vi.fn(),
   upsertSubscription: vi.fn()
 }
@@ -101,7 +103,11 @@ describe('Subscription_Settings.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authStore = { isAdministrator: true }
+    accountsStore.account.value = null
     accountsStore.loading.value = false
+    accountsStore.getById = vi.fn().mockImplementation(async (id) => {
+      accountsStore.account.value = { id, name: `Account ${id}` }
+    })
     accountsStore.getSubscriptions = vi.fn().mockResolvedValue({
       subscriptions: [],
       availableCategories: [
@@ -128,6 +134,11 @@ describe('Subscription_Settings.vue', () => {
     })
     await flushPromises()
 
+    expect(accountsStore.getById).toHaveBeenCalledWith(3)
+    expect(wrapper.find('h1.primary-heading').text()).toBe('Создание подписки')
+    expect(wrapper.find('[data-test="subscription-account-name"]').element.value).toBe('Account 3')
+    expect(wrapper.find('[data-test="subscription-account-name"]').attributes('readonly')).toBeDefined()
+
     const categorySelect = wrapper.find('[data-test="subscription-category-select"]')
     expect(categorySelect.text()).toContain('Premium')
     expect(categorySelect.text()).not.toContain('Free')
@@ -153,6 +164,11 @@ describe('Subscription_Settings.vue', () => {
 
     expect(wrapper.find('[data-test="save-subscription-settings-button"]').element.disabled).toBe(true)
     expect(wrapper.text()).toContain('Нет категорий для подписки')
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Выберите категорию')
   })
 
   it('loads and updates an existing subscription', async () => {
@@ -180,7 +196,10 @@ describe('Subscription_Settings.vue', () => {
     })
     await flushPromises()
 
+    expect(wrapper.find('h1.primary-heading').text()).toBe('Редактирование подписки')
     expect(wrapper.find('[data-test="subscription-category-select"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="subscription-start-date"]').classes()).toContain('date-input')
+    expect(wrapper.find('[data-test="subscription-end-date"]').classes()).toContain('date-input')
 
     await wrapper.find('[data-test="save-subscription-settings-button"]').trigger('click')
     await flushPromises()
@@ -193,7 +212,7 @@ describe('Subscription_Settings.vue', () => {
 
   it('lists affected playlists before retrying save with force cleanup', async () => {
     accountsStore.upsertSubscription = vi.fn()
-      .mockRejectedValueOnce({ status: 409, data: { affectedPlaylistCount: 1 } })
+      .mockRejectedValueOnce({ status: 409, data: { affectedPlaylistCount: 1, affectedPlaylists: [] } })
       .mockResolvedValueOnce({ subscriptions: [], availableCategories: [] })
 
     const wrapper = mountSettings({
@@ -218,6 +237,95 @@ describe('Subscription_Settings.vue', () => {
       endDate: '2026-06-30',
       forcePlaylistCleanup: true
     })
+  })
+
+  it('cancels playlist impact cleanup confirmation', async () => {
+    accountsStore.upsertSubscription = vi.fn()
+      .mockRejectedValueOnce({ status: 409, data: { affectedPlaylistCount: 1, affectedPlaylists: [] } })
+
+    const wrapper = mountSettings({
+      register: true,
+      submitValues: {
+        startDate: '2026-06-01',
+        endDate: '2026-06-30'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="save-subscription-settings-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-dialog"]').exists()).toBe(true)
+
+    await wrapper.find('[data-test="cancel-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-dialog"]').exists()).toBe(false)
+  })
+
+  it('redirects invalid subscription routes', async () => {
+    mountSettings({ register: true, accountId: NaN })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('reports missing edit subscriptions and load errors', async () => {
+    accountsStore.getSubscriptions = vi.fn()
+      .mockResolvedValueOnce({ subscriptions: [], availableCategories: [] })
+      .mockRejectedValueOnce({ status: 403 })
+      .mockRejectedValueOnce({ status: 404 })
+      .mockRejectedValueOnce(new Error('load failed'))
+
+    mountSettings({ register: false, accountId: 3, categoryId: 99 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Ошибка загрузки подписки: Подписка для категории с ID 99 не найдена')
+
+    mountSettings({ register: true, accountId: 3 })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+
+    mountSettings({ register: true, accountId: 4 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Лицевой счёт с ID 4 не найден')
+
+    mountSettings({ register: true, accountId: 5 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Ошибка загрузки подписки: load failed')
+  })
+
+  it('reports save authorization, missing entity, validation, and generic errors', async () => {
+    accountsStore.upsertSubscription = vi.fn()
+      .mockRejectedValueOnce({ status: 403 })
+      .mockRejectedValueOnce({ status: 404 })
+      .mockRejectedValueOnce({ status: 400 })
+      .mockRejectedValueOnce(new Error('save failed'))
+    const wrapper = mountSettings({
+      register: true,
+      submitValues: {
+        startDate: '2026-06-01',
+        endDate: '2026-06-30'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="save-subscription-settings-button"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-test="save-subscription-settings-button"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-test="save-subscription-settings-button"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-test="save-subscription-settings-button"]').trigger('click')
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+    expect(alertStore.error).toHaveBeenCalledWith('Лицевой счёт с ID 1 или категория с ID 7 не найдены')
+    expect(alertStore.error).toHaveBeenCalledWith('Проверьте корректность введённых данных')
+    expect(alertStore.error).toHaveBeenCalledWith('Ошибка при создании подписки: save failed')
   })
 
   it('redirects non-administrators', async () => {

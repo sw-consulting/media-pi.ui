@@ -1,15 +1,10 @@
 // Copyright (c) 2025 sw.consulting
 // This file is a part of Media Pi  frontend application
 
-import { library } from '@fortawesome/fontawesome-svg-core'
-import { faCheckDouble, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import DeviceGroupSettings from '@/components/DeviceGroup_Settings.vue'
-
-library.add(faCheckDouble, faXmark)
 
 let authStore
 const deviceGroupsStore = {
@@ -68,6 +63,15 @@ vi.mock('@/helpers/default.route.js', () => ({
   redirectToDefaultRoute: vi.fn()
 }))
 
+vi.mock('@sw-consulting/tooling.ui.kit', () => ({
+  ActionButton: {
+    name: 'ActionButton',
+    props: ['item', 'icon', 'iconSize', 'tooltipText', 'disabled'],
+    emits: ['click'],
+    template: '<button :data-icon="icon" :data-icon-size="iconSize" :data-tooltip="tooltipText" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
+  }
+}))
+
 const mountSettings = (props = {}) => mount({
   template: '<Suspense><DeviceGroupSettings v-bind="$attrs" /></Suspense>',
   components: { DeviceGroupSettings },
@@ -99,7 +103,7 @@ const mountSettings = (props = {}) => mount({
       Form: {
         template: `
           <div data-testid="form" @submit="onSubmit">
-            <slot :errors="errors" :isSubmitting="isSubmitting" />
+            <slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" />
           </div>
         `,
         props: ['validation-schema', 'initial-values'],
@@ -111,6 +115,9 @@ const mountSettings = (props = {}) => mount({
           }
         },
         methods: {
+          handleSubmit(submit) {
+            return submit({ name: props.submitValue || 'Test Group' })
+          },
           onSubmit() {
             this.$emit('submit', { name: props.submitValue || 'Test Group' })
           }
@@ -119,10 +126,13 @@ const mountSettings = (props = {}) => mount({
       Field: { 
         template: '<input data-testid="name-field" />', 
         props: ['name', 'type', 'disabled', 'class', 'placeholder']
+      },
+      ActionButton: {
+        name: 'ActionButton',
+        props: ['item', 'icon', 'iconSize', 'tooltipText', 'disabled'],
+        emits: ['click'],
+        template: '<button :data-icon="icon" :data-icon-size="iconSize" :data-tooltip="tooltipText" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
       }
-    },
-    components: {
-      'font-awesome-icon': FontAwesomeIcon
     },
     mocks: {
       $router: {
@@ -486,7 +496,7 @@ describe('DeviceGroup_Settings.vue', () => {
     const wrapper = mountSettings({ register: true, accountId: 5 })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Создать')
+    expect(wrapper.find('[data-test="save-device-group-button"]').attributes('data-tooltip')).toBe('Создать')
   })
 
   it('displays correct button text for edit mode', async () => {
@@ -494,7 +504,14 @@ describe('DeviceGroup_Settings.vue', () => {
     const wrapper = mountSettings({ register: false, id: 1 })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Сохранить')
+    expect(wrapper.find('[data-test="save-device-group-button"]').attributes('data-tooltip')).toBe('Сохранить')
+  })
+
+  it('displays playlists section heading', async () => {
+    const wrapper = mountSettings({ register: true, accountId: 5 })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlists-heading"]').text()).toBe('Плейлисты')
   })
 
   it('shows a single empty playlist message when no playlists are available', async () => {
@@ -550,13 +567,14 @@ describe('DeviceGroup_Settings.vue', () => {
   })
 
   it('handles cancel button click', async () => {
+    const router = await import('@/router')
     const wrapper = mountSettings({ register: true, accountId: 5 })
     await flushPromises()
 
-    const cancelButton = wrapper.find('button.secondary')
+    const cancelButton = wrapper.find('[data-test="cancel-device-group-button"]')
     await cancelButton.trigger('click')
 
-    expect(wrapper.vm.$router.go).toHaveBeenCalledWith(-1)
+    expect(router.default.go).toHaveBeenCalledWith(-1)
   })
 
   it('loads group with empty name if name is missing', async () => {
@@ -617,7 +635,32 @@ describe('DeviceGroup_Settings.vue', () => {
     const wrapper = mountSettings({ register: true, accountId: 5, isSubmitting: true })
     await flushPromises()
 
-    expect(wrapper.find('.spinner-border-sm').exists()).toBe(true)
+    expect(wrapper.find('[data-test="save-device-group-button"]').element.disabled).toBe(true)
+  })
+
+  it('uses header action buttons for save and cancel actions', async () => {
+    const router = await import('@/router')
+    const wrapper = mountSettings({ register: true, accountId: 5 })
+    await flushPromises()
+
+    const saveButton = wrapper.find('[data-test="save-device-group-button"]')
+    const cancelButton = wrapper.find('[data-test="cancel-device-group-button"]')
+
+    expect(saveButton.attributes('data-icon')).toBe('fa-solid fa-check-double')
+    expect(saveButton.attributes('data-icon-size')).toBe('2x')
+    expect(cancelButton.attributes('data-icon')).toBe('fa-solid fa-xmark')
+    expect(cancelButton.attributes('data-icon-size')).toBe('2x')
+
+    await saveButton.trigger('click')
+    await flushPromises()
+    expect(deviceGroupsStore.add).toHaveBeenCalledWith({
+      name: 'Test Group',
+      accountId: 5,
+      playlists: []
+    })
+
+    await cancelButton.trigger('click')
+    expect(router.default.go).toHaveBeenCalledWith(-1)
   })
 
   it('formats playlist duration and size', async () => {

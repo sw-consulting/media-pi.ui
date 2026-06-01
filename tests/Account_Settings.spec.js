@@ -103,7 +103,13 @@ const mountSettings = (props = {}) => mount({
         props: ['name', 'type', 'id', 'disabled']
       },
       FieldArrayWithButtons: {
-        template: '<div data-test="manager-field-array"></div>',
+        template: `
+          <div data-test="manager-field-array">
+            <span v-for="option in options" :key="option.value" data-test="manager-option">
+              {{ option.value }}:{{ option.text }}
+            </span>
+          </div>
+        `,
         props: ['name', 'label', 'fieldType', 'options', 'placeholder', 'addTooltip', 'removeTooltip', 'hasError']
       },
       SubscriptionsList: {
@@ -232,6 +238,31 @@ describe('Account_Settings.vue', () => {
     )
   })
 
+  it('handles account load authorization and not-found responses', async () => {
+    accountsStore.getById = vi.fn().mockRejectedValueOnce({ status: 403 })
+
+    mountSettings({ register: false, id: 1 })
+    await flushPromises()
+
+    expect(redirectToDefaultRoute).toHaveBeenCalled()
+
+    accountsStore.getById = vi.fn().mockRejectedValueOnce({ status: 404 })
+
+    mountSettings({ register: false, id: 2 })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Лицевой счёт с ID 2 не найден')
+  })
+
+  it('shows an error when manager options fail to load', async () => {
+    usersStore.getAll = vi.fn().mockRejectedValue(new Error('users down'))
+
+    mountSettings({ register: true })
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось загрузить список пользователей: users down')
+  })
+
   it('redirects on unauthorized submit errors', async () => {
     accountsStore.add = vi.fn().mockRejectedValue({ status: 401 })
     const wrapper = mountSettings({ register: true })
@@ -241,5 +272,25 @@ describe('Account_Settings.vue', () => {
     await flushPromises()
 
     expect(redirectToDefaultRoute).toHaveBeenCalled()
+  })
+
+  it('reports conflict, validation, and generic submit errors', async () => {
+    accountsStore.add = vi.fn()
+      .mockRejectedValueOnce({ status: 409 })
+      .mockRejectedValueOnce({ status: 422 })
+      .mockRejectedValueOnce(new Error('save failed'))
+    const wrapper = mountSettings({ register: true })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Лицевой счёт с таким названием уже существует')
+    expect(alertStore.error).toHaveBeenCalledWith('Проверьте корректность введённых данных')
+    expect(alertStore.error).toHaveBeenCalledWith('Ошибка при создании лицевого счёта: save failed')
   })
 })

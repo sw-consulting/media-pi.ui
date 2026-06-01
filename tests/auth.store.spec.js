@@ -43,6 +43,7 @@ describe('auth store', () => {
     global.localStorage = createLocalStorageMock()
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    router.push.mockReset()
     localStorage.clear()
   })
   
@@ -80,13 +81,14 @@ describe('auth store', () => {
     it('loads user from localStorage if present', () => {
       const testUser = { id: 1, name: 'Test User', roles: [1] }
       localStorage.setItem('user', JSON.stringify(testUser))
-      vi.spyOn(JSON, 'parse').mockImplementation(() => testUser)
+      const parseSpy = vi.spyOn(JSON, 'parse').mockImplementation(() => testUser)
       
       const store = useAuthStore()
       expect(store.user).toEqual(testUser)
       expect(store.isAdministrator).toBe(true)
       expect(store.isManager).toBeFalsy()
       expect(store.isEngineer).toBeFalsy()
+      parseSpy.mockRestore()
     })
 
     it('correctly identifies admin users', () => {
@@ -272,6 +274,18 @@ describe('auth store', () => {
       expect(localStorage.removeItem).toHaveBeenCalledWith('user')
       expect(statusStore.fetchStatus).toHaveBeenCalled()
       expect(router.push).toHaveBeenCalledWith('/login')
+    })
+
+    it('fetches status and rethrows when logout navigation fails', () => {
+      const statusStore = useStatusStore()
+      const store = useAuthStore()
+      const error = new Error('navigation failed')
+      router.push.mockImplementationOnce(() => {
+        throw error
+      })
+
+      expect(() => store.logout()).toThrow(error)
+      expect(statusStore.fetchStatus).toHaveBeenCalled()
     })
 
     it('re process updates user with jwt token and fetches status', async () => {
@@ -491,6 +505,101 @@ describe('auth store', () => {
       
       // Stored state should not be affected
       expect(store.getAccountsTreeState.expandedNodes).toEqual(['root-accounts', 'account-123'])
+    })
+  })
+
+  describe('Videos Tree State Management', () => {
+    beforeEach(() => {
+      setActivePinia(createPinia())
+      vi.clearAllMocks()
+      localStorage.clear()
+    })
+
+    it('initializes with empty videos tree state when no user', () => {
+      const store = useAuthStore()
+
+      expect(store.getVideosTreeState).toEqual({
+        selectedNode: [],
+        openedNodes: []
+      })
+    })
+
+    it('returns empty videos tree state for a user with no saved state', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+
+      expect(store.getVideosTreeState).toEqual({
+        selectedNode: [],
+        openedNodes: []
+      })
+    })
+
+    it('saves videos tree state and normalizes selected nodes', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+
+      store.saveVideosTreeState('video-123', ['root-videos'])
+
+      expect(store.getVideosTreeState).toEqual({
+        selectedNode: ['video-123'],
+        openedNodes: ['root-videos']
+      })
+      expect(localStorage.setItem).toHaveBeenCalledWith('videosTreeState', expect.any(String))
+    })
+
+    it('saves videos tree state arrays as defensive copies', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+      const selectedNodes = ['video-123']
+      const openedNodes = ['root-videos']
+
+      store.saveVideosTreeState(selectedNodes, openedNodes)
+      selectedNodes.push('video-456')
+      openedNodes.push('category-1')
+
+      expect(store.getVideosTreeState).toEqual({
+        selectedNode: ['video-123'],
+        openedNodes: ['root-videos']
+      })
+    })
+
+    it('does not save or clear videos tree state when no user is active', () => {
+      const store = useAuthStore()
+      store.user = null
+
+      store.saveVideosTreeState('video-123', ['root-videos'])
+      store.clearVideosTreeState()
+
+      expect(localStorage.setItem).not.toHaveBeenCalledWith('videosTreeState', expect.any(String))
+    })
+
+    it('clears videos tree state for the current user', () => {
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+
+      store.saveVideosTreeState(['video-123'], ['root-videos'])
+      expect(store.getVideosTreeState.selectedNode).toEqual(['video-123'])
+
+      store.clearVideosTreeState()
+
+      expect(store.getVideosTreeState).toEqual({
+        selectedNode: [],
+        openedNodes: []
+      })
+      expect(localStorage.setItem).toHaveBeenCalledWith('videosTreeState', '{}')
+    })
+
+    it('handles corrupted videos tree state in localStorage', () => {
+      localStorage.setItem('videosTreeState', 'invalid-json')
+
+      setActivePinia(createPinia())
+      const store = useAuthStore()
+      store.user = { id: 1, email: 'test@example.com' }
+
+      expect(store.getVideosTreeState).toEqual({
+        selectedNode: [],
+        openedNodes: []
+      })
     })
   })
 

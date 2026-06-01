@@ -12,6 +12,7 @@ import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
+import { formatRuDate } from '@/helpers/date.format.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
@@ -39,8 +40,8 @@ const deleteSaving = ref(false)
 const headers = computed(() => {
   const baseHeaders = [
     { title: 'Категория', align: 'start', key: 'categoryTitle', width: '40%' },
-    { title: 'Начало подписки', align: 'start', key: 'startDate', width: '25%' },
-    { title: 'Окончание подписки', align: 'start', key: 'endDate', width: '25%' }
+    { title: 'Начало подписки', align: 'start', key: 'startDateFormatted', width: '25%' },
+    { title: 'Окончание подписки', align: 'start', key: 'endDateFormatted', width: '25%' }
   ]
 
   if (!authStore.isAdministrator) return baseHeaders
@@ -53,11 +54,14 @@ const headers = computed(() => {
 
 const subscriptionRows = computed(() => (
   subscriptions.value?.subscriptions || []
-).filter(isPaidCategory).map(item => ({
+).filter(isPaidCategory).map((item, index) => ({
   ...item,
+  subscriptionRowId: createSubscriptionRowId(item, index),
   categoryTitle: item.categoryTitle || `Категория ${item.categoryId}`,
   startDate: item.startDate || '',
-  endDate: item.endDate || ''
+  endDate: item.endDate || '',
+  startDateFormatted: formatRuDate(item.startDate),
+  endDateFormatted: formatRuDate(item.endDate)
 })))
 
 const availableCategories = computed(() => (
@@ -66,13 +70,27 @@ const availableCategories = computed(() => (
 
 const isBusy = computed(() => loading.value || deleteSaving.value)
 const canCreateSubscription = computed(() => (
-  authStore.isAdministrator && availableCategories.value.length > 0 && !isBusy.value
+  authStore.isAdministrator && hasSubscriptionCategory.value && !isBusy.value
+))
+
+const hasSubscriptionCategory = computed(() => (
+  availableCategories.value.length > 0 || subscriptionRows.value.length > 0
 ))
 
 onMounted(refreshSubscriptions)
 
 function isPaidCategory(category) {
   return category?.free !== true && category?.categoryFree !== true
+}
+
+function createSubscriptionRowId(item, index) {
+  const identity = item.id ?? item.subscriptionId ?? index
+  return [
+    identity,
+    item.categoryId ?? '',
+    item.startDate ?? '',
+    item.endDate ?? ''
+  ].join(':')
 }
 
 async function refreshSubscriptions() {
@@ -91,7 +109,9 @@ function filterSubscriptions(value, query, item) {
   return [
     rawSubscription.categoryTitle,
     rawSubscription.startDate,
-    rawSubscription.endDate
+    rawSubscription.endDate,
+    rawSubscription.startDateFormatted,
+    rawSubscription.endDateFormatted
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
 }
 
@@ -189,7 +209,7 @@ function cancelPlaylistCleanup() {
         :search="authStore.subscriptions_search"
         v-model:sort-by="authStore.subscriptions_sort_by"
         :custom-filter="filterSubscriptions"
-        item-value="categoryId"
+        item-value="subscriptionRowId"
         class="elevation-1"
       >
         <template v-if="authStore.isAdministrator" v-slot:[`item.actions`]="{ item }">

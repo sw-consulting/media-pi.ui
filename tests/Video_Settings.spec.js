@@ -17,6 +17,11 @@ const videosStore = {
   update: vi.fn()
 }
 
+const accountsStore = {
+  account: ref(null),
+  getById: vi.fn()
+}
+
 const categoriesStore = {
   categories: ref([]),
   getAll: vi.fn()
@@ -43,6 +48,10 @@ vi.mock('@/stores/videos.store.js', () => ({
   useVideosStore: () => videosStore
 }))
 
+vi.mock('@/stores/accounts.store.js', () => ({
+  useAccountsStore: () => accountsStore
+}))
+
 vi.mock('@/stores/categories.store.js', () => ({
   useCategoriesStore: () => categoriesStore
 }))
@@ -64,6 +73,15 @@ vi.mock('@/helpers/user.helpers.js', () => ({
   canManageAccountById: (u, accountId) => Array.isArray(u?.accountIds) && u.accountIds.includes(accountId)
 }))
 
+vi.mock('@sw-consulting/tooling.ui.kit', () => ({
+  ActionButton: {
+    name: 'ActionButton',
+    props: ['item', 'icon', 'iconSize', 'tooltipText', 'disabled'],
+    emits: ['click'],
+    template: '<button :data-icon="icon" :data-icon-size="iconSize" :data-tooltip="tooltipText" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
+  }
+}))
+
 const mountSettings = (props = {}) => mount({
   template: '<Suspense><VideoSettings v-bind="$attrs" /></Suspense>',
   components: { VideoSettings },
@@ -76,13 +94,16 @@ const mountSettings = (props = {}) => mount({
   global: {
     stubs: {
       Form: {
-        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="false" /></form>',
+        template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="false" :handleSubmit="handleSubmit" /></form>',
         props: ['initialValues'],
         emits: ['submit'],
         data() {
           return { errors: props.showValidationError ? { title: 'Необходимо указать название' } : {} }
         },
         methods: {
+          handleSubmit(submit) {
+            return submit({ ...this.initialValues, ...(props.submitValues || {}) })
+          },
           onSubmit() {
             this.$emit('submit', { ...this.initialValues, ...(props.submitValues || {}) })
           }
@@ -115,10 +136,21 @@ const mountSettings = (props = {}) => mount({
 describe('Video_Settings.vue', () => {
   beforeEach(() => {
     authStore = { user: { roles: [1], accountIds: [] } }
-    videosStore.video.value = { id: 10, title: 'Clip', accountId: 0, categoryId: 3 }
+    videosStore.video.value = {
+      id: 10,
+      title: 'Clip',
+      accountId: 0,
+      categoryId: 3,
+      fileSizeBytes: 1048576,
+      durationSeconds: 65
+    }
     videosStore.loading.value = false
     videosStore.getById = vi.fn().mockResolvedValue()
     videosStore.update = vi.fn().mockResolvedValue()
+    accountsStore.account.value = null
+    accountsStore.getById = vi.fn().mockImplementation(async (id) => {
+      accountsStore.account.value = { id, name: `Account ${id}` }
+    })
     categoriesStore.categories.value = [{ id: 3, title: 'Sports' }, { id: 4, title: 'News' }]
     categoriesStore.getAll = vi.fn().mockResolvedValue()
     alertStore.alert.value = null
@@ -135,6 +167,9 @@ describe('Video_Settings.vue', () => {
 
     expect(videosStore.getById).toHaveBeenCalledWith(10)
     expect(categoriesStore.getAll).toHaveBeenCalled()
+    expect(wrapper.find('[data-test="video-account-name"]').element.value).toBe('Общие файлы')
+    expect(wrapper.find('[data-test="video-file-size"]').element.value).toBe('1.0 МБ')
+    expect(wrapper.find('[data-test="video-duration"]').element.value).toBe('1:05')
     expect(videosStore.update).toHaveBeenCalledWith(10, { title: 'Updated Clip', categoryId: 4 })
     expect(routerGo).toHaveBeenCalledWith(-1)
   })
@@ -146,6 +181,8 @@ describe('Video_Settings.vue', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-test="video-category-select"]').exists()).toBe(false)
+    expect(accountsStore.getById).toHaveBeenCalledWith(42)
+    expect(wrapper.find('[data-test="video-account-name"]').element.value).toBe('Account 42')
 
     await wrapper.find('[data-test="form"]').trigger('submit')
     await flushPromises()
@@ -243,13 +280,22 @@ describe('Video_Settings.vue', () => {
     expect(alertStore.error).toHaveBeenCalledWith('Ошибка загрузки видеофайла: Network failure')
   })
 
-  it('calls router.go(-1) when cancel button is clicked', async () => {
+  it('uses header action buttons for save and cancel', async () => {
     const wrapper = mountSettings()
     await flushPromises()
 
-    const cancelButton = wrapper.findAll('button[type="button"]')
-      .find(btn => btn.text().includes('Отменить'))
-    expect(cancelButton).toBeTruthy()
+    const saveButton = wrapper.find('[data-test="save-video-button"]')
+    const cancelButton = wrapper.find('[data-test="cancel-video-button"]')
+
+    expect(saveButton.attributes('data-icon')).toBe('fa-solid fa-check-double')
+    expect(saveButton.attributes('data-icon-size')).toBe('2x')
+    expect(cancelButton.attributes('data-icon')).toBe('fa-solid fa-xmark')
+    expect(cancelButton.attributes('data-icon-size')).toBe('2x')
+
+    await saveButton.trigger('click')
+    await flushPromises()
+    expect(videosStore.update).toHaveBeenCalled()
+
     await cancelButton.trigger('click')
 
     expect(routerGo).toHaveBeenCalledWith(-1)
@@ -347,6 +393,10 @@ describe('Video_Settings.vue - additional branch coverage', () => {
     videosStore.loading.value = false
     videosStore.getById = vi.fn().mockResolvedValue()
     videosStore.update = vi.fn().mockResolvedValue()
+    accountsStore.account.value = null
+    accountsStore.getById = vi.fn().mockImplementation(async (id) => {
+      accountsStore.account.value = { id, name: `Account ${id}` }
+    })
     categoriesStore.categories.value = [{ id: 3, title: 'Sports' }, { id: 4, title: 'News' }]
     categoriesStore.getAll = vi.fn().mockResolvedValue()
     alertStore.alert.value = null

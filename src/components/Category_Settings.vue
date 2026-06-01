@@ -54,7 +54,7 @@ const faXmark = 'fa-solid fa-xmark'
 const categoryTitleText = computed(() => (
   isRegister()
     ? 'Новая категория'
-    : `Настройки категории '${category.value.title || `Категория #${props.id}`}'`
+    : 'Настройки категории'
 ))
 
 function isRegister() {

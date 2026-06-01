@@ -6,14 +6,17 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
 import router from '@/router'
 import { useVideosStore } from '@/stores/videos.store.js'
+import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
+import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { createCategoryOptions } from '@/helpers/video.scope.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
@@ -26,11 +29,13 @@ const props = defineProps({
 })
 
 const videosStore = useVideosStore()
+const accountsStore = useAccountsStore()
 const categoriesStore = useCategoriesStore()
 const alertStore = useAlertStore()
 const authStore = useAuthStore()
 const { alert } = storeToRefs(alertStore)
 const { loading, video: loadedVideo } = storeToRefs(videosStore)
+const { account } = storeToRefs(accountsStore)
 const { categories } = storeToRefs(categoriesStore)
 
 const schema = Yup.object().shape({
@@ -44,9 +49,18 @@ const playlistImpactDialog = ref(false)
 const playlistImpact = ref(null)
 const pendingVideoPayload = ref(null)
 const forceSaving = ref(false)
+const faCheckDouble = 'fa-solid fa-check-double'
+const faXmark = 'fa-solid fa-xmark'
 
 const categoryOptions = computed(() => createCategoryOptions(categories.value || []))
 const isCommonVideo = computed(() => (video.value?.accountId ?? 0) === 0)
+const accountName = computed(() => {
+  const accountId = Number(video.value?.accountId ?? 0)
+  if (!Number.isFinite(accountId) || accountId === 0) return 'Общие файлы'
+  return video.value?.accountName || video.value?.accountDisplay || account.value?.name || `Лицевой счёт ${accountId}`
+})
+const formattedFileSize = computed(() => formatFileSize(video.value?.fileSizeBytes ?? video.value?.fileSize))
+const formattedDuration = computed(() => formatDuration(video.value?.durationSeconds ?? video.value?.duration))
 
 function canManageVideo(item) {
   if (!item) return false
@@ -71,6 +85,14 @@ if (!props.id || isNaN(props.id)) {
     }
     if (!canManageVideo(currentVideo)) {
       redirectToDefaultRoute()
+    }
+    const accountId = Number(currentVideo.accountId ?? 0)
+    if (Number.isFinite(accountId) && accountId !== 0 && !currentVideo.accountName && !currentVideo.accountDisplay) {
+      try {
+        await accountsStore.getById(accountId)
+      } catch {
+        // The readonly field can still fall back to the account id if the name is unavailable.
+      }
     }
     video.value = {
       ...currentVideo,
@@ -145,15 +167,49 @@ function cancelPlaylistCleanup() {
 
 <template>
   <div class="settings form-3 form-compact">
-    <h1 class="primary-heading">Настройки видеофайла</h1>
-    <hr class="hr" />
-
     <Form
       :validation-schema="schema"
       :initial-values="video"
       @submit="onSubmit"
-      v-slot="{ errors, isSubmitting }"
+      v-slot="{ errors, isSubmitting, handleSubmit }"
     >
+      <div class="header-with-actions">
+        <h1 class="primary-heading">Настройки видеофайла</h1>
+        <div class="header-actions-container">
+          <div class="header-actions header-actions-group">
+            <ActionButton
+              data-test="save-video-button"
+              :item="{}"
+              :icon="faCheckDouble"
+              icon-size="2x"
+              tooltip-text="Сохранить"
+              :disabled="isSubmitting"
+              @click="handleSubmit(onSubmit)"
+            />
+            <ActionButton
+              data-test="cancel-video-button"
+              :item="{}"
+              :icon="faXmark"
+              icon-size="2x"
+              tooltip-text="Отменить"
+              @click="router.go(-1)"
+            />
+          </div>
+        </div>
+      </div>
+      <hr class="hr" />
+
+      <div class="form-group">
+        <label for="accountName" class="label">Лицевой счёт:</label>
+        <input
+          id="accountName"
+          data-test="video-account-name"
+          :value="accountName"
+          readonly
+          class="form-control input"
+        />
+      </div>
+
       <div class="form-group">
         <label for="title" class="label">Название:</label>
         <Field
@@ -165,6 +221,30 @@ function cancelPlaylistCleanup() {
           :class="{ 'is-invalid': errors.title }"
           placeholder="Введите название видеофайла"
         />
+      </div>
+
+      <div class="video-media-row">
+        <div class="form-group video-media-group">
+          <label for="fileSize" class="label">Размер:</label>
+          <input
+            id="fileSize"
+            data-test="video-file-size"
+            :value="formattedFileSize"
+            readonly
+            class="form-control input metadata-input"
+          />
+        </div>
+
+        <div class="form-group video-media-group">
+          <label for="duration" class="label">Длительность:</label>
+          <input
+            id="duration"
+            data-test="video-duration"
+            :value="formattedDuration"
+            readonly
+            class="form-control input metadata-input"
+          />
+        </div>
       </div>
 
       <div v-if="isCommonVideo" class="form-group">
@@ -181,22 +261,6 @@ function cancelPlaylistCleanup() {
           :disabled="isSubmitting"
           data-test="video-category-select"
         />
-      </div>
-
-      <div class="form-group mt-8">
-        <button class="button primary" type="submit" :disabled="isSubmitting">
-          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
-          Сохранить
-        </button>
-        <button
-          class="button secondary"
-          type="button"
-          @click="$router.go(-1)"
-        >
-          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
-          Отменить
-        </button>
       </div>
 
       <div v-if="errors.title" class="alert alert-danger mt-3 mb-0">{{ errors.title }}</div>
@@ -221,3 +285,28 @@ function cancelPlaylistCleanup() {
     />
   </div>
 </template>
+
+<style scoped>
+.video-media-row {
+  display: grid;
+  grid-template-columns: calc(40% + 0.375rem) minmax(0, 1fr);
+  column-gap: 0;
+  row-gap: 0.25rem;
+  align-items: center;
+}
+
+.video-media-group {
+  min-width: 0;
+}
+
+.video-media-group .label {
+  width: auto;
+  min-width: 7.5rem;
+}
+
+.metadata-input {
+  flex: 0 0 10rem;
+  width: 10rem;
+  max-width: 10rem;
+}
+</style>
