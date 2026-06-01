@@ -74,6 +74,18 @@ const router = createRouter({
       props: true
     },
     {
+      path: '/account/:accountId/subscription/create',
+      name: 'Создание подписки',
+      component: () => import('@/views/Subscription_CreateView.vue'),
+      props: true
+    },
+    {
+      path: '/account/:accountId/subscription/edit/:categoryId',
+      name: 'Настройки подписки',
+      component: () => import('@/views/Subscription_EditView.vue'),
+      props: true
+    },
+    {
       path: '/user/edit/:id',
       name: 'Настройки',
       component: () => import('@/views/User_EditView.vue'),
