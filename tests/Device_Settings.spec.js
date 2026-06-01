@@ -1,14 +1,9 @@
 // Copyright (c) 2025 sw.consulting
 // This file is a part of Media Pi  frontend application
 
-import { library } from '@fortawesome/fontawesome-svg-core'
-import { faCheckDouble, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import DeviceSettings from '@/components/Device_Settings.vue'
-
-library.add(faCheckDouble, faXmark)
 
 let authStore
 const devicesStore = {
@@ -50,6 +45,15 @@ vi.mock('@/helpers/default.route.js', () => ({
   redirectToDefaultRoute: vi.fn()
 }))
 
+vi.mock('@sw-consulting/tooling.ui.kit', () => ({
+  ActionButton: {
+    name: 'ActionButton',
+    props: ['item', 'icon', 'iconSize', 'tooltipText', 'disabled'],
+    emits: ['click'],
+    template: '<button :data-icon="icon" :data-icon-size="iconSize" :data-tooltip="tooltipText" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
+  }
+}))
+
 const mountSettings = (props = {}) => mount({
   template: '<Suspense><DeviceSettings v-bind="$attrs" /></Suspense>',
   components: { DeviceSettings },
@@ -66,7 +70,7 @@ const mountSettings = (props = {}) => mount({
       Form: {
         template: `
           <div data-testid="form" @submit="onSubmit">
-            <slot :errors="errors" :isSubmitting="isSubmitting" />
+            <slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" />
           </div>
         `,
         props: ['validation-schema', 'initial-values'],
@@ -78,6 +82,9 @@ const mountSettings = (props = {}) => mount({
           }
         },
         methods: {
+          handleSubmit(submit) {
+            return submit({ name: props.submitName || 'Test Device', ipAddress: props.submitIp || '1.2.3.4' })
+          },
           onSubmit() {
             this.$emit('submit', { name: props.submitName || 'Test Device', ipAddress: props.submitIp || '1.2.3.4' })
           }
@@ -86,10 +93,13 @@ const mountSettings = (props = {}) => mount({
       Field: {
         template: '<input />',
         props: ['name', 'type', 'disabled', 'class', 'placeholder']
+      },
+      ActionButton: {
+        name: 'ActionButton',
+        props: ['item', 'icon', 'iconSize', 'tooltipText', 'disabled'],
+        emits: ['click'],
+        template: '<button :data-icon="icon" :data-icon-size="iconSize" :data-tooltip="tooltipText" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
       }
-    },
-    components: {
-      'font-awesome-icon': FontAwesomeIcon
     }
   }
 })
@@ -389,7 +399,7 @@ describe('Device_Settings.vue', () => {
       const wrapper = mountSettings({ register: true })
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Создать')
+      expect(wrapper.find('[data-test="save-device-button"]').attributes('data-tooltip')).toBe('Создать')
     })
 
     it('displays correct button text for edit mode', async () => {
@@ -399,7 +409,31 @@ describe('Device_Settings.vue', () => {
       const wrapper = mountSettings({ register: false, id: 1 })
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Сохранить')
+      expect(wrapper.find('[data-test="save-device-button"]').attributes('data-tooltip')).toBe('Сохранить')
+    })
+
+    it('uses header action buttons for save and cancel', async () => {
+      const router = await import('@/router')
+      devicesStore.register.mockResolvedValue({ id: 5 })
+      devicesStore.update.mockResolvedValue()
+
+      const wrapper = mountSettings({ register: true, accountId: 3 })
+      await flushPromises()
+
+      const saveButton = wrapper.find('[data-test="save-device-button"]')
+      const cancelButton = wrapper.find('[data-test="cancel-device-button"]')
+
+      expect(saveButton.attributes('data-icon')).toBe('fa-solid fa-check-double')
+      expect(saveButton.attributes('data-icon-size')).toBe('2x')
+      expect(cancelButton.attributes('data-icon')).toBe('fa-solid fa-xmark')
+      expect(cancelButton.attributes('data-icon-size')).toBe('2x')
+
+      await saveButton.trigger('click')
+      await flushPromises()
+      expect(devicesStore.update).toHaveBeenCalledWith(5, expect.objectContaining({ accountId: 3 }))
+
+      await cancelButton.trigger('click')
+      expect(router.default.go).toHaveBeenCalledWith(-1)
     })
 
     it('shows validation errors', async () => {

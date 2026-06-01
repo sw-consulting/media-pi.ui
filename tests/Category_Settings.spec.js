@@ -236,7 +236,7 @@ describe('Category_Settings.vue', () => {
 
     const videosList = wrapper.find('[data-test="category-videos-list"]')
 
-    expect(wrapper.find('.primary-heading').text()).toBe("Настройки категории 'Existing'")
+    expect(wrapper.find('.primary-heading').text()).toBe("Настройки категории")
     expect(videosList.exists()).toBe(true)
     expect(videosList.attributes('data-title')).toBe('Видеофайлы')
     expect(videosList.attributes('data-subtitle')).toBeUndefined()

@@ -12,6 +12,7 @@ import { useDevicesStore } from '@/stores/devices.store.js'
 import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { timeouts } from '@/helpers/config.js'
+import { formatRuDateTime } from '@/helpers/date.format.js'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
@@ -403,24 +404,7 @@ const hasAnyOperationInProgress = computed(() =>
 )
 
 // Device information display helpers
-const fmtDate = (value) => {
-  if (!value) return '—'
-  try {
-    const d = new Date(value)
-    if (Number.isNaN(d.getTime())) return String(value)
-    // Force Russian locale and a consistent date/time format
-    return d.toLocaleString('ru-RU', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
-  } catch {
-    return String(value)
-  }
-}
+const fmtDate = formatRuDateTime
 
 const deviceInfo = computed(() => {
   const dev = device.value

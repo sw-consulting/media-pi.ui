@@ -26,6 +26,11 @@ const confirmation = {
   confirmDelete: vi.fn(async () => true)
 }
 
+vi.mock('pinia', async () => {
+  const actual = await vi.importActual('pinia')
+  return { ...actual, storeToRefs: (store) => store }
+})
+
 vi.mock('@/router', () => ({ default: { push: routerPush } }))
 vi.mock('@/stores/accounts.store.js', () => ({ useAccountsStore: () => accountsStore }))
 vi.mock('@/stores/auth.store.js', () => ({ useAuthStore: () => authStore }))
@@ -48,14 +53,20 @@ const globalStubs = {
     template: '<input data-test="subscription-search" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
   },
   'v-data-table': {
-    props: ['items', 'headers', 'customFilter'],
+    props: ['items', 'headers', 'customFilter', 'itemValue'],
     template: `
       <div class="data-table">
-        <div v-for="item in items" :key="item.categoryId" class="data-row" data-test="subscription-row">
+        <div
+          v-for="item in items"
+          :key="item.subscriptionRowId"
+          class="data-row"
+          data-test="subscription-row"
+          :data-row-id="item.subscriptionRowId"
+        >
           <slot name="item.actions" :item="item" />
           <span data-test="subscription-category">{{ item.categoryTitle }}</span>
-          <span data-test="subscription-start">{{ item.startDate }}</span>
-          <span data-test="subscription-end">{{ item.endDate }}</span>
+          <span data-test="subscription-start">{{ item.startDateFormatted }}</span>
+          <span data-test="subscription-end">{{ item.endDateFormatted }}</span>
           <span v-if="customFilter" :data-test="'filter-' + item.categoryId">{{ customFilter(null, item.categoryTitle, { raw: item }) }}</span>
         </div>
       </div>
@@ -119,7 +130,43 @@ describe('Subscriptions_List.vue', () => {
     expect(accountsStore.getSubscriptions).toHaveBeenCalledWith(1)
     expect(wrapper.text()).toContain('Premium')
     expect(wrapper.text()).not.toContain('Free')
+    expect(wrapper.find('[data-test="subscription-start"]').text()).toBe('01.06.2026')
+    expect(wrapper.find('[data-test="subscription-end"]').text()).toBe('30.06.2026')
     expect(wrapper.find('[data-test="filter-7"]').text()).toBe('true')
+  })
+
+  it('renders multiple subscriptions for the same category', async () => {
+    accountsStore.subscriptions.value = {
+      subscriptions: [
+        { categoryId: 7, categoryTitle: 'Premium', categoryFree: false, startDate: '2026-06-01', endDate: '2026-06-30' },
+        { categoryId: 7, categoryTitle: 'Premium', categoryFree: false, startDate: '2026-07-01', endDate: '2026-07-31' }
+      ],
+      availableCategories: []
+    }
+
+    const wrapper = mountList()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-test="subscription-row"]')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].attributes('data-row-id')).not.toBe(rows[1].attributes('data-row-id'))
+    expect(wrapper.find('[data-test="create-subscription-button"]').element.disabled).toBe(false)
+  })
+
+  it('matches search against formatted subscription dates', async () => {
+    accountsStore.subscriptions.value = {
+      subscriptions: [
+        { categoryId: 7, categoryTitle: 'Premium', categoryFree: false, startDate: '2026-06-01', endDate: '2026-06-30' }
+      ],
+      availableCategories: []
+    }
+
+    const wrapper = mountList()
+    await flushPromises()
+
+    const vm = wrapper.vm
+
+    expect(vm.filterSubscriptions(null, '01.06.2026', { raw: vm.subscriptionRows[0] })).toBe(true)
   })
 
   it('routes create and edit actions for administrators', async () => {
@@ -187,7 +234,7 @@ describe('Subscriptions_List.vue', () => {
       availableCategories: []
     }
     accountsStore.deleteSubscription = vi.fn()
-      .mockRejectedValueOnce({ status: 409, data: { affectedPlaylistCount: 1 } })
+      .mockRejectedValueOnce({ status: 409, data: { affectedPlaylistCount: 1, affectedPlaylists: [] } })
       .mockResolvedValueOnce({ subscriptions: [], availableCategories: [] })
 
     const wrapper = mountList()

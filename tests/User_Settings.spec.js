@@ -12,7 +12,13 @@ import { resolveAll } from './helpers/test-utils'
 // simple stubs for vee-validate components
 const FormStub = {
   name: 'Form',
-  template: '<form @submit.prevent="$emit(\'submit\')"><slot :errors="{}" :isSubmitting="false" /></form>'
+  props: ['initialValues'],
+  template: '<form @submit.prevent="$emit(\'submit\', initialValues)"><slot :errors="{}" :isSubmitting="false" :handleSubmit="handleSubmit" /></form>',
+  methods: {
+    handleSubmit(submit) {
+      return submit(this.initialValues || {})
+    }
+  }
 }
 const FieldStub = {
   name: 'Field',
@@ -24,6 +30,13 @@ const FieldArrayWithButtonsStub = {
   name: 'FieldArrayWithButtons',
   props: ['name', 'label', 'options', 'hasError', 'addTooltip', 'removeTooltip', 'placeholder'],
   template: '<div class="field-array-stub">{{ label }}</div>'
+}
+
+const ActionButtonStub = {
+  name: 'ActionButton',
+  props: ['item', 'icon', 'iconSize', 'tooltipText', 'disabled'],
+  emits: ['click'],
+  template: '<button :data-icon="icon" :data-icon-size="iconSize" :data-tooltip="tooltipText" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
 }
 
 let isAdmin
@@ -114,10 +127,20 @@ beforeEach(() => {
 })
 
 describe('User_Settings.vue real component', () => {
+  function stubs() {
+    return {
+      Form: FormStub,
+      Field: FieldStub,
+      FieldArrayWithButtons: FieldArrayWithButtonsStub,
+      ActionButton: ActionButtonStub,
+      'font-awesome-icon': true
+    }
+  }
+
   it('fetches user by id when editing', async () => {
     mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     expect(getById).toHaveBeenCalledWith(5, true)
@@ -127,7 +150,7 @@ describe('User_Settings.vue real component', () => {
     Object.defineProperty(window, 'location', { writable: true, value: { href: 'http://localhost/path' } })
     const wrapper = mount(Parent, {
       props: { register: true },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -145,7 +168,7 @@ describe('User_Settings.vue real component', () => {
     isAdmin = true
     const wrapper = mount(Parent, {
       props: { register: true },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -159,7 +182,7 @@ describe('User_Settings.vue real component', () => {
     isAdmin = true
     const wrapper = mount(Parent, {
       props: { register: false, id: 7 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -173,7 +196,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = [11]
     const wrapper = mount(Parent, {
       props: { register: false, id: 1 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     
@@ -194,7 +217,7 @@ describe('User_Settings.vue real component', () => {
     
     const wrapper = mount(Parent, {
       props: { register: true },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     
@@ -213,7 +236,7 @@ describe('User_Settings.vue real component', () => {
     
     const wrapper = mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     
@@ -234,7 +257,7 @@ describe('User_Settings.vue real component', () => {
     Object.defineProperty(window, 'location', { writable: true, value: { href: 'http://localhost/path' } })
     const wrapper = mount(Parent, {
       props: { register: true },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     
@@ -253,7 +276,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = [21, 11, 1] // Multiple roles: Engineer, Manager, Admin
     const wrapper = mount(Parent, {
       props: { register: false, id: 1 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -265,7 +288,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = []
     const wrapper = mount(Parent, {
       props: { register: false, id: 1 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -278,7 +301,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = [11]
     const wrapper = mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -299,7 +322,7 @@ describe('User_Settings.vue real component', () => {
     mockUser.value.roles = [11]
     const wrapper = mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     const child = wrapper.findComponent(UserSettings)
@@ -318,10 +341,35 @@ describe('User_Settings.vue real component', () => {
   it('calls ensureLoaded from roles store during component setup', async () => {
     mount(Parent, {
       props: { register: false, id: 5 },
-      global: { stubs: { Form: FormStub, Field: FieldStub, FieldArrayWithButtons: FieldArrayWithButtonsStub, 'font-awesome-icon': true } }
+      global: { stubs: stubs() }
     })
     await resolveAll()
     expect(ensureLoaded).toHaveBeenCalled()
+  })
+
+  it('uses header action buttons for save and cancel', async () => {
+    isAdmin = true
+    const wrapper = mount(Parent, {
+      props: { register: false, id: 7 },
+      global: { stubs: stubs() }
+    })
+    await resolveAll()
+
+    const saveButton = wrapper.find('[data-test="save-user-button"]')
+    const cancelButton = wrapper.find('[data-test="cancel-user-button"]')
+
+    expect(saveButton.attributes('data-icon')).toBe('fa-solid fa-check-double')
+    expect(saveButton.attributes('data-icon-size')).toBe('2x')
+    expect(cancelButton.attributes('data-icon')).toBe('fa-solid fa-xmark')
+    expect(cancelButton.attributes('data-icon-size')).toBe('2x')
+
+    await saveButton.trigger('click')
+    await resolveAll()
+    expect(updateUser).toHaveBeenCalled()
+
+    await cancelButton.trigger('click')
+    await resolveAll()
+    expect(routerPush).toHaveBeenCalledWith('/users')
   })
 })
 

@@ -211,7 +211,7 @@ const someVisiblePlaylistItemsSelected = computed(() => (
 ))
 
 const playlistButtonText = computed(() => (props.register ? 'Создать' : 'Сохранить'))
-const playlistTitleText = computed(() => (props.register ? 'Новый плейлист' : `Настройки плейлиста '${playlist.value.title}'` ))
+const playlistTitleText = computed(() => (props.register ? 'Новый плейлист' : 'Настройки плейлиста' ))
 const formKey = computed(() => `${props.register ? 'create' : 'edit'}-${playlist.value.accountId ?? 'none'}`)
 const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'

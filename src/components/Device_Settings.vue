@@ -7,6 +7,7 @@ import router from '@/router'
 import { storeToRefs } from 'pinia'
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
+import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 
 import { useDevicesStore } from '@/stores/devices.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
@@ -34,6 +35,8 @@ const alertStore = useAlertStore()
 const authStore = useAuthStore()
 const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(devicesStore)
+const faCheckDouble = 'fa-solid fa-check-double'
+const faXmark = 'fa-solid fa-xmark'
 
 const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя'),
@@ -140,15 +143,38 @@ async function onSubmit (values) {
 
 <template>
   <div class="settings form-2 form-compact">
-    <h1 class="primary-heading">{{ isRegister() ? 'Новое устройство' : 'Настройки устройства' }}</h1>
-    <hr class="hr" />
-
     <Form
       :validation-schema="schema"
       :initial-values="device"
       @submit="onSubmit"
-      v-slot="{ errors, isSubmitting }"
+      v-slot="{ errors, isSubmitting, handleSubmit }"
     >
+      <div class="header-with-actions">
+        <h1 class="primary-heading">{{ isRegister() ? 'Новое устройство' : 'Настройки устройства' }}</h1>
+        <div class="header-actions-container">
+          <div class="header-actions header-actions-group">
+            <ActionButton
+              data-test="save-device-button"
+              :item="{}"
+              :icon="faCheckDouble"
+              icon-size="2x"
+              :tooltip-text="getButton()"
+              :disabled="isSubmitting"
+              @click="handleSubmit(onSubmit)"
+            />
+            <ActionButton
+              data-test="cancel-device-button"
+              :item="{}"
+              :icon="faXmark"
+              icon-size="2x"
+              tooltip-text="Отменить"
+              @click="router.go(-1)"
+            />
+          </div>
+        </div>
+      </div>
+      <hr class="hr" />
+
       <div class="form-group">
         <label for="name" class="label">Название:</label>
         <Field name="name" type="text" id="name" :disabled="isSubmitting"
@@ -171,22 +197,6 @@ async function onSubmit (values) {
           class="form-control input" :class="{ 'is-invalid': errors.port }"
           placeholder="Введите TCP порт (1-65535)"
         />
-      </div>
-
-      <div class="form-group mt-8">
-        <button class="button primary" type="submit" :disabled="isSubmitting">
-          <span v-show="isSubmitting" class="spinner-border spinner-border-sm mr-1"></span>
-          <font-awesome-icon size="1x" icon="fa-solid fa-check-double" class="mr-1" />
-          {{ getButton() }}
-        </button>
-        <button
-          class="button secondary"
-          type="button"
-          @click="$router.go(-1)"
-        >
-          <font-awesome-icon size="1x" icon="fa-solid fa-xmark" class="mr-1" />
-          Отменить
-        </button>
       </div>
 
       <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>

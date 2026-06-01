@@ -35,7 +35,7 @@ const accountsStore = useAccountsStore()
 const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
-const { loading } = storeToRefs(accountsStore)
+const { loading, account } = storeToRefs(accountsStore)
 
 const subscription = ref({ categoryId: props.categoryId || '', startDate: '', endDate: '' })
 const availableCategories = ref([])
@@ -57,13 +57,11 @@ const schema = Yup.object().shape({
   endDate: Yup.string().required('Укажите дату окончания подписки')
 })
 
-const titleText = computed(() => (
-  isRegister()
-    ? 'Новая подписка'
-    : `Настройки подписки '${currentCategory.value?.title || `Категория #${props.categoryId}`}'`
-))
+const titleText = computed(() => (isRegister() ? 'Создание подписки' : 'Редактирование подписки'))
 
 const buttonText = computed(() => (isRegister() ? 'Создать' : 'Сохранить'))
+
+const accountName = computed(() => account.value?.name || '')
 
 const categoryOptions = computed(() => (
   isRegister()
@@ -103,6 +101,7 @@ if (!props.accountId || isNaN(props.accountId)) {
 } else {
   initialLoading.value = true
   try {
+    await accountsStore.getById(props.accountId)
     const data = await accountsStore.getSubscriptions(props.accountId)
     const paidAvailable = (data?.availableCategories || []).filter(isPaidCategory)
     if (isRegister()) {
@@ -236,6 +235,17 @@ function cancelPlaylistCleanup() {
       <hr class="hr" />
 
       <div class="form-group">
+        <label for="accountName" class="label">Лицевой счёт:</label>
+        <input
+          id="accountName"
+          data-test="subscription-account-name"
+          :value="accountName"
+          readonly
+          class="form-control input"
+        />
+      </div>
+
+      <div class="form-group">
         <label for="categoryId" class="label">Категория:</label>
         <select
           id="categoryId"
@@ -251,30 +261,34 @@ function cancelPlaylistCleanup() {
         </select>
       </div>
 
-      <div class="form-group">
-        <label for="startDate" class="label">Начало подписки:</label>
-        <Field
-          name="startDate"
-          type="date"
-          id="startDate"
-          data-test="subscription-start-date"
-          :disabled="isSubmitting"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.startDate }"
-        />
-      </div>
+      <div class="subscription-date-row" data-test="subscription-date-row">
+        <div class="form-group subscription-date-group">
+          <label for="startDate" class="label">Начало подписки:</label>
+          <Field
+            name="startDate"
+            v-model="subscription.startDate"
+            type="date"
+            id="startDate"
+            data-test="subscription-start-date"
+            :disabled="isSubmitting"
+            class="form-control input date-input"
+            :class="{ 'is-invalid': errors.startDate }"
+          />
+        </div>
 
-      <div class="form-group">
-        <label for="endDate" class="label">Окончание подписки:</label>
-        <Field
-          name="endDate"
-          type="date"
-          id="endDate"
-          data-test="subscription-end-date"
-          :disabled="isSubmitting"
-          class="form-control input"
-          :class="{ 'is-invalid': errors.endDate }"
-        />
+        <div class="form-group subscription-date-group">
+          <label for="endDate" class="label">Окончание подписки:</label>
+          <Field
+            name="endDate"
+            v-model="subscription.endDate"
+            type="date"
+            id="endDate"
+            data-test="subscription-end-date"
+            :disabled="isSubmitting"
+            class="form-control input date-input"
+            :class="{ 'is-invalid': errors.endDate }"
+          />
+        </div>
       </div>
 
       <div v-if="errors.startDate" class="alert alert-danger mt-3 mb-0">{{ errors.startDate }}</div>
@@ -303,3 +317,28 @@ function cancelPlaylistCleanup() {
     />
   </div>
 </template>
+
+<style scoped>
+.subscription-date-row {
+  display: grid;
+  grid-template-columns: calc(40% + 0.375rem) minmax(0, 1fr);
+  column-gap: 0;
+  row-gap: 0.25rem;
+  align-items: center;
+}
+
+.subscription-date-group {
+  min-width: 0;
+}
+
+.subscription-date-group .label {
+  width: auto;
+  min-width: 8.5rem;
+}
+
+.date-input {
+  flex: 0 0 12rem;
+  width: 12rem;
+  max-width: 12rem;
+}
+</style>
