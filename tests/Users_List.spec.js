@@ -224,8 +224,8 @@ describe('Users_List.vue', () => {
     await flushPromises()
 
     expect(getAll).toHaveBeenCalled()
-    expect(wrapper.html()).toContain('Ошибка при загрузке списка пользователей: Failed to fetch users')
-    expect(errorFn).toHaveBeenCalled()
+    expect(wrapper.html()).not.toContain('Ошибка при загрузке списка пользователей: Failed to fetch users')
+    expect(errorFn).toHaveBeenCalledWith('Не удалось загрузить списки ролей, пользователей и лицевых счетов')
   })
 
   it('shows confirmation dialog before deleting a user', async () => {

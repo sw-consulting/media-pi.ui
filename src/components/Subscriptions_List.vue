@@ -29,7 +29,7 @@ const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 
-const { subscriptions, loading, error } = storeToRefs(accountsStore)
+const { subscriptions, loading } = storeToRefs(accountsStore)
 const { alert } = storeToRefs(alertStore)
 
 const playlistImpactDialog = ref(false)
@@ -238,9 +238,6 @@ function cancelPlaylistCleanup() {
       </div>
     </v-card>
 
-    <div v-if="error" class="text-center m-5">
-      <div class="text-danger">Ошибка при загрузке списка подписок: {{ error }}</div>
-    </div>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}

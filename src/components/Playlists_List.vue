@@ -23,7 +23,7 @@ const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 
-const { playlists, loading, error } = storeToRefs(playlistsStore)
+const { playlists, loading } = storeToRefs(playlistsStore)
 const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
 const { alert } = storeToRefs(alertStore)
 
@@ -201,9 +201,6 @@ async function deletePlaylist(item) {
         {{ isBusy ? 'Загрузка...' : 'Нет плейлистов' }}
       </div>
     </v-card>
-    <div v-if="error" class="text-center m-5">
-      <div class="text-danger">Ошибка при загрузке списка плейлистов: {{ error }}</div>
-    </div>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
