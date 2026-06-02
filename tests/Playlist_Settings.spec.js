@@ -22,6 +22,8 @@ const playlistsStore = {
 }
 
 const videosStore = {
+  videoPreview: ref(null),
+  open: vi.fn(),
   getAllByAccount: vi.fn()
 }
 
@@ -98,6 +100,12 @@ const mountSettings = (props = {}) => mount({
   },
   global: {
     stubs: {
+      VideoViewDialog: {
+        name: 'VideoViewDialog',
+        props: ['modelValue', 'video', 'title'],
+        emits: ['update:modelValue', 'playback-error'],
+        template: '<div v-if="modelValue" data-test="video-view-dialog" :data-title="title" :data-src="video && video.streamUrl"><button data-test="trigger-video-playback-error" @click="$emit(\'playback-error\', \'Стриминг этого видеофайла не поддерживается браузером.\')"></button></div>'
+      },
       Form: {
         template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" /></form>',
         props: ['validationSchema', 'initialValues'],
@@ -273,6 +281,15 @@ describe('Playlist_Settings.vue', () => {
     playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([])
     playlistsStore.create = vi.fn().mockResolvedValue()
     playlistsStore.update = vi.fn().mockResolvedValue()
+    videosStore.videoPreview.value = null
+    videosStore.open = vi.fn(async (id) => {
+      videosStore.videoPreview.value = {
+        id,
+        filename: `video-${id}.mp4`,
+        streamUrl: `http://localhost:8080/api/videos/${id}/file?playbackToken=token-${id}`
+      }
+      return videosStore.videoPreview.value
+    })
     videosStore.getAllByAccount = vi.fn(async (accountId) => {
       if (accountId === 1) {
         return [{ id: 11, title: 'Video 1', originalFilename: 'one.mp4', fileSizeBytes: 1200, durationSeconds: 60, accountId: 1 }]
@@ -301,7 +318,7 @@ describe('Playlist_Settings.vue', () => {
     const videoRows = wrapper.findAll('.playlist-video-row')
     const targetRow = videoRows.find(r => r.text().includes('Video 1'))
     expect(targetRow).toBeTruthy()
-    await targetRow.find('button').trigger('click')
+    await targetRow.find('[data-test="add-video-button"]').trigger('click')
 
     await wrapper.find('[data-test="form"]').trigger('submit')
     await flushPromises()
@@ -314,6 +331,63 @@ describe('Playlist_Settings.vue', () => {
       items: [{ videoId: 11, position: 1 }]
     }))
     expect(callArg.filename).toMatch(/^playlist-\d{6}\.m3u$/)
+  })
+
+  it('opens an available video in the playback dialog', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableRow = findRowByTextAndSelector(wrapper, '[data-test="open-available-video-button"]', 'Video 1')
+    expect(availableRow).toBeTruthy()
+    const openButton = availableRow.find('[data-test="open-available-video-button"]')
+    expect(openButton.attributes('data-icon')).toBe('fa-solid fa-film')
+
+    await openButton.trigger('click')
+    await flushPromises()
+
+    expect(alertStore.clear).toHaveBeenCalled()
+    expect(alertStore.clear.mock.invocationCallOrder[0]).toBeLessThan(videosStore.open.mock.invocationCallOrder[0])
+    expect(videosStore.open).toHaveBeenCalledWith(11)
+    const dialog = wrapper.find('[data-test="video-view-dialog"]')
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.attributes('data-title')).toBe('Video 1')
+    expect(dialog.attributes('data-src')).toBe('http://localhost:8080/api/videos/11/file?playbackToken=token-11')
+
+    await wrapper.find('[data-test="trigger-video-playback-error"]').trigger('click')
+
+    expect(alertStore.error).toHaveBeenCalledWith('Стриминг этого видеофайла не поддерживается браузером.')
+  })
+
+  it('opens a playlist video in the playback dialog', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistRow = findRowByTextAndSelector(wrapper, '[data-test="open-playlist-video-button"]', 'Video 1')
+    expect(playlistRow).toBeTruthy()
+    await playlistRow.find('[data-test="open-playlist-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(videosStore.open).toHaveBeenCalledWith(11)
+    const dialog = wrapper.find('[data-test="video-view-dialog"]')
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.attributes('data-title')).toBe('Video 1')
+    expect(dialog.attributes('data-src')).toBe('http://localhost:8080/api/videos/11/file?playbackToken=token-11')
+  })
+
+  it('shows an alert when opening video preview from playlist settings fails', async () => {
+    videosStore.open = vi.fn().mockRejectedValue(new Error('preview failed'))
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const availableRow = findRowByTextAndSelector(wrapper, '[data-test="open-available-video-button"]', 'Video 1')
+    await availableRow.find('[data-test="open-available-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось открыть видео: preview failed')
+    expect(wrapper.find('[data-test="video-view-dialog"]').exists()).toBe(false)
   })
 
   it('batch-adds selected available videos in list order', async () => {
@@ -631,7 +705,7 @@ describe('Playlist_Settings.vue', () => {
     const videoRows = wrapper.findAll('.playlist-video-row')
     const targetRow = videoRows.find(r => r.text().includes('Video 1'))
     expect(targetRow).toBeTruthy()
-    await targetRow.find('button').trigger('click')
+    await targetRow.find('[data-test="add-video-button"]').trigger('click')
 
     await wrapper.find('[data-test="form"]').trigger('submit')
     await flushPromises()
@@ -656,7 +730,7 @@ describe('Playlist_Settings.vue', () => {
     const videoRows = wrapper.findAll('.playlist-video-row')
     const targetRow = videoRows.find(r => r.text().includes('Video 1'))
     expect(targetRow).toBeTruthy()
-    await targetRow.find('button').trigger('click')
+    await targetRow.find('[data-test="add-video-button"]').trigger('click')
 
     await wrapper.find('[data-test="form"]').trigger('submit')
     await flushPromises()
@@ -1127,7 +1201,7 @@ describe('Playlist_Settings.vue', () => {
     await flushPromises()
 
     const availableRow = wrapper.findAll('.playlist-video-row').find(r => r.text().includes('fallback.mp4'))
-    await availableRow.find('button').trigger('click')
+    await availableRow.find('[data-test="add-video-button"]').trigger('click')
     await flushPromises()
 
     const playlistTable = getPlaylistTable(wrapper)

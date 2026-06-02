@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { reactive, ref, nextTick } from 'vue'
 import VideosList from '@/components/Videos_List.vue'
@@ -36,9 +36,18 @@ const categoriesStore = {
 
 const videosStore = {
   videos: ref([]),
+  videoPreview: ref(null),
   loading: ref(false),
   error: ref(null),
   getAllByAccount: vi.fn(async () => videosStore.videos.value),
+  open: vi.fn(async (id) => {
+    videosStore.videoPreview.value = {
+      id,
+      filename: `video-${id}.mp4`,
+      streamUrl: `http://localhost:8080/api/videos/${id}/file?playbackToken=token-${id}`
+    }
+    return videosStore.videoPreview.value
+  }),
   update: vi.fn(async () => ({})),
   uploadFile: vi.fn(async () => ({})),
   uploadFiles: vi.fn(async () => ({})),
@@ -71,7 +80,7 @@ vi.mock('@/stores/alert.store.js', () => ({ useAlertStore: () => alertStore }))
 vi.mock('@/helpers/confirmation.js', () => ({ useConfirmation: () => confirmation }))
 vi.mock('@/router', () => ({ default: router }))
 vi.mock('@sw-consulting/tooling.ui.kit', () => ({
-  ActionButton: { name: 'ActionButton', props: ['item', 'icon', 'tooltipText', 'disabled'], emits: ['click'], template: '<button :disabled="disabled" @click="$emit(\'click\', item)"><slot /></button>' }
+  ActionButton: { name: 'ActionButton', props: ['item', 'icon', 'tooltipText', 'disabled'], emits: ['click'], template: '<button :data-icon="icon" :data-tooltip="tooltipText" :disabled="disabled" @click="$emit(\'click\', item)"><slot /></button>' }
 }))
 vi.mock('@/helpers/user.helpers.js', () => ({
   isAdministrator: (u) => Array.isArray(u?.roles) && u.roles.includes(1),
@@ -80,6 +89,12 @@ vi.mock('@/helpers/user.helpers.js', () => ({
 }))
 
 const globalStubs = {
+  VideoViewDialog: {
+    name: 'VideoViewDialog',
+    props: ['modelValue', 'video', 'title'],
+    emits: ['update:modelValue', 'playback-error'],
+    template: '<div v-if="modelValue" data-test="video-view-dialog" :data-title="title" :data-src="video && video.streamUrl"><button data-test="trigger-video-playback-error" @click="$emit(\'playback-error\', \'Стриминг этого видеофайла не поддерживается браузером.\')"></button></div>'
+  },
   ModalWindow: {
     name: 'ModalWindow',
     props: ['modelValue', 'title'],
@@ -160,6 +175,7 @@ describe('Videos_List.vue', () => {
     accountsStore.accounts.value = []
     categoriesStore.categories.value = []
     videosStore.videos.value = []
+    videosStore.videoPreview.value = null
     currentUser = { roles: [1], accountIds: [] }
     authStore.user = currentUser
     authStore.videos_per_page = 10
@@ -170,6 +186,14 @@ describe('Videos_List.vue', () => {
     accountsStore.getSubscriptions.mockImplementation(async () => ({ subscriptions: [], availableCategories: [] }))
     categoriesStore.getAll.mockImplementation(async () => categoriesStore.categories.value)
     videosStore.getAllByAccount.mockImplementation(async () => videosStore.videos.value)
+    videosStore.open.mockImplementation(async (id) => {
+      videosStore.videoPreview.value = {
+        id,
+        filename: `video-${id}.mp4`,
+        streamUrl: `http://localhost:8080/api/videos/${id}/file?playbackToken=token-${id}`
+      }
+      return videosStore.videoPreview.value
+    })
     videosStore.update.mockImplementation(async () => ({}))
     videosStore.uploadFile.mockImplementation(async () => ({}))
     videosStore.uploadFiles.mockImplementation(async () => ({}))
@@ -182,6 +206,10 @@ describe('Videos_List.vue', () => {
     confirmation.confirmDelete.mockImplementation(async () => true)
     confirmation.confirmAction.mockImplementation(async () => true)
     router.push.mockClear()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('renders as a top-level list by default', async () => {
@@ -1367,6 +1395,43 @@ describe('Videos_List.vue', () => {
     await flushPromises()
 
     expect(videosStore.remove).toHaveBeenCalledWith(140)
+  })
+
+  it('opens selected video in the playback dialog from the row film button', async () => {
+    videosStore.videos.value = [{ id: 141, title: 'Watchable', accountId: null }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const openButton = wrapper.find('[data-test="open-video-button"]')
+    expect(openButton.attributes('data-icon')).toBe('fa-solid fa-film')
+
+    await openButton.trigger('click')
+    await flushPromises()
+
+    expect(alertStore.clear).toHaveBeenCalled()
+    expect(alertStore.clear.mock.invocationCallOrder[0]).toBeLessThan(videosStore.open.mock.invocationCallOrder[0])
+    expect(videosStore.open).toHaveBeenCalledWith(141)
+    const dialog = wrapper.find('[data-test="video-view-dialog"]')
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.attributes('data-title')).toBe('Watchable')
+    expect(dialog.attributes('data-src')).toBe('http://localhost:8080/api/videos/141/file?playbackToken=token-141')
+
+    await wrapper.find('[data-test="trigger-video-playback-error"]').trigger('click')
+
+    expect(alertStore.error).toHaveBeenCalledWith('Стриминг этого видеофайла не поддерживается браузером.')
+  })
+
+  it('shows an alert when opening video preview fails', async () => {
+    videosStore.videos.value = [{ id: 142, title: 'Broken', accountId: null }]
+    videosStore.open.mockRejectedValueOnce(new Error('preview failed'))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="open-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось открыть видеофайл: preview failed')
+    expect(wrapper.find('[data-test="video-view-dialog"]').exists()).toBe(false)
   })
 
   it('clears the alert when close button is clicked', async () => {

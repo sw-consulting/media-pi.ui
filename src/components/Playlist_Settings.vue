@@ -19,6 +19,7 @@ import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { createAccountOptions } from '@/helpers/account.options.js'
 import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { getVideoCategoryTitle } from '@/helpers/video.scope.helpers.js'
+import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 
 const props = defineProps({
   register: {
@@ -43,6 +44,7 @@ const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(playlistsStore)
+const { videoPreview } = storeToRefs(videosStore)
 
 const playlist = ref({
   title: '',
@@ -70,6 +72,8 @@ const videosLoading = ref(false)
 const selectedAvailableVideoIds = ref([])
 const selectedPlaylistItemKeys = ref([])
 const availableSortBy = ref([])
+const videoDialogOpen = ref(false)
+const videoDialogTitle = ref('')
 let playlistItemUid = 0
 
 const schema = Yup.object().shape({
@@ -100,11 +104,11 @@ const playlistVideoHeaders = [
     width: '140px',
     headerProps: { class: 'playlist-media-info-header' }
   },
-  { title: '', align: 'center', key: 'actions', sortable: false, width: '44px' }
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '140px' }
 ]
 
 const availableVideoHeaders = [
-  { title: '', align: 'center', key: 'actions', sortable: false, width: '44px' },
+  { title: '', align: 'center', key: 'actions', sortable: false, width: '88px' },
   { title: '', align: 'center', key: 'select', sortable: false, width: '44px' },
   { title: 'Название', align: 'start', key: 'title' },
   { ...scopeHeader },
@@ -295,7 +299,34 @@ function createPlaylistItem(videoId, position) {
 }
 
 function getVideoTitle(video) {
-  return video?.title || video?.originalFilename || `Видео #${video?.id}`
+  const id = video?.id ?? video?.videoId
+  return video?.title || video?.originalFilename || `Видео #${id}`
+}
+
+function getVideoId(video) {
+  return video?.id ?? video?.videoId ?? null
+}
+
+function showVideoDialog(item) {
+  videoDialogTitle.value = getVideoTitle(item)
+  videoDialogOpen.value = true
+}
+
+function handleVideoPlaybackError(message) {
+  alertStore.error(message)
+}
+
+async function openVideo(item) {
+  const videoId = getVideoId(item)
+  if (!videoId) return
+
+  alertStore.clear()
+  try {
+    await videosStore.open(videoId)
+    showVideoDialog(item)
+  } catch (err) {
+    alertStore.error(`Не удалось открыть видео: ${err.message || err}`)
+  }
 }
 
 function toSortableMediaNumber(value) {
@@ -622,7 +653,7 @@ async function onSubmit(values) {
         <div class="playlist-column">
           <div class="playlist-column-header header-with-actions">
             <div class="playlist-column-title">
-              <h2 class="secondary-heading">Видео в плейлисте</h2>
+              <h2 class="secondary-heading">Видеофайлы в плейлисте</h2>
             </div>
           </div>
           <div class="playlist-column-controls">
@@ -698,6 +729,14 @@ async function onSubmit(values) {
             <template v-slot:[`item.actions`]="{ item }">
               <div class="playlist-video-actions">
                 <ActionButton
+                  data-test="open-playlist-video-button"
+                  :item="item"
+                  icon="fa-solid fa-film"
+                  tooltip-text="Просмотр видеофайла"
+                  :disabled="isSubmitting || videosStore.loading"
+                  @click="openVideo(item)"
+                />
+                <ActionButton
                   data-test="move-up-button"
                   :item="item"
                   icon="fa-solid fa-chevron-up"
@@ -730,7 +769,7 @@ async function onSubmit(values) {
         <div class="playlist-column">
           <div class="playlist-column-header header-with-actions">
             <div class="playlist-column-title">
-              <h2 class="secondary-heading">Доступные видео</h2>
+              <h2 class="secondary-heading">Доступные видеофайлы</h2>
             </div>
           </div>
           <div class="playlist-column-controls">
@@ -814,14 +853,24 @@ async function onSubmit(values) {
               </div>
             </template>
             <template v-slot:[`item.actions`]="{ item }">
-              <ActionButton
-                data-test="add-video-button"
-                :item="item"
-                icon="fa-solid fa-angle-left"
-                tooltip-text="Добавить в плейлист"
-                :disabled="isSubmitting"
-                @click="addVideoToPlaylist"
-              />
+              <div class="playlist-video-actions">
+                <ActionButton
+                  data-test="add-video-button"
+                  :item="item"
+                  icon="fa-solid fa-angle-left"
+                  tooltip-text="Добавить в плейлист"
+                  :disabled="isSubmitting"
+                  @click="addVideoToPlaylist"
+                />
+                <ActionButton
+                  data-test="open-available-video-button"
+                  :item="item"
+                  icon="fa-solid fa-film"
+                  tooltip-text="Просмотр видеофайла"
+                  :disabled="isSubmitting || videosLoading || videosStore.loading"
+                  @click="openVideo(item)"
+                />
+              </div>
             </template>
           </v-data-table>
         </div>
@@ -839,6 +888,13 @@ async function onSubmit(values) {
       <span class="spinner-border spinner-border-lg align-center"></span>
       <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
+
+    <VideoViewDialog
+      v-model="videoDialogOpen"
+      :video="videoPreview"
+      :title="videoDialogTitle"
+      @playback-error="handleVideoPlaybackError"
+    />
   </div>
 </template>
 
