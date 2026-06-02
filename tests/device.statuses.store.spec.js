@@ -167,10 +167,12 @@ describe('device.statuses.store', () => {
     global.fetch = vi.fn().mockResolvedValueOnce(mockResponse)
 
     const mockAbort = vi.fn()
-    global.AbortController = vi.fn(() => ({
-      signal: { aborted: false },
-      abort: mockAbort
-    }))
+    global.AbortController = vi.fn(function () {
+      return {
+        signal: { aborted: false },
+        abort: mockAbort
+      }
+    })
 
     const store = useDeviceStatusesStore()
     
@@ -293,10 +295,12 @@ describe('device.statuses.store', () => {
     }
 
     global.fetch = vi.fn().mockResolvedValueOnce(mockResponse)
-    global.AbortController = vi.fn(() => ({
-      signal: { aborted: false },
-      abort: vi.fn()
-    }))
+    global.AbortController = vi.fn(function () {
+      return {
+        signal: { aborted: false },
+        abort: vi.fn()
+      }
+    })
 
     const store = useDeviceStatusesStore()
     await store.startStream()
@@ -321,5 +325,4 @@ describe('device.statuses.store', () => {
     expect(store.error).toBe(err)
   })
 })
-
 
