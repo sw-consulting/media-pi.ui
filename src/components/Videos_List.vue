@@ -23,6 +23,7 @@ import { estimateSelectWidth } from '@/helpers/account.options.js'
 import {
   createCategoryOptions,
   createVideoScopeOptions,
+  filterAccessibleCategories,
   getVideoCategoryTitle,
   parseVideoScope
 } from '@/helpers/video.scope.helpers.js'
@@ -73,10 +74,15 @@ const localItemsPerPage = ref(10)
 const localSearch = ref('')
 const localSortBy = ref([])
 const localPage = ref(1)
+const accessibleCategoryIds = ref(new Set())
+
+const accessibleCategories = computed(() => (
+  filterAccessibleCategories(categories.value || [], authStore.user, accessibleCategoryIds.value)
+))
 
 const scopeOptions = computed(() => {
   if (props.fixedScope) return []
-  return createVideoScopeOptions(accounts.value || [], categories.value || [], authStore.user)
+  return createVideoScopeOptions(accounts.value || [], accessibleCategories.value, authStore.user, accessibleCategoryIds.value)
 })
 const selectedScopeInfo = computed(() => parseVideoScope(selectedScope.value))
 const categoryOptions = computed(() => createCategoryOptions(categories.value || []))
@@ -210,9 +216,85 @@ function ensureSelection(options) {
   }
 }
 
+function getAccessibleAccountIds() {
+  if (isAdministrator(authStore.user)) {
+    return (accounts.value || [])
+      .map(account => account?.id)
+      .filter(id => id !== null && id !== undefined && id !== 0)
+  }
+
+  const accountIds = new Set(Array.isArray(authStore.user?.accountIds) ? authStore.user.accountIds : [])
+  for (const account of accounts.value || []) {
+    if (canManageAccountById(authStore.user, account?.id)) {
+      accountIds.add(account.id)
+    }
+  }
+  return Array.from(accountIds).filter(id => id !== null && id !== undefined && id !== 0)
+}
+
+async function loadAccessibleCategoryIds() {
+  accessibleCategoryIds.value = new Set()
+  if (!authStore.user || isAdministrator(authStore.user)) return
+
+  const categoryIds = new Set()
+  for (const accountId of getAccessibleAccountIds()) {
+    const data = await accountsStore.getSubscriptions(accountId)
+    for (const subscription of data?.subscriptions || []) {
+      if (subscription?.categoryId !== null && subscription?.categoryId !== undefined) {
+        categoryIds.add(Number(subscription.categoryId))
+      }
+    }
+  }
+  accessibleCategoryIds.value = categoryIds
+}
+
+function canAccessCommonVideo(video) {
+  if (isAdministrator(authStore.user)) return true
+
+  const categoryId = Number(video?.categoryId || 0)
+  if (!Number.isFinite(categoryId) || categoryId === 0) return true
+
+  return accessibleCategories.value.some(category => Number(category.id) === categoryId)
+}
+
+function uniqueAccessibleVideos(items) {
+  const uniqueById = new Map()
+  for (const item of items || []) {
+    if (!item || !canAccessCommonVideo(item)) continue
+    uniqueById.set(item.id, item)
+  }
+  return Array.from(uniqueById.values())
+}
+
+async function refreshCommonVideos() {
+  if (isAdministrator(authStore.user)) {
+    await videosStore.getAllByAccount(0, {})
+    return
+  }
+
+  const accountIds = getAccessibleAccountIds()
+  if (!accountIds.length) {
+    await videosStore.getAllByAccount(0, {})
+    videos.value = uniqueAccessibleVideos(videos.value || [])
+    return
+  }
+
+  const collected = []
+  for (const accountId of accountIds) {
+    const items = await videosStore.getAllByAccount(0, { availableForAccountId: accountId })
+    collected.push(...(items || []))
+  }
+  videos.value = uniqueAccessibleVideos(collected)
+}
+
 const refreshVideos = async () => {
   try {
     const scope = selectedScopeInfo.value
+    if (scope.type === 'common') {
+      await refreshCommonVideos()
+      return true
+    }
+
     await videosStore.getAllByAccount(
       scope.accountId,
       Object.prototype.hasOwnProperty.call(scope, 'categoryId') && scope.categoryId !== undefined
@@ -246,6 +328,10 @@ onMounted(async () => {
       await accountsStore.getAll()
     }
     await categoriesStore.getAll()
+    await loadAccessibleCategoryIds()
+    if (selectedScope.value !== undefined && selectedScope.value !== null) {
+      await refreshVideos()
+    }
   } catch (err) {
     alertStore.error('Не удалось загрузить справочники видеофайлов: ' + (err?.message || err))
   }

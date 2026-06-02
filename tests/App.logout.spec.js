@@ -195,7 +195,7 @@ describe('App Logout Functionality', () => {
     expect(categoriesLink).toBeTruthy()
   })
 
-  it('should display categories link for managers', async () => {
+  it('should not display categories link for managers', async () => {
     authStore.user = {
       id: 2,
       firstName: 'Jane',
@@ -209,7 +209,7 @@ describe('App Logout Functionality', () => {
 
     const links = wrapper.findAll('a[class="link"]')
     const categoriesLink = links.find(link => link.text() === 'Категории')
-    expect(categoriesLink).toBeTruthy()
+    expect(categoriesLink).toBeUndefined()
   })
 
   it('should not show user name in app bar when logged out', async () => {

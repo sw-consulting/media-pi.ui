@@ -23,7 +23,8 @@ const accountsStore = {
   accounts: ref([]),
   loading: ref(false),
   error: ref(null),
-  getAll: vi.fn(async () => accountsStore.accounts.value)
+  getAll: vi.fn(async () => accountsStore.accounts.value),
+  getSubscriptions: vi.fn(async () => ({ subscriptions: [], availableCategories: [] }))
 }
 
 const categoriesStore = {
@@ -166,6 +167,7 @@ describe('Videos_List.vue', () => {
     authStore.videos_sort_by = []
     authStore.videos_page = 1
     accountsStore.getAll.mockImplementation(async () => accountsStore.accounts.value)
+    accountsStore.getSubscriptions.mockImplementation(async () => ({ subscriptions: [], availableCategories: [] }))
     categoriesStore.getAll.mockImplementation(async () => categoriesStore.categories.value)
     videosStore.getAllByAccount.mockImplementation(async () => videosStore.videos.value)
     videosStore.update.mockImplementation(async () => ({}))
@@ -267,6 +269,76 @@ describe('Videos_List.vue', () => {
         signal: expect.any(AbortSignal)
       }
     )
+  })
+
+  it('filters category scopes for non-admin users but keeps common files without category', async () => {
+    currentUser = { roles: [11], accountIds: [2] }
+    authStore.user = currentUser
+    accountsStore.accounts.value = [{ id: 2, name: 'Managed' }]
+    categoriesStore.categories.value = [
+      { id: 4, title: 'Free', free: true },
+      { id: 5, title: 'Subscribed', free: false },
+      { id: 6, title: 'Hidden', free: false }
+    ]
+    accountsStore.getSubscriptions.mockResolvedValue({
+      subscriptions: [{ categoryId: 5, categoryTitle: 'Subscribed', categoryFree: false }],
+      availableCategories: []
+    })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const optionTexts = wrapper.findAll('select').at(0).findAll('option').map(option => option.text())
+
+    expect(accountsStore.getSubscriptions).toHaveBeenCalledWith(2)
+    expect(optionTexts).toEqual([
+      'Managed',
+      'Общие видеофайлы',
+      '↳ Без категории',
+      '↳ Free',
+      '↳ Subscribed'
+    ])
+    expect(optionTexts).not.toContain('↳ Hidden')
+  })
+
+  it('filters common videos at file level for non-admin users', async () => {
+    currentUser = { roles: [11], accountIds: [2] }
+    authStore.user = currentUser
+    accountsStore.accounts.value = [{ id: 2, name: 'Managed' }]
+    categoriesStore.categories.value = [
+      { id: 4, title: 'Free', free: true },
+      { id: 5, title: 'Subscribed', free: false },
+      { id: 6, title: 'Hidden', free: false }
+    ]
+    accountsStore.getSubscriptions.mockResolvedValue({
+      subscriptions: [{ categoryId: 5, categoryTitle: 'Subscribed', categoryFree: false }],
+      availableCategories: []
+    })
+    videosStore.getAllByAccount.mockImplementation(async (accountId, options = {}) => {
+      const items = accountId === 0 && options.availableForAccountId === 2
+        ? [
+            { id: 10, title: 'No category', accountId: 0, categoryId: 0 },
+            { id: 11, title: 'Free category', accountId: 0, categoryId: 4 },
+            { id: 12, title: 'Subscribed category', accountId: 0, categoryId: 5 },
+            { id: 13, title: 'Hidden category', accountId: 0, categoryId: 6 }
+          ]
+        : []
+      videosStore.videos.value = items
+      return items
+    })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedScope = 'common:all'
+    await nextTick()
+    await flushPromises()
+
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { availableForAccountId: 2 })
+    expect(wrapper.text()).toContain('No category')
+    expect(wrapper.text()).toContain('Free category')
+    expect(wrapper.text()).toContain('Subscribed category')
+    expect(wrapper.text()).not.toContain('Hidden category')
   })
 
   it('shows dash for account-linked video category labels', async () => {
