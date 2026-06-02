@@ -15,6 +15,24 @@ export function createCategoryScope(categoryId) {
   return `category:${categoryId}`
 }
 
+export function isFreeCategory(category) {
+  return category?.free === true || category?.categoryFree === true
+}
+
+export function filterAccessibleCategories(categories, user, accessibleCategoryIds = null) {
+  if (isAdministrator(user)) return categories || []
+  if (accessibleCategoryIds === null || accessibleCategoryIds === undefined) return categories || []
+
+  const rawAllowedIds = accessibleCategoryIds instanceof Set
+    ? Array.from(accessibleCategoryIds)
+    : (Array.isArray(accessibleCategoryIds) ? accessibleCategoryIds : [])
+  const allowedIds = new Set(rawAllowedIds.map(id => Number(id)))
+
+  return (categories || []).filter(category => (
+    isFreeCategory(category) || allowedIds.has(Number(category.id))
+  ))
+}
+
 export function parseVideoScope(value) {
   if (typeof value === 'number') {
     return value === 0
@@ -41,7 +59,7 @@ export function parseVideoScope(value) {
   return { type: 'none', accountId: null, categoryId: undefined }
 }
 
-export function createVideoScopeOptions(accounts, categories, user) {
+export function createVideoScopeOptions(accounts, categories, user, accessibleCategoryIds = null) {
   if (!user) return []
 
   const options = []
@@ -59,7 +77,7 @@ export function createVideoScopeOptions(accounts, categories, user) {
   options.push({ value: COMMON_ALL_SCOPE, title: 'Общие видеофайлы' })
   options.push({ value: CATEGORY_NONE_SCOPE, title: `${CATEGORY_SCOPE_PREFIX}Без категории` })
 
-  for (const category of categories || []) {
+  for (const category of filterAccessibleCategories(categories, user, accessibleCategoryIds)) {
     options.push({
       value: createCategoryScope(category.id),
       title: `${CATEGORY_SCOPE_PREFIX}${category.title || `Категория ${category.id}`}`

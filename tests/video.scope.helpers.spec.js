@@ -7,6 +7,7 @@ import {
   COMMON_ALL_SCOPE,
   createCategoryOptions,
   createVideoScopeOptions,
+  filterAccessibleCategories,
   getCategoryTitle,
   getVideoCategoryTitle,
   parseVideoScope
@@ -53,6 +54,33 @@ describe('video.scope.helpers', () => {
       '↳ Без категории',
       '↳ News'
     ])
+  })
+
+  it('filters named category scopes for non-admin users by free flag and subscriptions', () => {
+    const options = createVideoScopeOptions(
+      [{ id: 2, name: 'Two' }],
+      [
+        { id: 7, title: 'Free', free: true },
+        { id: 8, title: 'Paid allowed', free: false },
+        { id: 9, title: 'Paid denied', free: false }
+      ],
+      { roles: [11], accountIds: [2] },
+      new Set([8])
+    )
+
+    expect(options.map(option => option.value)).toEqual([
+      'account:2',
+      COMMON_ALL_SCOPE,
+      CATEGORY_NONE_SCOPE,
+      'category:7',
+      'category:8'
+    ])
+  })
+
+  it('leaves categories unchanged when access information is not supplied', () => {
+    const categories = [{ id: 9, title: 'News', free: false }]
+
+    expect(filterAccessibleCategories(categories, { roles: [11], accountIds: [2] })).toEqual(categories)
   })
 
   it('parses all supported scope values', () => {
