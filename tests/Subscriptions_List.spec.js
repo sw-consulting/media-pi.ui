@@ -53,9 +53,10 @@ const globalStubs = {
     template: '<input data-test="subscription-search" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
   },
   'v-data-table': {
-    props: ['items', 'headers', 'customFilter', 'itemValue'],
+    props: ['items', 'headers', 'customFilter', 'itemValue', 'noDataText', 'noResultsText'],
     template: `
       <div class="data-table">
+        <div v-if="!items.length" data-test="table-empty">{{ noDataText }}</div>
         <div
           v-for="item in items"
           :key="item.subscriptionRowId"
@@ -133,6 +134,13 @@ describe('Subscriptions_List.vue', () => {
     expect(wrapper.find('[data-test="subscription-start"]').text()).toBe('01.06.2026')
     expect(wrapper.find('[data-test="subscription-end"]').text()).toBe('30.06.2026')
     expect(wrapper.find('[data-test="filter-7"]').text()).toBe('true')
+  })
+
+  it('uses Vuetify empty text for an empty subscription list', async () => {
+    const wrapper = mountList()
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="table-empty"]').text()).toBe('Нет подписок')
   })
 
   it('renders multiple subscriptions for the same category', async () => {

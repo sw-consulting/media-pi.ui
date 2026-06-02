@@ -286,8 +286,8 @@ onBeforeUnmount(() => {
         :items="screenshots"
         :items-length="totalCount"
         :items-per-page-options="itemsPerPageOptions"
-        :loading="isBusy"
-        items-per-page-text="Снимков на странице"
+        items-per-page-text="Фотографий на странице"
+        no-data-text="Нет фотографий"
         page-text="{0}-{1} из {2}"
         item-value="id"
         class="elevation-1"
@@ -325,10 +325,6 @@ onBeforeUnmount(() => {
           {{ formatFileSize(item.fileSizeBytes) }}
         </template>
       </v-data-table-server>
-
-      <div v-if="!isBusy && !screenshots.length" class="text-center m-5">
-        Нет скриншотов
-      </div>
     </v-card>
 
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">

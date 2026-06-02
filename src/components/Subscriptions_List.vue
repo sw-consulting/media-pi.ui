@@ -198,9 +198,10 @@ function cancelPlaylistCleanup() {
         />
       </div>
       <v-data-table
-        v-if="subscriptionRows.length"
         v-model:items-per-page="authStore.subscriptions_per_page"
         items-per-page-text="Подписок на странице"
+        no-data-text="Нет подписок"
+        no-results-text="Подписки не найдены"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
         v-model:page="authStore.subscriptions_page"
@@ -233,9 +234,6 @@ function cancelPlaylistCleanup() {
           </div>
         </template>
       </v-data-table>
-      <div v-if="!subscriptionRows.length" class="text-center m-5">
-        {{ isBusy ? 'Загрузка...' : 'Нет подписок' }}
-      </div>
     </v-card>
 
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">

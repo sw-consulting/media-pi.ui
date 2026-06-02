@@ -672,9 +672,10 @@ watch(videos, (current) => {
         />
       </div>
       <v-data-table
-        v-if="videos?.length"
         v-model:items-per-page="tableItemsPerPage"
         items-per-page-text="Видеофайлов на странице"
+        no-data-text="Нет видеофайлов"
+        no-results-text="Видеофайлы не найдены"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
         v-model:page="tablePage"
@@ -721,9 +722,6 @@ watch(videos, (current) => {
           </div>
         </template>
       </v-data-table>
-      <div v-if="!videos?.length" class="text-center m-5">
-        {{ isBusy ? 'Загрузка...' : 'Нет видеофайлов' }}
-      </div>
     </v-card>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>

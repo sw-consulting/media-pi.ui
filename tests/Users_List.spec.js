@@ -102,12 +102,27 @@ const actionButtonStub = {
   template: '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\', item)"></button>'
 }
 
+const dataTableStub = {
+  name: 'VDataTable',
+  props: ['items', 'noDataText'],
+  template: `
+    <div class="data-table">
+      <div v-if="!items || !items.length" data-test="table-empty">{{ noDataText }}</div>
+    </div>
+  `
+}
+
 const baseMountOptions = {
   global: {
     stubs: {
-      'v-card': true,
-      'v-data-table': true,
-      'v-text-field': true,
+      'v-card': { template: '<div><slot /></div>' },
+      'v-data-table': dataTableStub,
+      VDataTable: dataTableStub,
+      'v-text-field': {
+        props: ['modelValue'],
+        emits: ['update:modelValue'],
+        template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
+      },
       'font-awesome-icon': true,
       'router-link': true,
       ActionButton: actionButtonStub
@@ -160,7 +175,10 @@ describe('Users_List.vue', () => {
   it('handles empty users array', async () => {
     mockUsers.value = []
     const wrapper = mountComponent()
+    await flushPromises()
+
     expect(wrapper.exists()).toBe(true)
+    expect(wrapper.find('[data-test="table-empty"]').text()).toBe('Список пользователей пуст')
     // Reset mock data for other tests
     mockUsers.value = [{ id: 1, firstName: 'John', lastName: 'Doe', patronymic: '', email: 'john@example.com', roles: ['administrator'] }]
   })
