@@ -23,7 +23,7 @@ import { useAccountsStore } from '@/stores/accounts.store.js'
 const accountsStore = useAccountsStore()
 
 const usersStore = useUsersStore()
-const { users, loading, error } = storeToRefs(usersStore)
+const { users, loading } = storeToRefs(usersStore)
 
 const enhancedUsers = computed(() => {
   if (!users.value || !Array.isArray(users.value)) return []
@@ -235,9 +235,6 @@ const headers = [
       </v-data-table>
       <div v-if="!enhancedUsers?.length" class="text-center m-5">Список пользователей пуст</div>
     </v-card>
-    <div v-if="error" class="text-center m-5">
-      <div class="text-danger">Ошибка при загрузке списка пользователей: {{ error }}</div>
-    </div>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}

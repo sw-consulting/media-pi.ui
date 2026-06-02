@@ -19,7 +19,7 @@ const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 
-const { categories, loading, error } = storeToRefs(categoriesStore)
+const { categories, loading } = storeToRefs(categoriesStore)
 const { alert } = storeToRefs(alertStore)
 
 const headers = computed(() => {
@@ -150,9 +150,6 @@ async function deleteCategory(item) {
         {{ loading ? 'Загрузка...' : 'Нет категорий' }}
       </div>
     </v-card>
-    <div v-if="error" class="text-center m-5">
-      <div class="text-danger">Ошибка при загрузке списка категорий: {{ error }}</div>
-    </div>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
