@@ -13,7 +13,9 @@ const routerGo = vi.hoisted(() => vi.fn())
 let authStore
 const accountsStore = {
   account: ref(null),
+  accounts: ref([]),
   loading: ref(false),
+  getAll: vi.fn(),
   getById: vi.fn(),
   getSubscriptions: vi.fn(),
   upsertSubscription: vi.fn()
@@ -104,7 +106,11 @@ describe('Subscription_Settings.vue', () => {
     vi.clearAllMocks()
     authStore = { isAdministrator: true }
     accountsStore.account.value = null
+    accountsStore.accounts.value = []
     accountsStore.loading.value = false
+    accountsStore.getAll = vi.fn().mockImplementation(async () => {
+      accountsStore.accounts.value = []
+    })
     accountsStore.getById = vi.fn().mockImplementation(async (id) => {
       accountsStore.account.value = { id, name: `Account ${id}` }
     })
@@ -151,6 +157,76 @@ describe('Subscription_Settings.vue', () => {
       endDate: '2026-06-30'
     })
     expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('preselects requested category when creating from category subscriptions list', async () => {
+    accountsStore.getSubscriptions = vi.fn().mockResolvedValue({
+      subscriptions: [],
+      availableCategories: [
+        { id: 7, title: 'Premium', free: false },
+        { id: 9, title: 'Sports', free: false }
+      ]
+    })
+
+    const wrapper = mountSettings({
+      register: true,
+      accountId: 3,
+      categoryId: 9,
+      submitValues: {
+        startDate: '2026-06-01',
+        endDate: '2026-06-30'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="save-subscription-settings-button"]').trigger('click')
+    await flushPromises()
+
+    expect(accountsStore.upsertSubscription).toHaveBeenCalledWith(3, 9, {
+      startDate: '2026-06-01',
+      endDate: '2026-06-30'
+    })
+  })
+
+  it('creates category-locked subscription after selecting an account', async () => {
+    accountsStore.accounts.value = [
+      { id: 3, name: 'Account 3' },
+      { id: 4, name: 'Account 4' }
+    ]
+    accountsStore.getAll = vi.fn().mockResolvedValue()
+    accountsStore.getSubscriptions = vi.fn().mockResolvedValue({
+      subscriptions: [],
+      availableCategories: []
+    })
+
+    const wrapper = mountSettings({
+      register: true,
+      accountId: undefined,
+      categoryId: 9,
+      categoryLocked: true,
+      categoryTitle: 'Sports',
+      submitValues: {
+        startDate: '2026-06-01',
+        endDate: '2026-06-30'
+      }
+    })
+    await flushPromises()
+
+    expect(accountsStore.getAll).toHaveBeenCalled()
+    expect(wrapper.find('[data-test="subscription-account-name"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="subscription-category-select"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-test="subscription-category-select"]').text()).toContain('Sports')
+
+    await wrapper.find('[data-test="subscription-account-select"]').setValue('3')
+    await flushPromises()
+    await wrapper.find('[data-test="save-subscription-settings-button"]').trigger('click')
+    await flushPromises()
+
+    expect(accountsStore.getSubscriptions).toHaveBeenCalledWith(3)
+    expect(accountsStore.upsertSubscription).toHaveBeenCalledWith(3, 9, {
+      startDate: '2026-06-01',
+      endDate: '2026-06-30'
+    })
   })
 
   it('disables save when no paid categories are available for creation', async () => {

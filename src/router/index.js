@@ -77,7 +77,30 @@ const router = createRouter({
       path: '/account/:accountId/subscription/create',
       name: 'Создание подписки',
       component: () => import('@/views/Subscription_CreateView.vue'),
-      props: true
+      props: route => {
+        const categoryId = Array.isArray(route.query.categoryId)
+          ? route.query.categoryId[0]
+          : route.query.categoryId
+        return {
+          accountId: route.params.accountId,
+          categoryId
+        }
+      }
+    },
+    {
+      path: '/category/:categoryId/subscription/create',
+      name: 'Создание подписки категории',
+      component: () => import('@/views/Subscription_CreateView.vue'),
+      props: route => {
+        const categoryTitle = Array.isArray(route.query.categoryTitle)
+          ? route.query.categoryTitle[0]
+          : route.query.categoryTitle
+        return {
+          categoryId: route.params.categoryId,
+          categoryLocked: true,
+          categoryTitle
+        }
+      }
     },
     {
       path: '/account/:accountId/subscription/edit/:categoryId',

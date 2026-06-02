@@ -23,11 +23,20 @@ const props = defineProps({
   },
   accountId: {
     type: Number,
-    required: true
+    required: false
   },
   categoryId: {
     type: Number,
     required: false
+  },
+  categoryLocked: {
+    type: Boolean,
+    default: false
+  },
+  categoryTitle: {
+    type: String,
+    required: false,
+    default: ''
   }
 })
 
@@ -35,9 +44,10 @@ const accountsStore = useAccountsStore()
 const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
-const { loading, account } = storeToRefs(accountsStore)
+const { loading, account, accounts } = storeToRefs(accountsStore)
 
 const subscription = ref({ categoryId: props.categoryId || '', startDate: '', endDate: '' })
+const selectedAccountId = ref(props.accountId || '')
 const availableCategories = ref([])
 const currentCategory = ref(null)
 const initialLoading = ref(false)
@@ -63,14 +73,35 @@ const buttonText = computed(() => (isRegister() ? 'Создать' : 'Сохра
 
 const accountName = computed(() => account.value?.name || '')
 
+const hasAccountIdProp = computed(() => props.accountId !== undefined && props.accountId !== null)
+
+const hasFixedAccount = computed(() => (
+  hasAccountIdProp.value && Boolean(props.accountId) && !isNaN(props.accountId)
+))
+
+const isCategoryLocked = computed(() => Boolean(isRegister() && props.categoryLocked && props.categoryId))
+
+const accountOptions = computed(() => (
+  accounts.value || []
+).map(account => ({
+  value: account.id,
+  text: account.name || account.title || `Лицевой счёт ${account.id}`
+})))
+
 const categoryOptions = computed(() => (
-  isRegister()
-    ? availableCategories.value
-    : currentCategory.value ? [currentCategory.value] : []
+  isCategoryLocked.value
+    ? [{ id: props.categoryId, title: props.categoryTitle || `Категория ${props.categoryId}` }]
+    : isRegister()
+      ? availableCategories.value
+      : currentCategory.value ? [currentCategory.value] : []
 ).map(category => ({
   value: category.id,
   text: category.title || `Категория ${category.id}`
 })))
+
+const canSaveSubscription = computed(() => (
+  Boolean(selectedAccountId.value) && categoryOptions.value.length > 0
+))
 
 function isRegister() {
   return props.register
@@ -96,36 +127,79 @@ function resolveEditCategory(row) {
   }
 }
 
-if (!props.accountId || isNaN(props.accountId)) {
+async function loadAccountSubscriptions(accountId) {
+  const data = await accountsStore.getSubscriptions(accountId)
+  const paidAvailable = (data?.availableCategories || []).filter(isPaidCategory)
+
+  if (isRegister()) {
+    availableCategories.value = paidAvailable
+    const requestedCategory = paidAvailable.find(category => category.id === props.categoryId)
+    const firstAvailable = isCategoryLocked.value
+      ? { id: props.categoryId }
+      : requestedCategory || paidAvailable[0]
+    subscription.value = {
+      categoryId: firstAvailable?.id || '',
+      startDate: '',
+      endDate: ''
+    }
+    return data
+  }
+
+  const loadedSubscription = (data?.subscriptions || [])
+    .filter(isPaidCategory)
+    .map(normalizeSubscriptionRow)
+    .find(item => item.categoryId === props.categoryId)
+  if (!loadedSubscription) {
+    throw new Error(`Подписка для категории с ID ${props.categoryId} не найдена`)
+  }
+  currentCategory.value = resolveEditCategory(loadedSubscription)
+  subscription.value = {
+    categoryId: loadedSubscription.categoryId,
+    startDate: loadedSubscription.startDate,
+    endDate: loadedSubscription.endDate
+  }
+  return data
+}
+
+async function onAccountChange() {
+  const accountId = Number(selectedAccountId.value)
+  if (!accountId) {
+    availableCategories.value = []
+    subscription.value = {
+      categoryId: isCategoryLocked.value ? props.categoryId : '',
+      startDate: '',
+      endDate: ''
+    }
+    return
+  }
+
+  initialLoading.value = true
+  try {
+    await loadAccountSubscriptions(accountId)
+  } catch (err) {
+    alertStore.error(`Ошибка загрузки подписки: ${err.message || err}`)
+  } finally {
+    initialLoading.value = false
+  }
+}
+
+if (hasAccountIdProp.value && (!props.accountId || isNaN(props.accountId))) {
   redirectToDefaultRoute()
 } else {
   initialLoading.value = true
   try {
-    await accountsStore.getById(props.accountId)
-    const data = await accountsStore.getSubscriptions(props.accountId)
-    const paidAvailable = (data?.availableCategories || []).filter(isPaidCategory)
-    if (isRegister()) {
-      availableCategories.value = paidAvailable
-      const firstAvailable = paidAvailable[0]
+    if (hasFixedAccount.value) {
+      await accountsStore.getById(props.accountId)
+      await loadAccountSubscriptions(props.accountId)
+    } else if (isRegister()) {
+      await accountsStore.getAll()
       subscription.value = {
-        categoryId: firstAvailable?.id || '',
+        categoryId: isCategoryLocked.value ? props.categoryId : '',
         startDate: '',
         endDate: ''
       }
     } else {
-      const loadedSubscription = (data?.subscriptions || [])
-        .filter(isPaidCategory)
-        .map(normalizeSubscriptionRow)
-        .find(item => item.categoryId === props.categoryId)
-      if (!loadedSubscription) {
-        throw new Error(`Подписка для категории с ID ${props.categoryId} не найдена`)
-      }
-      currentCategory.value = resolveEditCategory(loadedSubscription)
-      subscription.value = {
-        categoryId: loadedSubscription.categoryId,
-        startDate: loadedSubscription.startDate,
-        endDate: loadedSubscription.endDate
-      }
+      redirectToDefaultRoute()
     }
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
@@ -140,9 +214,9 @@ if (!props.accountId || isNaN(props.accountId)) {
   }
 }
 
-async function saveSubscriptionPayload(categoryId, payload, forcePlaylistCleanup = false) {
+async function saveSubscriptionPayload(accountId, categoryId, payload, forcePlaylistCleanup = false) {
   try {
-    await accountsStore.upsertSubscription(props.accountId, categoryId, {
+    await accountsStore.upsertSubscription(accountId, categoryId, {
       ...payload,
       ...(forcePlaylistCleanup ? { forcePlaylistCleanup: true } : {})
     })
@@ -150,14 +224,14 @@ async function saveSubscriptionPayload(categoryId, payload, forcePlaylistCleanup
   } catch (err) {
     if (isPlaylistAccessImpactError(err) && !forcePlaylistCleanup) {
       playlistImpact.value = err.data
-      pendingSubscriptionSave.value = { categoryId, payload }
+      pendingSubscriptionSave.value = { accountId, categoryId, payload }
       playlistImpactDialog.value = true
       return
     }
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
     } else if (err.status === 404) {
-      alertStore.error(`Лицевой счёт с ID ${props.accountId} или категория с ID ${categoryId} не найдены`)
+      alertStore.error(`Лицевой счёт с ID ${accountId} или категория с ID ${categoryId} не найдены`)
     } else if (err.status === 422 || err.status === 400) {
       alertStore.error('Проверьте корректность введённых данных')
     } else {
@@ -167,13 +241,19 @@ async function saveSubscriptionPayload(categoryId, payload, forcePlaylistCleanup
 }
 
 async function onSubmit(values) {
+  const accountId = Number(selectedAccountId.value)
+  if (!accountId) {
+    alertStore.error('Выберите лицевой счёт')
+    return
+  }
+
   const categoryId = Number(subscription.value.categoryId)
   if (!categoryId) {
     alertStore.error('Выберите категорию')
     return
   }
 
-  await saveSubscriptionPayload(categoryId, {
+  await saveSubscriptionPayload(accountId, categoryId, {
     startDate: values.startDate,
     endDate: values.endDate
   })
@@ -184,6 +264,7 @@ async function confirmPlaylistCleanup() {
   subscriptionForceSaving.value = true
   try {
     await saveSubscriptionPayload(
+      pendingSubscriptionSave.value.accountId,
       pendingSubscriptionSave.value.categoryId,
       pendingSubscriptionSave.value.payload,
       true
@@ -218,7 +299,7 @@ function cancelPlaylistCleanup() {
               :icon="faCheckDouble"
               icon-size="2x"
               :tooltip-text="buttonText"
-              :disabled="isSubmitting || !categoryOptions.length"
+              :disabled="isSubmitting || !canSaveSubscription"
               @click="handleSubmit(onSubmit)"
             />
             <ActionButton
@@ -234,7 +315,7 @@ function cancelPlaylistCleanup() {
       </div>
       <hr class="hr" />
 
-      <div class="form-group">
+      <div v-if="hasFixedAccount" class="form-group">
         <label for="accountName" class="label">Лицевой счёт:</label>
         <input
           id="accountName"
@@ -245,6 +326,23 @@ function cancelPlaylistCleanup() {
         />
       </div>
 
+      <div v-else class="form-group">
+        <label for="accountId" class="label">Лицевой счёт:</label>
+        <select
+          id="accountId"
+          v-model="selectedAccountId"
+          data-test="subscription-account-select"
+          class="form-control input"
+          :disabled="isSubmitting"
+          @change="onAccountChange"
+        >
+          <option value="">Выберите лицевой счёт</option>
+          <option v-for="option in accountOptions" :key="option.value" :value="option.value">
+            {{ option.text }}
+          </option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label for="categoryId" class="label">Категория:</label>
         <select
@@ -252,7 +350,7 @@ function cancelPlaylistCleanup() {
           v-model="subscription.categoryId"
           data-test="subscription-category-select"
           class="form-control input"
-          :disabled="!isRegister() || isSubmitting"
+          :disabled="!isRegister() || isCategoryLocked || isSubmitting"
         >
           <option value="">Выберите категорию</option>
           <option v-for="option in categoryOptions" :key="option.value" :value="option.value">

@@ -15,12 +15,27 @@ import { useConfirmation } from '@/helpers/confirmation.js'
 import { formatRuDate } from '@/helpers/date.format.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
+import { canManageAccountById } from '@/helpers/user.helpers.js'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 
 const props = defineProps({
   accountId: {
     type: Number,
-    required: true
+    required: false
+  },
+  categoryId: {
+    type: Number,
+    required: false
+  },
+  categoryTitle: {
+    type: String,
+    required: false,
+    default: ''
+  },
+  mode: {
+    type: String,
+    default: 'account',
+    validator: value => ['account', 'category'].includes(value)
   }
 })
 
@@ -29,22 +44,32 @@ const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 
-const { subscriptions, loading } = storeToRefs(accountsStore)
+const { accounts, subscriptions, loading } = storeToRefs(accountsStore)
 const { alert } = storeToRefs(alertStore)
 
 const playlistImpactDialog = ref(false)
 const playlistImpact = ref(null)
 const pendingDelete = ref(null)
 const deleteSaving = ref(false)
+const categoryRows = ref([])
+const categoryLoading = ref(false)
+
+const isCategoryMode = computed(() => props.mode === 'category')
 
 const headers = computed(() => {
-  const baseHeaders = [
-    { title: 'Категория', align: 'start', key: 'categoryTitle', width: '40%' },
-    { title: 'Начало подписки', align: 'start', key: 'startDateFormatted', width: '25%' },
-    { title: 'Окончание подписки', align: 'start', key: 'endDateFormatted', width: '25%' }
-  ]
+  const baseHeaders = isCategoryMode.value
+    ? [
+        { title: 'Лицевой счёт', align: 'start', key: 'accountName', width: '40%' },
+        { title: 'Начало подписки', align: 'start', key: 'startDateFormatted', width: '25%' },
+        { title: 'Окончание подписки', align: 'start', key: 'endDateFormatted', width: '25%' }
+      ]
+    : [
+        { title: 'Категория', align: 'start', key: 'categoryTitle', width: '40%' },
+        { title: 'Начало подписки', align: 'start', key: 'startDateFormatted', width: '25%' },
+        { title: 'Окончание подписки', align: 'start', key: 'endDateFormatted', width: '25%' }
+      ]
 
-  if (!authStore.isAdministrator) return baseHeaders
+  if (!canManageSubscriptions.value) return baseHeaders
 
   return [
     { title: '', align: 'center', key: 'actions', sortable: false, width: '10%' },
@@ -52,29 +77,41 @@ const headers = computed(() => {
   ]
 })
 
-const subscriptionRows = computed(() => (
+const accountSubscriptionRows = computed(() => (
   subscriptions.value?.subscriptions || []
 ).filter(isPaidCategory).map((item, index) => ({
   ...item,
-  subscriptionRowId: createSubscriptionRowId(item, index),
+  subscriptionRowId: createAccountSubscriptionRowId(item, index),
   categoryTitle: item.categoryTitle || `Категория ${item.categoryId}`,
   startDate: item.startDate || '',
   endDate: item.endDate || '',
   startDateFormatted: formatRuDate(item.startDate),
-  endDateFormatted: formatRuDate(item.endDate)
+  endDateFormatted: formatRuDate(item.endDate),
+  hasSubscription: true
 })))
+
+const subscriptionRows = computed(() => (
+  isCategoryMode.value ? categoryRows.value : accountSubscriptionRows.value
+))
 
 const availableCategories = computed(() => (
   subscriptions.value?.availableCategories || []
 ).filter(isPaidCategory))
 
-const isBusy = computed(() => loading.value || deleteSaving.value)
+const isBusy = computed(() => loading.value || categoryLoading.value || deleteSaving.value)
+const canManageSubscriptions = computed(() => Boolean(authStore.isAdministrator))
 const canCreateSubscription = computed(() => (
-  authStore.isAdministrator && hasSubscriptionCategory.value && !isBusy.value
+  canManageSubscriptions.value
+    && !isBusy.value
+    && (
+      isCategoryMode.value
+        ? Boolean(props.categoryId)
+        : hasSubscriptionCategory.value
+    )
 ))
 
 const hasSubscriptionCategory = computed(() => (
-  availableCategories.value.length > 0 || subscriptionRows.value.length > 0
+  availableCategories.value.length > 0 || accountSubscriptionRows.value.length > 0
 ))
 
 onMounted(refreshSubscriptions)
@@ -83,7 +120,12 @@ function isPaidCategory(category) {
   return category?.free !== true && category?.categoryFree !== true
 }
 
-function createSubscriptionRowId(item, index) {
+function canManageAccountSubscription(accountId) {
+  if (authStore.isAdministrator) return true
+  return canManageAccountById(authStore.user, accountId)
+}
+
+function createAccountSubscriptionRowId(item, index) {
   const identity = item.id ?? item.subscriptionId ?? index
   return [
     identity,
@@ -93,9 +135,81 @@ function createSubscriptionRowId(item, index) {
   ].join(':')
 }
 
+function createCategorySubscriptionRowId(accountId, subscription, index = 0) {
+  return [
+    `account:${accountId}`,
+    `category:${props.categoryId}`,
+    subscription?.id ?? subscription?.subscriptionId ?? index,
+    subscription?.startDate ?? '',
+    subscription?.endDate ?? ''
+  ].join(':')
+}
+
+function getAccountName(account) {
+  return account?.name || account?.title || `Лицевой счёт ${account?.id || ''}`
+}
+
+function normalizeCategoryRow(account, subscription, index = 0) {
+  return {
+    ...(subscription || {}),
+    subscriptionRowId: createCategorySubscriptionRowId(account.id, subscription, index),
+    accountId: account.id,
+    accountName: getAccountName(account),
+    categoryId: props.categoryId,
+    categoryTitle: subscription?.categoryTitle || '',
+    startDate: subscription?.startDate || '',
+    endDate: subscription?.endDate || '',
+    startDateFormatted: subscription ? formatRuDate(subscription.startDate) : '—',
+    endDateFormatted: subscription ? formatRuDate(subscription.endDate) : '—',
+    hasSubscription: Boolean(subscription)
+  }
+}
+
+async function refreshAccountSubscriptions() {
+  if (!props.accountId) return
+  await accountsStore.getSubscriptions(props.accountId)
+}
+
+async function refreshCategorySubscriptions() {
+  if (!props.categoryId) {
+    categoryRows.value = []
+    return
+  }
+
+  categoryLoading.value = true
+  try {
+    await accountsStore.getAll()
+    const accessibleAccounts = (accounts.value || [])
+      .filter(account => account?.id && canManageAccountSubscription(account.id))
+    const rows = []
+
+    for (const account of accessibleAccounts) {
+      const data = await accountsStore.getSubscriptions(account.id)
+      const accountSubscriptions = (data?.subscriptions || [])
+        .filter(isPaidCategory)
+        .filter(item => item.categoryId === props.categoryId)
+
+      accountSubscriptions.forEach((subscription, index) => {
+        rows.push(normalizeCategoryRow(account, subscription, index))
+      })
+    }
+
+    categoryRows.value = rows
+  } catch (err) {
+    categoryRows.value = []
+    alertStore.error('Не удалось загрузить подписки: ' + (err?.message || err))
+  } finally {
+    categoryLoading.value = false
+  }
+}
+
 async function refreshSubscriptions() {
   try {
-    await accountsStore.getSubscriptions(props.accountId)
+    if (isCategoryMode.value) {
+      await refreshCategorySubscriptions()
+    } else {
+      await refreshAccountSubscriptions()
+    }
   } catch (err) {
     alertStore.error('Не удалось загрузить подписки: ' + (err?.message || err))
   }
@@ -107,6 +221,7 @@ function filterSubscriptions(value, query, item) {
   if (!rawSubscription) return false
   const q = query.toLocaleLowerCase()
   return [
+    rawSubscription.accountName,
     rawSubscription.categoryTitle,
     rawSubscription.startDate,
     rawSubscription.endDate,
@@ -116,21 +231,57 @@ function filterSubscriptions(value, query, item) {
 }
 
 function createSubscription() {
+  if (isCategoryMode.value) {
+    if (!canCreateSubscription.value) return
+    router.push({
+      path: `/category/${props.categoryId}/subscription/create`,
+      query: props.categoryTitle ? { categoryTitle: props.categoryTitle } : {}
+    })
+    return
+  }
+
   if (!canCreateSubscription.value) return
   router.push(`/account/${props.accountId}/subscription/create`)
 }
 
+function canEditRowSubscription(item) {
+  return Boolean(
+    item?.hasSubscription
+      && canManageSubscriptions.value
+      && !isBusy.value
+      && (
+        !isCategoryMode.value
+          || canManageAccountSubscription(item.accountId)
+      )
+  )
+}
+
+function canDeleteRowSubscription(item) {
+  return canEditRowSubscription(item)
+}
+
+function getRowAccountId(item) {
+  return isCategoryMode.value ? item?.accountId : props.accountId
+}
+
+function getRowCategoryId(item) {
+  return isCategoryMode.value ? props.categoryId : item?.categoryId
+}
+
 function editSubscription(item) {
-  if (!item || !authStore.isAdministrator) return
-  router.push(`/account/${props.accountId}/subscription/edit/${item.categoryId}`)
+  if (!canEditRowSubscription(item)) return
+  router.push(`/account/${getRowAccountId(item)}/subscription/edit/${getRowCategoryId(item)}`)
 }
 
 async function deleteSubscriptionPayload(item, forcePlaylistCleanup = false) {
   deleteSaving.value = true
   try {
-    await accountsStore.deleteSubscription(props.accountId, item.categoryId, {
+    await accountsStore.deleteSubscription(getRowAccountId(item), getRowCategoryId(item), {
       ...(forcePlaylistCleanup ? { forcePlaylistCleanup: true } : {})
     })
+    if (isCategoryMode.value) {
+      await refreshCategorySubscriptions()
+    }
     playlistImpactDialog.value = false
     pendingDelete.value = null
   } catch (err) {
@@ -147,8 +298,13 @@ async function deleteSubscriptionPayload(item, forcePlaylistCleanup = false) {
 }
 
 async function deleteSubscription(item) {
-  if (!item || !authStore.isAdministrator) return
-  const confirmed = await confirmDelete(item.categoryTitle || `Категория ${item.categoryId}`, 'подписку')
+  if (!canDeleteRowSubscription(item)) return
+  const confirmed = await confirmDelete(
+    isCategoryMode.value
+      ? item.accountName || `Лицевой счёт ${item.accountId}`
+      : item.categoryTitle || `Категория ${item.categoryId}`,
+    'подписку'
+  )
   if (!confirmed) return
   await deleteSubscriptionPayload(item)
 }
@@ -170,7 +326,7 @@ function cancelPlaylistCleanup() {
   <div class="subscriptions-section settings table-3">
     <div class="header-with-actions">
       <h2 class="secondary-heading">Подписки</h2>
-      <div v-if="authStore.isAdministrator" class="header-actions-container">
+      <div v-if="canManageSubscriptions" class="header-actions-container">
         <div v-if="isBusy" class="header-actions header-actions-group">
           <span class="spinner-border spinner-border-m"></span>
         </div>
@@ -213,9 +369,10 @@ function cancelPlaylistCleanup() {
         item-value="subscriptionRowId"
         class="elevation-1"
       >
-        <template v-if="authStore.isAdministrator" v-slot:[`item.actions`]="{ item }">
+        <template v-if="canManageSubscriptions" v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">
             <ActionButton
+              v-if="canEditRowSubscription(item)"
               data-test="edit-subscription-button"
               :item="item"
               icon="fa-solid fa-pen"
@@ -224,6 +381,7 @@ function cancelPlaylistCleanup() {
               @click="editSubscription"
             />
             <ActionButton
+              v-if="canDeleteRowSubscription(item)"
               data-test="delete-subscription-button"
               :item="item"
               icon="fa-solid fa-trash-can"

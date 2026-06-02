@@ -76,7 +76,7 @@ function cancel() {
         color="orange-darken-3"
         variant="text"
         :disabled="saving"
-        @click="$emit('confirm')"
+        @click="confirm"
       >
         <span v-show="saving" class="spinner-border spinner-border-sm mr-1"></span>
         Продолжить

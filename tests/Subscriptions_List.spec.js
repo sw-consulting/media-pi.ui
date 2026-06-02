@@ -11,9 +11,11 @@ const routerPush = vi.hoisted(() => vi.fn())
 
 let authStore
 const accountsStore = {
+  accounts: ref([]),
   subscriptions: ref({ subscriptions: [], availableCategories: [] }),
   loading: ref(false),
   error: ref(null),
+  getAll: vi.fn(),
   getSubscriptions: vi.fn(),
   deleteSubscription: vi.fn()
 }
@@ -65,6 +67,7 @@ const globalStubs = {
           :data-row-id="item.subscriptionRowId"
         >
           <slot name="item.actions" :item="item" />
+          <span v-if="item.accountName" data-test="subscription-account">{{ item.accountName }}</span>
           <span data-test="subscription-category">{{ item.categoryTitle }}</span>
           <span data-test="subscription-start">{{ item.startDateFormatted }}</span>
           <span data-test="subscription-end">{{ item.endDateFormatted }}</span>
@@ -106,8 +109,10 @@ describe('Subscriptions_List.vue', () => {
       subscriptions: [],
       availableCategories: []
     }
+    accountsStore.accounts.value = []
     accountsStore.loading.value = false
     accountsStore.error.value = null
+    accountsStore.getAll = vi.fn(async () => accountsStore.accounts.value)
     accountsStore.getSubscriptions = vi.fn(async () => accountsStore.subscriptions.value)
     accountsStore.deleteSubscription = vi.fn(async () => accountsStore.subscriptions.value)
     alertStore.alert.value = null
@@ -195,6 +200,137 @@ describe('Subscriptions_List.vue', () => {
 
     expect(routerPush).toHaveBeenCalledWith('/account/4/subscription/create')
     expect(routerPush).toHaveBeenCalledWith('/account/4/subscription/edit/7')
+  })
+
+  it('renders category mode as accounts with subscription dates', async () => {
+    accountsStore.accounts.value = [
+      { id: 1, name: 'Cafe' },
+      { id: 2, name: 'Shop' }
+    ]
+    accountsStore.getSubscriptions = vi.fn(async (accountId) => ({
+      subscriptions: accountId === 1
+        ? [
+            {
+              categoryId: 7,
+              categoryTitle: 'Premium',
+              categoryFree: false,
+              startDate: '2026-06-01',
+              endDate: '2026-06-30'
+            },
+            {
+              categoryId: 7,
+              categoryTitle: 'Premium',
+              categoryFree: false,
+              startDate: '2026-07-01',
+              endDate: '2026-07-31'
+            }
+          ]
+        : [],
+      availableCategories: []
+    }))
+
+    const wrapper = mountList({ mode: 'category', categoryId: 7, categoryTitle: 'Premium' })
+    await flushPromises()
+
+    expect(accountsStore.getAll).toHaveBeenCalled()
+    expect(accountsStore.getSubscriptions).toHaveBeenCalledWith(1)
+    expect(accountsStore.getSubscriptions).toHaveBeenCalledWith(2)
+    expect(wrapper.findAll('[data-test="subscription-row"]')).toHaveLength(2)
+    expect(wrapper.findAll('[data-test="subscription-account"]').map(item => item.text())).toEqual(['Cafe', 'Cafe'])
+    expect(wrapper.findAll('[data-test="subscription-start"]').map(item => item.text())).toEqual(['01.06.2026', '01.07.2026'])
+  })
+
+  it('routes category mode row actions using row account and fixed category', async () => {
+    accountsStore.accounts.value = [
+      { id: 1, name: 'Cafe' },
+      { id: 2, name: 'Shop' }
+    ]
+    accountsStore.getSubscriptions = vi.fn(async (accountId) => ({
+      subscriptions: accountId === 1
+        ? [
+            {
+              categoryId: 7,
+              categoryTitle: 'Premium',
+              categoryFree: false,
+              startDate: '2026-06-01',
+              endDate: '2026-06-30'
+            }
+          ]
+        : [],
+      availableCategories: []
+    }))
+
+    const wrapper = mountList({ mode: 'category', categoryId: 7, categoryTitle: 'Premium' })
+    await flushPromises()
+
+    await wrapper.find('[data-test="create-subscription-button"]').trigger('click')
+    await wrapper.find('[data-test="edit-subscription-button"]').trigger('click')
+
+    expect(routerPush).toHaveBeenCalledWith({
+      path: '/category/7/subscription/create',
+      query: { categoryTitle: 'Premium' }
+    })
+    expect(routerPush).toHaveBeenCalledWith('/account/1/subscription/edit/7')
+  })
+
+  it('filters category mode accounts by user access rights', async () => {
+    authStore.isAdministrator = false
+    authStore.user = {
+      roles: [11],
+      accountIds: [2]
+    }
+    accountsStore.accounts.value = [
+      { id: 1, name: 'Cafe' },
+      { id: 2, name: 'Shop' }
+    ]
+    accountsStore.getSubscriptions = vi.fn(async () => ({
+      subscriptions: [
+        {
+          categoryId: 7,
+          categoryTitle: 'Premium',
+          categoryFree: false,
+          startDate: '2026-06-01',
+          endDate: '2026-06-30'
+        }
+      ],
+      availableCategories: []
+    }))
+
+    const wrapper = mountList({ mode: 'category', categoryId: 7 })
+    await flushPromises()
+
+    expect(accountsStore.getSubscriptions).not.toHaveBeenCalledWith(1)
+    expect(accountsStore.getSubscriptions).toHaveBeenCalledWith(2)
+    expect(wrapper.findAll('[data-test="subscription-account"]').map(item => item.text())).toEqual(['Shop'])
+    expect(wrapper.find('[data-test="create-subscription-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="edit-subscription-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="delete-subscription-button"]').exists()).toBe(false)
+  })
+
+  it('deletes category mode subscription by row account and fixed category', async () => {
+    accountsStore.accounts.value = [{ id: 1, name: 'Cafe' }]
+    accountsStore.getSubscriptions = vi.fn(async () => ({
+      subscriptions: [
+        {
+          categoryId: 7,
+          categoryTitle: 'Premium',
+          categoryFree: false,
+          startDate: '2026-06-01',
+          endDate: '2026-06-30'
+        }
+      ],
+      availableCategories: []
+    }))
+    accountsStore.deleteSubscription = vi.fn(async () => ({ subscriptions: [], availableCategories: [] }))
+
+    const wrapper = mountList({ mode: 'category', categoryId: 7 })
+    await flushPromises()
+
+    await wrapper.find('[data-test="delete-subscription-button"]').trigger('click')
+    await flushPromises()
+
+    expect(confirmation.confirmDelete).toHaveBeenCalledWith('Cafe', 'подписку')
+    expect(accountsStore.deleteSubscription).toHaveBeenCalledWith(1, 7, {})
   })
 
   it('hides actions for non-administrators', async () => {

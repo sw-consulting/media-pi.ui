@@ -109,6 +109,14 @@ const mountSettings = (props = {}) => mount({
           fixedScope: String
         },
         template: '<div data-test="category-videos-list" :data-title="title" :data-embedded="embedded ? \'true\' : \'false\'" :data-fixed-scope="fixedScope"></div>'
+      },
+      SubscriptionsList: {
+        props: {
+          mode: String,
+          categoryId: Number,
+          categoryTitle: String
+        },
+        template: '<div data-test="category-subscriptions-list" :data-mode="mode" :data-category-id="categoryId" :data-category-title="categoryTitle"></div>'
       }
     },
     mocks: {
@@ -242,6 +250,50 @@ describe('Category_Settings.vue', () => {
     expect(videosList.attributes('data-subtitle')).toBeUndefined()
     expect(videosList.attributes('data-embedded')).toBe('true')
     expect(videosList.attributes('data-fixed-scope')).toBe('category:9')
+  })
+
+  it('shows category subscriptions for paid categories', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: false }
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9
+    })
+    await flushPromises()
+
+    const subscriptionsList = wrapper.find('[data-test="category-subscriptions-list"]')
+    const subscriptionsSection = wrapper.find('[data-test="category-subscriptions-section"]')
+
+    expect(subscriptionsSection.exists()).toBe(true)
+    expect(subscriptionsSection.isVisible()).toBe(true)
+    expect(subscriptionsList.exists()).toBe(true)
+    expect(subscriptionsList.isVisible()).toBe(true)
+    expect(subscriptionsList.attributes('data-mode')).toBe('category')
+    expect(subscriptionsList.attributes('data-category-id')).toBe('9')
+    expect(subscriptionsList.attributes('data-category-title')).toBe('Existing')
+    expect(wrapper.html().indexOf('data-test="category-videos-list"')).toBeLessThan(
+      wrapper.html().indexOf('data-test="category-subscriptions-section"')
+    )
+  })
+
+  it('hides but keeps category subscriptions mounted when free access is enabled', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: false }
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9
+    })
+    await flushPromises()
+
+    const subscriptionsList = wrapper.find('[data-test="category-subscriptions-list"]')
+    expect(subscriptionsList.exists()).toBe(true)
+    expect(subscriptionsList.isVisible()).toBe(true)
+
+    await wrapper.find('[data-test="category-free-checkbox"]').setValue(true)
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="category-subscriptions-list"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="category-subscriptions-section"]').attributes('style')).toContain('display: none')
   })
 
   it('redirects on 401 or 403 load error', async () => {

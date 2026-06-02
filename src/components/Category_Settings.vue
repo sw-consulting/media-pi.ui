@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import VideosList from '@/components/Videos_List.vue'
+import SubscriptionsList from '@/components/Subscriptions_List.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 import { createCategoryScope } from '@/helpers/video.scope.helpers.js'
 
@@ -232,6 +233,19 @@ function cancelPlaylistCleanup() {
       embedded
       :fixed-scope="createCategoryScope(props.id)"
     />
+
+    <div
+      v-if="!isRegister() && props.id"
+      v-show="!category.free"
+      data-test="category-subscriptions-section"
+      class="mt-8"
+    >
+      <SubscriptionsList
+        mode="category"
+        :category-id="props.id"
+        :category-title="category.title"
+      />
+    </div>
 
     <PlaylistAccessImpactDialog
       v-model="playlistImpactDialog"
