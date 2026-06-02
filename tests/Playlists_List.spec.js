@@ -67,9 +67,10 @@ const globalStubs = {
     template: '<select @change="emitValue"><option v-for="item in items" :key="item.value" :value="item.value">{{ item.title }}</option></select>'
   },
   'v-data-table': {
-    props: ['items'],
+    props: ['items', 'noDataText', 'noResultsText'],
     template: `
       <div class="data-table">
+        <div v-if="!items.length" data-test="table-empty">{{ noDataText }}</div>
         <div v-for="item in items" :key="item.id">
           <slot name="item.totalFileSizeBytes" :item="item" />
           <slot name="item.totalDurationSeconds" :item="item" />
@@ -144,5 +145,6 @@ describe('Playlists_List.vue', () => {
     await flushPromises()
     const btn = wrapper.find('[data-test="create-playlist-button"]')
     expect(btn.attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="table-empty"]').text()).toBe('Нет плейлистов')
   })
 })

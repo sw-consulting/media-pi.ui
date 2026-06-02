@@ -1,19 +1,23 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { ref, nextTick } from 'vue'
+import { reactive, ref, nextTick } from 'vue'
 import VideosList from '@/components/Videos_List.vue'
 
 /* global File, AbortSignal */
 
 let currentUser
 
-const makeAuthStore = () => ({
-  user: currentUser,
+const authStore = reactive({
+  user: null,
   videos_per_page: 10,
   videos_search: '',
   videos_sort_by: [],
   videos_page: 1
 })
+const makeAuthStore = () => {
+  authStore.user = currentUser
+  return authStore
+}
 
 const accountsStore = {
   accounts: ref([]),
@@ -95,7 +99,7 @@ const globalStubs = {
     template: '<select @change="emitValue"><option v-for="item in items" :key="item.value" :value="item.value">{{ item.title }}</option></select>'
   },
   'v-data-table': {
-    props: ['items', 'modelValue', 'showSelect', 'headers'],
+    props: ['items', 'modelValue', 'showSelect', 'headers', 'noDataText', 'noResultsText'],
     emits: ['update:modelValue', 'update:itemsPerPage', 'update:page', 'update:sortBy'],
     computed: {
       hasCategoryColumn() {
@@ -113,6 +117,7 @@ const globalStubs = {
     },
     template: `
       <div class="data-table" :data-show-select="showSelect ? 'true' : 'false'" :data-has-category-column="hasCategoryColumn ? 'true' : 'false'">
+        <div v-if="!items.length" data-test="table-empty">{{ noDataText }}</div>
         <div v-for="item in items" :key="item.id">
           <input
             v-if="showSelect"
@@ -155,6 +160,11 @@ describe('Videos_List.vue', () => {
     categoriesStore.categories.value = []
     videosStore.videos.value = []
     currentUser = { roles: [1], accountIds: [] }
+    authStore.user = currentUser
+    authStore.videos_per_page = 10
+    authStore.videos_search = ''
+    authStore.videos_sort_by = []
+    authStore.videos_page = 1
     accountsStore.getAll.mockImplementation(async () => accountsStore.accounts.value)
     categoriesStore.getAll.mockImplementation(async () => categoriesStore.categories.value)
     videosStore.getAllByAccount.mockImplementation(async () => videosStore.videos.value)
@@ -1057,13 +1067,16 @@ describe('Videos_List.vue', () => {
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
-    wrapper.vm.tableItemsPerPage = 20
     wrapper.vm.tableSearch = 'test'
-    wrapper.vm.tableSortBy = [{ key: 'duration', order: 'desc' }]
-    wrapper.vm.tablePage = 2
+    await wrapper.find('[data-test="trigger-items-per-page"]').trigger('click')
+    await wrapper.find('[data-test="trigger-page"]').trigger('click')
+    await wrapper.find('[data-test="trigger-sort-by"]').trigger('click')
+    await nextTick()
 
-    expect(wrapper.vm.tableItemsPerPage).toBe(20)
+    expect(wrapper.vm.tableItemsPerPage).toBe(5)
     expect(wrapper.vm.tableSearch).toBe('test')
+    expect(wrapper.vm.tableSortBy).toEqual([{ key: 'title', order: 'asc' }])
+    expect(wrapper.vm.tablePage).toBe(2)
   })
 
   it('triggers file upload dialog when upload button is clicked', async () => {
@@ -1133,6 +1146,7 @@ describe('Videos_List.vue', () => {
     await flushPromises()
 
     expect(wrapper.vm.selectedScope).toBeNull()
+    expect(wrapper.find('[data-test="table-empty"]').text()).toBe('Нет видеофайлов')
   })
 
   it('canManageVideo returns false for null or undefined item', async () => {
@@ -1383,6 +1397,11 @@ describe('Videos_List.vue', () => {
 describe('Videos_List.vue - playlist impact and v-model coverage', () => {
   beforeEach(() => {
     currentUser = { id: 1, roles: [1], accountIds: [], isAdministrator: true }
+    authStore.user = currentUser
+    authStore.videos_per_page = 10
+    authStore.videos_search = ''
+    authStore.videos_sort_by = []
+    authStore.videos_page = 1
     videosStore.videos.value = [{ id: 31, title: 'First', accountId: 0, categoryId: 0 }]
     categoriesStore.categories.value = [{ id: 3, title: 'Sports' }, { id: 4, title: 'News' }]
     videosStore.updateCategoryBatch = vi.fn().mockResolvedValue({ requestedCount: 1, updatedIds: [31], failures: [] })

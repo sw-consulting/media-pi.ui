@@ -156,9 +156,10 @@ async function deletePlaylist(item) {
         />
       </div>
       <v-data-table
-        v-if="playlists?.length"
         v-model:items-per-page="authStore.playlists_per_page"
         items-per-page-text="Плейлистов на странице"
+        no-data-text="Нет плейлистов"
+        no-results-text="Плейлисты не найдены"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
         v-model:page="authStore.playlists_page"
@@ -197,9 +198,6 @@ async function deletePlaylist(item) {
           </div>
         </template>
       </v-data-table>
-      <div v-if="!playlists?.length" class="text-center m-5">
-        {{ isBusy ? 'Загрузка...' : 'Нет плейлистов' }}
-      </div>
     </v-card>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>

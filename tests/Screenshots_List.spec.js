@@ -122,10 +122,11 @@ const globalStubs = {
     template: '<div v-if="modelValue" class="v-dialog-stub"><slot /></div>'
   },
   'v-data-table-server': {
-    props: ['items'],
+    props: ['items', 'noDataText'],
     emits: ['update:items-per-page', 'update:page', 'update:sort-by'],
     template: `
       <div class="table-server-stub">
+        <div v-if="!items.length" data-test="table-empty">{{ noDataText }}</div>
         <div v-for="item in items" :key="item.id" class="table-row">
           <slot name="item.actions" :item="item"></slot>
           <slot name="item.time_created" :item="item"></slot>
@@ -428,7 +429,7 @@ describe('Screenshots_List.vue', () => {
     expect(getAllByDevice).toHaveBeenCalledWith(7, { from: null, to: null })
   })
 
-  it('shows "Нет скриншотов" when list is empty and not loading', async () => {
+  it('shows "Нет фотографий" when list is empty and not loading', async () => {
     screenshotsRef.value = []
     totalCountRef.value = 0
 
@@ -438,7 +439,7 @@ describe('Screenshots_List.vue', () => {
     })
 
     await flushPromises()
-    expect(wrapper.text()).toContain('Нет скриншотов')
+    expect(wrapper.find('[data-test="table-empty"]').text()).toBe('Нет фотографий')
   })
 
   it('clears the alert when component is unmounted', async () => {

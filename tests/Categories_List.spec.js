@@ -39,9 +39,10 @@ vi.mock('@sw-consulting/tooling.ui.kit', () => ({
 const globalStubs = {
   'v-card': { template: '<div><slot /></div>' },
   'v-data-table': {
-    props: ['items', 'customFilter'],
+    props: ['items', 'customFilter', 'noDataText', 'noResultsText'],
     template: `
       <div class="data-table">
+        <div v-if="!items.length" data-test="table-empty">{{ noDataText }}</div>
         <div v-for="item in items" :key="item.id" class="data-row">
           <slot name="item.actions" :item="item" />
           <span class="title-cell">{{ item.title }}</span>
@@ -106,6 +107,7 @@ describe('Categories_List.vue', () => {
     await wrapper.find('[data-test="create-category-button"]').trigger('click')
 
     expect(routerPush).toHaveBeenCalledWith('/category/create')
+    expect(wrapper.find('[data-test="table-empty"]').text()).toBe('Нет категорий')
   })
 
   it('routes admin to edit category', async () => {

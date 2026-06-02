@@ -192,9 +192,10 @@ const headers = [
         />
       </div>
       <v-data-table
-        v-if="enhancedUsers?.length"
         v-model:items-per-page="authStore.users_per_page"
         items-per-page-text="Пользователей на странице"
+        no-data-text="Список пользователей пуст"
+        no-results-text="Пользователи не найдены"
         :items-per-page-options="itemsPerPageOptions"
         page-text="{0}-{1} из {2}"
         v-model:page="authStore.users_page"
@@ -233,7 +234,6 @@ const headers = [
           </div>
         </template>
       </v-data-table>
-      <div v-if="!enhancedUsers?.length" class="text-center m-5">Список пользователей пуст</div>
     </v-card>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
