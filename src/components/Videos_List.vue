@@ -17,6 +17,7 @@ import { useConfirmation } from '@/helpers/confirmation.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import ModalWindow from '@/components/ModalWindow.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
+import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
 import { estimateSelectWidth } from '@/helpers/account.options.js'
@@ -50,7 +51,7 @@ const authStore = useAuthStore()
 const alertStore = useAlertStore()
 const { confirmDelete, confirmAction } = useConfirmation()
 
-const { videos, loading } = storeToRefs(videosStore)
+const { videos, loading, videoPreview } = storeToRefs(videosStore)
 const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
 const { loading: categoriesLoading, categories } = storeToRefs(categoriesStore)
 const { alert } = storeToRefs(alertStore)
@@ -70,11 +71,14 @@ const batchCategoryDialog = ref(false)
 const playlistImpactDialog = ref(false)
 const playlistImpact = ref(null)
 const pendingCategoryUpdate = ref(null)
+const videoDialogOpen = ref(false)
+const videoDialogTitle = ref('')
 const localItemsPerPage = ref(10)
 const localSearch = ref('')
 const localSortBy = ref([])
 const localPage = ref(1)
 const accessibleCategoryIds = ref(new Set())
+const accessInfoLoaded = ref(false)
 
 const accessibleCategories = computed(() => (
   filterAccessibleCategories(categories.value || [], authStore.user, accessibleCategoryIds.value)
@@ -233,19 +237,35 @@ function getAccessibleAccountIds() {
 }
 
 async function loadAccessibleCategoryIds() {
+  accessInfoLoaded.value = false
   accessibleCategoryIds.value = new Set()
-  if (!authStore.user || isAdministrator(authStore.user)) return
+  if (!authStore.user || isAdministrator(authStore.user)) {
+    accessInfoLoaded.value = true
+    return
+  }
 
-  const categoryIds = new Set()
-  for (const accountId of getAccessibleAccountIds()) {
-    const data = await accountsStore.getSubscriptions(accountId)
-    for (const subscription of data?.subscriptions || []) {
-      if (subscription?.categoryId !== null && subscription?.categoryId !== undefined) {
-        categoryIds.add(Number(subscription.categoryId))
+  try {
+    const categoryIds = new Set()
+    for (const accountId of getAccessibleAccountIds()) {
+      const data = await accountsStore.getSubscriptions(accountId)
+      for (const subscription of data?.subscriptions || []) {
+        if (subscription?.categoryId !== null && subscription?.categoryId !== undefined) {
+          categoryIds.add(Number(subscription.categoryId))
+        }
       }
     }
+    accessibleCategoryIds.value = categoryIds
+  } catch (err) {
+    // Mark access info as unavailable (distinct from “no subscriptions”) so filters/options don't collapse to free-only.
+    accessibleCategoryIds.value = null
+    throw err
+  } finally {
+    accessInfoLoaded.value = true
   }
-  accessibleCategoryIds.value = categoryIds
+}
+
+function shouldDeferScopeSync() {
+  return !props.fixedScope && authStore.user && !isAdministrator(authStore.user) && !accessInfoLoaded.value
 }
 
 function canAccessCommonVideo(video) {
@@ -308,9 +328,13 @@ const refreshVideos = async () => {
   }
 }
 
-watch(scopeOptions, (options) => ensureSelection(options), { immediate: true })
+watch(scopeOptions, (options) => {
+  if (shouldDeferScopeSync()) return
+  ensureSelection(options)
+}, { immediate: true })
 
 watch(selectedScope, async () => {
+  if (shouldDeferScopeSync()) return
   if (selectedScope.value === undefined || selectedScope.value === null) return
   selectedVideoIds.value = []
   await refreshVideos()
@@ -394,6 +418,30 @@ function canManageVideo(item) {
 
 function videoCategoryTitle(video) {
   return getVideoCategoryTitle(video, categories.value || [])
+}
+
+function getVideoTitle(video) {
+  return video?.title || video?.originalFilename || `Видео #${video?.id}`
+}
+
+function showVideoDialog(item) {
+  videoDialogTitle.value = getVideoTitle(item)
+  videoDialogOpen.value = true
+}
+
+function handleVideoPlaybackError(message) {
+  alertStore.error(message)
+}
+
+async function openVideo(item) {
+  if (!item?.id) return
+  alertStore.clear()
+  try {
+    await videosStore.open(item.id)
+    showVideoDialog(item)
+  } catch (err) {
+    alertStore.error('Не удалось открыть видеофайл: ' + (err?.message || err))
+  }
 }
 
 function editVideo(item) {
@@ -790,6 +838,14 @@ watch(videos, (current) => {
         <template v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">
             <ActionButton
+              data-test="open-video-button"
+              :item="item"
+              icon="fa-solid fa-film"
+              tooltip-text="Просмотр видеофайла"
+              :disabled="isBusy || categorySaving"
+              @click="openVideo(item)"
+            />
+            <ActionButton
               data-test="edit-video-button"
               :item="item"
               icon="fa-solid fa-pen"
@@ -809,6 +865,12 @@ watch(videos, (current) => {
         </template>
       </v-data-table>
     </v-card>
+    <VideoViewDialog
+      v-model="videoDialogOpen"
+      :video="videoPreview"
+      :title="videoDialogTitle"
+      @playback-error="handleVideoPlaybackError"
+    />
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}

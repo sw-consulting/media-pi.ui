@@ -8,9 +8,16 @@ import { apiUrl } from '@/helpers/config.js'
 
 const baseUrl = `${apiUrl}/videos`
 
+function normalizeStreamUrl(url) {
+  if (/^https?:\/\//i.test(url)) return url
+  if (/^https?:\/\//i.test(apiUrl)) return new URL(url, apiUrl).toString()
+  return url
+}
+
 export const useVideosStore = defineStore('videos', () => {
   const videos = ref([])
   const video = ref(null)
+  const videoPreview = ref(null)
   const loading = ref(false)
   const error = ref(null)
 
@@ -72,6 +79,26 @@ export const useVideosStore = defineStore('videos', () => {
     ).catch(err => {
       video.value = null
       throw err
+    })
+  }
+
+  async function open(id) {
+    return handleRequest(async () => {
+      const result = await fetchWrapper.post(`${baseUrl}/${id}/playback-token`)
+      const rawStreamUrl = result?.url || (result?.token
+        ? `${baseUrl}/${id}/file?playbackToken=${encodeURIComponent(result.token)}`
+        : null)
+      if (!rawStreamUrl) throw new Error('Не удалось получить ссылку на видеофайл')
+
+      const currentVideo = video.value?.id === id ? video.value : null
+      const listedVideo = (videos.value || []).find(item => item?.id === id)
+      videoPreview.value = {
+        id,
+        filename: result?.filename || result?.title || currentVideo?.originalFilename || currentVideo?.title || listedVideo?.originalFilename || listedVideo?.title || `video-${id}`,
+        streamUrl: normalizeStreamUrl(rawStreamUrl),
+        expiresAt: result?.expiresAt || null
+      }
+      return videoPreview.value
     })
   }
 
@@ -214,10 +241,12 @@ export const useVideosStore = defineStore('videos', () => {
   return {
     videos,
     video,
+    videoPreview,
     loading,
     error,
     getAll,
     getById,
+    open,
     update,
     remove,
     removeBatch,

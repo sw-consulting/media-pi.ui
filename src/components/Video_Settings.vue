@@ -20,6 +20,7 @@ import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { createCategoryOptions } from '@/helpers/video.scope.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
+import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 
 const props = defineProps({
   id: {
@@ -34,7 +35,7 @@ const categoriesStore = useCategoriesStore()
 const alertStore = useAlertStore()
 const authStore = useAuthStore()
 const { alert } = storeToRefs(alertStore)
-const { loading, video: loadedVideo } = storeToRefs(videosStore)
+const { loading, video: loadedVideo, videoPreview } = storeToRefs(videosStore)
 const { account } = storeToRefs(accountsStore)
 const { categories } = storeToRefs(categoriesStore)
 
@@ -49,6 +50,8 @@ const playlistImpactDialog = ref(false)
 const playlistImpact = ref(null)
 const pendingVideoPayload = ref(null)
 const forceSaving = ref(false)
+const videoDialogOpen = ref(false)
+const videoDialogTitle = ref('')
 const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'
 
@@ -148,6 +151,34 @@ async function onSubmit(values) {
   await saveVideoPayload(payload)
 }
 
+function getVideoTitle(item) {
+  return item?.title || item?.originalFilename || `Видео #${item?.id || props.id}`
+}
+
+function showVideoDialog() {
+  videoDialogTitle.value = getVideoTitle(video.value)
+  videoDialogOpen.value = true
+}
+
+function handleVideoPlaybackError(message) {
+  alertStore.error(message)
+}
+
+async function openVideo() {
+  if (!video.value?.id) return
+  alertStore.clear()
+  try {
+    await videosStore.open(video.value.id)
+    showVideoDialog()
+  } catch (err) {
+    if (err.status === 401 || err.status === 403) {
+      redirectToDefaultRoute()
+      return
+    }
+    alertStore.error(`Ошибка открытия видеофайла: ${err.message || err}`)
+  }
+}
+
 async function confirmPlaylistCleanup() {
   if (!pendingVideoPayload.value) return
   forceSaving.value = true
@@ -177,6 +208,15 @@ function cancelPlaylistCleanup() {
         <h1 class="primary-heading">Настройки видеофайла</h1>
         <div class="header-actions-container">
           <div class="header-actions header-actions-group">
+            <ActionButton
+              data-test="open-video-button"
+              :item="{}"
+              icon="fa-solid fa-film"
+              icon-size="2x"
+              tooltip-text="Просмотр видеофайла"
+              :disabled="isSubmitting || loading || initialLoading || !video.id"
+              @click="openVideo"
+            />
             <ActionButton
               data-test="save-video-button"
               :item="{}"
@@ -282,6 +322,12 @@ function cancelPlaylistCleanup() {
       :saving="forceSaving"
       @confirm="confirmPlaylistCleanup"
       @cancel="cancelPlaylistCleanup"
+    />
+    <VideoViewDialog
+      v-model="videoDialogOpen"
+      :video="videoPreview"
+      :title="videoDialogTitle"
+      @playback-error="handleVideoPlaybackError"
     />
   </div>
 </template>

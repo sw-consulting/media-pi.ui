@@ -12,8 +12,10 @@ const routerGo = vi.hoisted(() => vi.fn())
 
 const videosStore = {
   video: ref(null),
+  videoPreview: ref(null),
   loading: ref(false),
   getById: vi.fn(),
+  open: vi.fn(),
   update: vi.fn()
 }
 
@@ -123,6 +125,12 @@ const mountSettings = (props = {}) => mount({
         props: ['modelValue', 'title'],
         emits: ['confirm', 'cancel', 'update:modelValue']
       },
+      VideoViewDialog: {
+        name: 'VideoViewDialog',
+        props: ['modelValue', 'video', 'title'],
+        emits: ['update:modelValue', 'playback-error'],
+        template: '<div v-if="modelValue" data-test="video-view-dialog" :data-title="title" :data-src="video && video.streamUrl"><button data-test="trigger-video-playback-error" @click="$emit(\'playback-error\', \'Стриминг этого видеофайла не поддерживается браузером.\')"></button></div>'
+      },
       'v-btn': {
         template: '<button v-bind="$attrs"><slot /></button>'
       }
@@ -146,6 +154,15 @@ describe('Video_Settings.vue', () => {
     }
     videosStore.loading.value = false
     videosStore.getById = vi.fn().mockResolvedValue()
+    videosStore.videoPreview.value = null
+    videosStore.open = vi.fn(async (id) => {
+      videosStore.videoPreview.value = {
+        id,
+        filename: `video-${id}.mp4`,
+        streamUrl: `http://localhost:8080/api/videos/${id}/file?playbackToken=token-${id}`
+      }
+      return videosStore.videoPreview.value
+    })
     videosStore.update = vi.fn().mockResolvedValue()
     accountsStore.account.value = null
     accountsStore.getById = vi.fn().mockImplementation(async (id) => {
@@ -284,9 +301,12 @@ describe('Video_Settings.vue', () => {
     const wrapper = mountSettings()
     await flushPromises()
 
+    const openButton = wrapper.find('[data-test="open-video-button"]')
     const saveButton = wrapper.find('[data-test="save-video-button"]')
     const cancelButton = wrapper.find('[data-test="cancel-video-button"]')
 
+    expect(openButton.attributes('data-icon')).toBe('fa-solid fa-film')
+    expect(openButton.attributes('data-icon-size')).toBe('2x')
     expect(saveButton.attributes('data-icon')).toBe('fa-solid fa-check-double')
     expect(saveButton.attributes('data-icon-size')).toBe('2x')
     expect(cancelButton.attributes('data-icon')).toBe('fa-solid fa-xmark')
@@ -299,6 +319,38 @@ describe('Video_Settings.vue', () => {
     await cancelButton.trigger('click')
 
     expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('opens current video in playback dialog from the header film button', async () => {
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    await wrapper.find('[data-test="open-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.clear).toHaveBeenCalled()
+    expect(alertStore.clear.mock.invocationCallOrder[0]).toBeLessThan(videosStore.open.mock.invocationCallOrder[0])
+    expect(videosStore.open).toHaveBeenCalledWith(10)
+    const dialog = wrapper.find('[data-test="video-view-dialog"]')
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.attributes('data-title')).toBe('Clip')
+    expect(dialog.attributes('data-src')).toBe('http://localhost:8080/api/videos/10/file?playbackToken=token-10')
+
+    await wrapper.find('[data-test="trigger-video-playback-error"]').trigger('click')
+
+    expect(alertStore.error).toHaveBeenCalledWith('Стриминг этого видеофайла не поддерживается браузером.')
+  })
+
+  it('shows an alert when opening current video fails', async () => {
+    videosStore.open = vi.fn().mockRejectedValue(new Error('preview failed'))
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    await wrapper.find('[data-test="open-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Ошибка открытия видеофайла: preview failed')
+    expect(wrapper.find('[data-test="video-view-dialog"]').exists()).toBe(false)
   })
 
   it('calls alertStore.clear when alert close button is clicked', async () => {

@@ -40,6 +40,7 @@ describe('videos.store', () => {
 
   afterEach(() => {
     global.FormData = originalFormData
+    vi.unstubAllGlobals()
   })
 
   it('getAll loads videos', async () => {
@@ -82,6 +83,65 @@ describe('videos.store', () => {
     await expect(store.getById(1)).rejects.toThrow('not found')
     expect(store.video).toBeNull()
     expect(store.error).toBe(error)
+  })
+
+  it('open requests playback token and stores stream url', async () => {
+    fetchWrapper.post.mockResolvedValueOnce({
+      token: 'token-11',
+      expiresAt: '2026-06-02T11:00:00Z',
+      url: '/api/videos/11/file?playbackToken=token-11'
+    })
+
+    const store = useVideosStore()
+    const result = await store.open(11)
+
+    expect(fetchWrapper.post).toHaveBeenCalledWith(expect.stringContaining('/videos/11/playback-token'))
+    expect(result).toEqual({
+      id: 11,
+      filename: 'video-11',
+      streamUrl: 'http://localhost:8080/api/videos/11/file?playbackToken=token-11',
+      expiresAt: '2026-06-02T11:00:00Z'
+    })
+    expect(store.videoPreview).toEqual(result)
+    expect(store.loading).toBe(false)
+    expect(store.error).toBeNull()
+  })
+
+  it('open builds stream url from token when response has no url', async () => {
+    fetchWrapper.post.mockResolvedValueOnce({
+      token: 'fallback-token',
+      expiresAt: '2026-06-02T12:00:00Z'
+    })
+
+    const store = useVideosStore()
+    const result = await store.open(12)
+
+    expect(result.filename).toBe('video-12')
+    expect(result.streamUrl).toBe('http://localhost:8080/api/videos/12/file?playbackToken=fallback-token')
+  })
+
+  it('open uses loaded video original filename as filename fallback', async () => {
+    fetchWrapper.post.mockResolvedValueOnce({
+      token: 'title-token',
+      url: '/api/videos/1/file?playbackToken=title-token'
+    })
+
+    const store = useVideosStore()
+    store.video = { id: 1, title: 'Clip title', originalFilename: 'clip.mp4' }
+    const result = await store.open(1)
+
+    expect(result.filename).toBe('clip.mp4')
+  })
+
+  it('open sets error state and rethrows when preview loading fails', async () => {
+    const error = new Error('preview failed')
+    fetchWrapper.post.mockRejectedValueOnce(error)
+
+    const store = useVideosStore()
+
+    await expect(store.open(13)).rejects.toThrow('preview failed')
+    expect(store.error).toBe(error)
+    expect(store.loading).toBe(false)
   })
 
   it('update puts data and refreshes list', async () => {
