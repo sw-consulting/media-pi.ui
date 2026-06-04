@@ -45,6 +45,7 @@ const schema = Yup.object().shape({
 })
 
 const category = ref({ title: '', free: true })
+const createdCategoryId = ref(null)
 const initialLoading = ref(false)
 const playlistImpactDialog = ref(false)
 const playlistImpact = ref(null)
@@ -55,9 +56,17 @@ const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'
 let beforeEmbeddedActionHandler = async () => true
 const categoryTitleText = computed(() => (
-  isRegister()
+  isCreatingNewCategory()
     ? 'Новая категория'
     : 'Настройки категории'
+))
+const activeCategoryId = computed(() => props.id || createdCategoryId.value)
+const categoryVideosScope = computed(() => (
+  activeCategoryId.value ? createCategoryScope(activeCategoryId.value) : null
+))
+const isPendingCategoryVideosScope = computed(() => !activeCategoryId.value)
+const showCategoryVideosList = computed(() => (
+  authStore.isAdministrator && (isRegister() || Boolean(activeCategoryId.value))
 ))
 
 function isRegister() {
@@ -65,7 +74,35 @@ function isRegister() {
 }
 
 function getButton() {
-  return isRegister() ? 'Создать' : 'Сохранить'
+  return isCreatingNewCategory() ? 'Создать' : 'Сохранить'
+}
+
+function isCreatingNewCategory() {
+  return isRegister() && !activeCategoryId.value
+}
+
+function normalizeCategoryId(value) {
+  const id = Number(value)
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
+function getStoredCategories() {
+  const items = categoriesStore.categories
+  if (Array.isArray(items)) return items
+  if (Array.isArray(items?.value)) return items.value
+  return []
+}
+
+function resolveCreatedCategoryId(createdCategory, payload) {
+  const directId = normalizeCategoryId(createdCategory?.id)
+    || normalizeCategoryId(createdCategory?.categoryId)
+    || normalizeCategoryId(createdCategory?.category?.id)
+  if (directId) return directId
+
+  const matchingCategory = getStoredCategories().find(item => (
+    item?.title === payload.title && item?.free === payload.free
+  ))
+  return normalizeCategoryId(matchingCategory?.id)
 }
 
 if (!isRegister()) {
@@ -120,12 +157,19 @@ async function beforeEmbeddedListAction() {
 
 async function saveCategoryPayload(payload, forcePlaylistCleanup = false, navigate = true) {
   try {
-    if (isRegister()) {
-      await categoriesStore.create(payload)
+    if (isCreatingNewCategory()) {
+      const createdCategory = await categoriesStore.create(payload)
+      const savedCategoryId = resolveCreatedCategoryId(createdCategory, payload)
+      if (savedCategoryId) {
+        createdCategoryId.value = savedCategoryId
+      } else if (!navigate) {
+        alertStore.error('Категория создана, но не удалось определить её ID для загрузки видеофайлов')
+        return false
+      }
     } else {
       const updatePayload = { ...payload }
       if (forcePlaylistCleanup) updatePayload.forcePlaylistCleanup = true
-      await categoriesStore.update(props.id, updatePayload)
+      await categoriesStore.update(activeCategoryId.value, updatePayload)
     }
     category.value = { ...category.value, title: payload.title, free: payload.free }
     playlistImpactDialog.value = false
@@ -147,13 +191,13 @@ async function saveCategoryPayload(payload, forcePlaylistCleanup = false, naviga
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
     } else if (err.status === 404) {
-      alertStore.error(`Категория с ID ${props.id} не найдена`)
+      alertStore.error(`Категория с ID ${activeCategoryId.value || props.id} не найдена`)
     } else if (err.status === 409) {
       alertStore.error('Категория с таким названием уже существует или используется')
     } else if (err.status === 422) {
       alertStore.error('Проверьте корректность введённых данных')
     } else {
-      alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} категории: ${err.message || err}`)
+      alertStore.error(`Ошибка при ${isCreatingNewCategory() ? 'создании' : 'обновлении'} категории: ${err.message || err}`)
     }
     return false
   }
@@ -168,12 +212,12 @@ async function onSubmit(values) {
 }
 
 async function saveBeforeEmbeddedAction(values) {
-  if (isRegister()) return false
   const payload = {
     title: values.title.trim(),
     free: category.value.free
   }
-  return saveCategoryPayload(payload, false, false)
+  const saved = await saveCategoryPayload(payload, false, false)
+  return saved && Boolean(activeCategoryId.value)
 }
 
 async function confirmPlaylistCleanup() {
@@ -268,11 +312,12 @@ function cancelPlaylistCleanup() {
     </Form>
 
     <VideosList
-      v-if="!isRegister() && props.id"
+      v-if="showCategoryVideosList"
       class="mt-8"
       title="Видеофайлы"
       embedded
-      :fixed-scope="createCategoryScope(props.id)"
+      :fixed-scope="categoryVideosScope"
+      :pending-fixed-scope="isPendingCategoryVideosScope"
       :before-embedded-action="beforeEmbeddedListAction"
     />
 
