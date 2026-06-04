@@ -207,6 +207,13 @@ function cancelPlaylistCleanup() {
       <div class="header-with-actions">
         <h1 class="primary-heading">Настройки видеофайла</h1>
         <div class="header-actions-container">
+          <div
+            v-if="loading || initialLoading || forceSaving"
+            class="header-actions header-actions-group"
+            data-test="settings-loading-indicator"
+          >
+            <span class="spinner-border spinner-border-m"></span>
+          </div>
           <div class="header-actions header-actions-group">
             <ActionButton
               data-test="open-video-button"
@@ -309,11 +316,6 @@ function cancelPlaylistCleanup() {
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
-    </div>
-
-    <div v-if="loading || initialLoading" class="text-center m-5">
-      <span class="spinner-border spinner-border-lg align-center"></span>
-      <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
 
     <PlaylistAccessImpactDialog

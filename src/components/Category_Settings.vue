@@ -49,9 +49,11 @@ const initialLoading = ref(false)
 const playlistImpactDialog = ref(false)
 const playlistImpact = ref(null)
 const pendingCategoryPayload = ref(null)
+const pendingCategoryNavigate = ref(true)
 const categoryForceSaving = ref(false)
 const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'
+let beforeEmbeddedActionHandler = async () => true
 const categoryTitleText = computed(() => (
   isRegister()
     ? 'Новая категория'
@@ -95,7 +97,28 @@ if (!isRegister()) {
   }
 }
 
-async function saveCategoryPayload(payload, forcePlaylistCleanup = false) {
+function runSubmitHandler(handleSubmit, submit) {
+  const submitResult = handleSubmit(submit)
+  return typeof submitResult === 'function' ? submitResult() : submitResult
+}
+
+function captureEmbeddedActionHandler(handleSubmit) {
+  beforeEmbeddedActionHandler = async () => {
+    let submitted = false
+    const result = await runSubmitHandler(handleSubmit, async (values) => {
+      submitted = true
+      return saveBeforeEmbeddedAction(values)
+    })
+    return submitted && result !== false
+  }
+  return true
+}
+
+async function beforeEmbeddedListAction() {
+  return beforeEmbeddedActionHandler()
+}
+
+async function saveCategoryPayload(payload, forcePlaylistCleanup = false, navigate = true) {
   try {
     if (isRegister()) {
       await categoriesStore.create(payload)
@@ -104,13 +127,22 @@ async function saveCategoryPayload(payload, forcePlaylistCleanup = false) {
       if (forcePlaylistCleanup) updatePayload.forcePlaylistCleanup = true
       await categoriesStore.update(props.id, updatePayload)
     }
-    router.go(-1)
+    category.value = { ...category.value, title: payload.title, free: payload.free }
+    playlistImpactDialog.value = false
+    playlistImpact.value = null
+    pendingCategoryPayload.value = null
+    pendingCategoryNavigate.value = true
+    if (navigate) {
+      router.go(-1)
+    }
+    return true
   } catch (err) {
     if (isPlaylistAccessImpactError(err) && !forcePlaylistCleanup) {
       playlistImpact.value = err.data
       pendingCategoryPayload.value = payload
+      pendingCategoryNavigate.value = navigate
       playlistImpactDialog.value = true
-      return
+      return false
     }
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
@@ -123,6 +155,7 @@ async function saveCategoryPayload(payload, forcePlaylistCleanup = false) {
     } else {
       alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} категории: ${err.message || err}`)
     }
+    return false
   }
 }
 
@@ -134,11 +167,20 @@ async function onSubmit(values) {
   await saveCategoryPayload(payload)
 }
 
+async function saveBeforeEmbeddedAction(values) {
+  if (isRegister()) return false
+  const payload = {
+    title: values.title.trim(),
+    free: category.value.free
+  }
+  return saveCategoryPayload(payload, false, false)
+}
+
 async function confirmPlaylistCleanup() {
   if (!pendingCategoryPayload.value) return
   categoryForceSaving.value = true
   try {
-    await saveCategoryPayload(pendingCategoryPayload.value, true)
+    await saveCategoryPayload(pendingCategoryPayload.value, true, pendingCategoryNavigate.value)
   } finally {
     categoryForceSaving.value = false
   }
@@ -148,6 +190,7 @@ function cancelPlaylistCleanup() {
   if (categoryForceSaving.value) return
   playlistImpactDialog.value = false
   pendingCategoryPayload.value = null
+  pendingCategoryNavigate.value = true
 }
 </script>
 
@@ -162,6 +205,13 @@ function cancelPlaylistCleanup() {
       <div class="header-with-actions">
         <h1 class="primary-heading">{{ categoryTitleText }}</h1>
         <div class="header-actions-container">
+          <div
+            v-if="loading || initialLoading || categoryForceSaving"
+            class="header-actions header-actions-group"
+            data-test="settings-loading-indicator"
+          >
+            <span class="spinner-border spinner-border-m"></span>
+          </div>
           <div class="header-actions header-actions-group">
             <ActionButton
               data-test="save-category-button"
@@ -214,17 +264,8 @@ function cancelPlaylistCleanup() {
       </div>
 
       <div v-if="errors.title" class="alert alert-danger mt-3 mb-0">{{ errors.title }}</div>
+      <template v-if="captureEmbeddedActionHandler(handleSubmit)"></template>
     </Form>
-
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
-
-    <div v-if="loading || initialLoading" class="text-center m-5">
-      <span class="spinner-border spinner-border-lg align-center"></span>
-      <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
-    </div>
 
     <VideosList
       v-if="!isRegister() && props.id"
@@ -232,6 +273,7 @@ function cancelPlaylistCleanup() {
       title="Видеофайлы"
       embedded
       :fixed-scope="createCategoryScope(props.id)"
+      :before-embedded-action="beforeEmbeddedListAction"
     />
 
     <div
@@ -244,7 +286,14 @@ function cancelPlaylistCleanup() {
         mode="category"
         :category-id="props.id"
         :category-title="category.title"
+        embedded
+        :before-embedded-action="beforeEmbeddedListAction"
       />
+    </div>
+
+    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
+      {{ alert.message }}
     </div>
 
     <PlaylistAccessImpactDialog

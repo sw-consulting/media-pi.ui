@@ -228,6 +228,8 @@ describe('Videos_List.vue', () => {
   })
 
   it('renders embedded mode as a subordinate subsection', async () => {
+    alertStore.alert.value = { message: 'Video alert', type: 'alert-danger' }
+
     const wrapper = mount(VideosList, {
       props: {
         title: 'Видеофайлы',
@@ -250,6 +252,122 @@ describe('Videos_List.vue', () => {
     expect(wrapper.find('hr.hr').exists()).toBe(false)
     expect(wrapper.find('.videos-list-subsection-divider').exists()).toBe(true)
     expect(wrapper.find('.videos-list-card-embedded').exists()).toBe(true)
+    expect(wrapper.find('.alert-dismissable').exists()).toBe(false)
+  })
+
+  it('runs the embedded action hook before editing a video', async () => {
+    videosStore.videos.value = [{ id: 3, title: 'Clip', accountId: 0, categoryId: 9 }]
+    const beforeEmbeddedAction = vi.fn(async () => false)
+
+    const wrapper = mount(VideosList, {
+      props: {
+        embedded: true,
+        fixedScope: 'category:9',
+        beforeEmbeddedAction
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(router.push).not.toHaveBeenCalled()
+  })
+
+  it('runs the embedded action hook before deleting a video', async () => {
+    videosStore.videos.value = [{ id: 4, title: 'Clip', accountId: 0, categoryId: 9 }]
+    const beforeEmbeddedAction = vi.fn(async () => false)
+
+    const wrapper = mount(VideosList, {
+      props: {
+        embedded: true,
+        fixedScope: 'category:9',
+        beforeEmbeddedAction
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="delete-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(confirmation.confirmDelete).not.toHaveBeenCalled()
+    expect(videosStore.remove).not.toHaveBeenCalled()
+  })
+
+  it('runs the embedded action hook before opening the upload picker', async () => {
+    const beforeEmbeddedAction = vi.fn(async () => false)
+
+    const wrapper = mount(VideosList, {
+      props: {
+        embedded: true,
+        fixedScope: 'category:9',
+        beforeEmbeddedAction
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    const fileInput = wrapper.find('input[type="file"]').element
+    fileInput.click = vi.fn()
+
+    await wrapper.find('[data-test="upload-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(fileInput.click).not.toHaveBeenCalled()
+  })
+
+  it('runs the embedded action hook before opening batch category dialog', async () => {
+    videosStore.videos.value = [{ id: 5, title: 'Clip', accountId: 0, categoryId: 9 }]
+    const beforeEmbeddedAction = vi.fn(async () => false)
+
+    const wrapper = mount(VideosList, {
+      props: {
+        embedded: true,
+        fixedScope: 'category:9',
+        beforeEmbeddedAction
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [5]
+    await nextTick()
+
+    await wrapper.find('[data-test="batch-category-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(wrapper.vm.batchCategoryDialog).toBe(false)
+  })
+
+  it('runs the embedded action hook before batch deleting videos', async () => {
+    videosStore.videos.value = [{ id: 6, title: 'Clip', accountId: 0, categoryId: 9 }]
+    const beforeEmbeddedAction = vi.fn(async () => false)
+
+    const wrapper = mount(VideosList, {
+      props: {
+        embedded: true,
+        fixedScope: 'category:9',
+        beforeEmbeddedAction
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [6]
+    await nextTick()
+
+    await wrapper.find('[data-test="batch-delete-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(confirmation.confirmAction).not.toHaveBeenCalled()
+    expect(videosStore.removeBatch).not.toHaveBeenCalled()
   })
 
   it('loads videos for default and changed account selection', async () => {

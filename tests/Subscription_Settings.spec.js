@@ -159,6 +159,20 @@ describe('Subscription_Settings.vue', () => {
     expect(routerGo).toHaveBeenCalledWith(-1)
   })
 
+  it('shows store loading as a header action indicator', async () => {
+    accountsStore.loading.value = true
+
+    const wrapper = mountSettings({
+      register: true,
+      accountId: 3
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="settings-loading-indicator"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="settings-loading-indicator"] .spinner-border-m').exists()).toBe(true)
+    expect(wrapper.find('.spinner-border-lg').exists()).toBe(false)
+  })
+
   it('preselects requested category when creating from category subscriptions list', async () => {
     accountsStore.getSubscriptions = vi.fn().mockResolvedValue({
       subscriptions: [],

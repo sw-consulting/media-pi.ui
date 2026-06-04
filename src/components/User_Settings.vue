@@ -26,6 +26,7 @@ const rolesStore = useRolesStore()
 const accountsStore = useAccountsStore()
 const usersStore = useUsersStore()
 const authStore = useAuthStore()
+const { loading: usersLoading } = storeToRefs(usersStore)
 const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'
 
@@ -277,6 +278,9 @@ function onSubmit(values) {
       <div class="header-with-actions">
         <h1 class="primary-heading">{{ getTitle() }}</h1>
         <div class="header-actions-container">
+          <div v-if="usersLoading" class="header-actions header-actions-group" data-test="settings-loading-indicator">
+            <span class="spinner-border spinner-border-m"></span>
+          </div>
           <div class="header-actions header-actions-group">
             <ActionButton
               data-test="save-user-button"
@@ -408,9 +412,6 @@ function onSubmit(values) {
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
     </div>
-  </div>
-  <div v-if="user?.loading" class="text-center m-5">
-    <span class="spinner-border spinner-border-lg align-center"></span>
   </div>
   <div v-if="user?.error" class="text-center m-5">
     <div class="text-danger">Ошибка при загрузке информации о пользователе: {{ user.error }}</div>

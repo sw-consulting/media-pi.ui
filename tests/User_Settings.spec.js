@@ -42,6 +42,7 @@ const ActionButtonStub = {
 let isAdmin
 let isManager
 const mockUser = ref({ id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: [11] })
+const usersLoading = ref(false)
 const getById = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const addUser = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const updateUser = vi.hoisted(() => vi.fn(() => Promise.resolve()))
@@ -56,6 +57,7 @@ const getName = vi.hoisted(() => vi.fn((id) => `Role #${id}`))
 vi.mock('@/stores/users.store.js', () => ({
   useUsersStore: () => ({
     user: mockUser,
+    loading: usersLoading,
     getById,
     add: addUser,
     update: updateUser
@@ -122,6 +124,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   isAdmin = false
   isManager = false
+  usersLoading.value = false
   mockUser.value = { id: 1, firstName: 'John', lastName: 'Doe', email: 'john@example.com', roles: [11] }
   accountsStore.accounts = []
 })
@@ -176,6 +179,20 @@ describe('User_Settings.vue real component', () => {
     await resolveAll()
     expect(addUser).toHaveBeenCalledWith(expect.any(Object), true)
     expect(routerPush).toHaveBeenCalledWith('/users')
+  })
+
+  it('shows store loading as a header action indicator', async () => {
+    usersLoading.value = true
+
+    const wrapper = mount(Parent, {
+      props: { register: true },
+      global: { stubs: stubs() }
+    })
+    await resolveAll()
+
+    expect(wrapper.find('[data-test="settings-loading-indicator"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="settings-loading-indicator"] .spinner-border-m').exists()).toBe(true)
+    expect(wrapper.find('.spinner-border-lg').exists()).toBe(false)
   })
 
   it('updates user when editing as admin', async () => {

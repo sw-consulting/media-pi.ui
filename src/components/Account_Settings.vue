@@ -52,6 +52,7 @@ const { loading } = storeToRefs(accountsStore)
 const initialLoading = ref(false)
 const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'
+let beforeEmbeddedActionHandler = async () => true
 
 if (!isRegister()) {
   initialLoading.value = true
@@ -123,7 +124,28 @@ function getButton() {
   return isRegister() ? 'Создать' : 'Сохранить'
 }
 
-async function onSubmit(values) {
+function runSubmitHandler(handleSubmit, submit) {
+  const submitResult = handleSubmit(submit)
+  return typeof submitResult === 'function' ? submitResult() : submitResult
+}
+
+function captureEmbeddedActionHandler(handleSubmit) {
+  beforeEmbeddedActionHandler = async () => {
+    let submitted = false
+    const result = await runSubmitHandler(handleSubmit, async (values) => {
+      submitted = true
+      return saveBeforeEmbeddedAction(values)
+    })
+    return submitted && result !== false
+  }
+  return true
+}
+
+async function beforeEmbeddedListAction() {
+  return beforeEmbeddedActionHandler()
+}
+
+async function saveAccountPayload(values, navigate = true) {
   try {
     // Filter out empty string values and convert to numbers
     const filteredManagers = (values.managers || [])
@@ -141,7 +163,10 @@ async function onSubmit(values) {
     } else {
       await accountsStore.update(props.id, payload)
     }
-    router.go(-1)
+    if (navigate) {
+      router.go(-1)
+    }
+    return true
   } catch (err) {
     if (err.status === 401 || err.status === 403) {
       redirectToDefaultRoute()
@@ -152,7 +177,17 @@ async function onSubmit(values) {
     } else {
       alertStore.error(`Ошибка при ${isRegister() ? 'создании' : 'обновлении'} лицевого счёта: ${err.message || err}`)
     }
+    return false
   }
+}
+
+async function saveBeforeEmbeddedAction(values) {
+  if (isRegister()) return false
+  return saveAccountPayload(values, false)
+}
+
+async function onSubmit(values) {
+  await saveAccountPayload(values)
 }
 </script>
 
@@ -167,6 +202,9 @@ async function onSubmit(values) {
       <div class="header-with-actions">
         <h1 class="primary-heading">{{ isRegister() ? 'Новый лицевой счёт' : 'Настройки лицевого счёта' }}</h1>
         <div class="header-actions-container">
+          <div v-if="loading || initialLoading" class="header-actions header-actions-group" data-test="settings-loading-indicator">
+            <span class="spinner-border spinner-border-m"></span>
+          </div>
           <div class="header-actions header-actions-group">
             <ActionButton
               data-test="save-account-button"
@@ -223,21 +261,21 @@ async function onSubmit(values) {
       <!-- Form validation errors -->
       <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
       <div v-if="errors.managers" class="alert alert-danger mt-3 mb-0">{{ errors.managers }}</div>
+      <template v-if="captureEmbeddedActionHandler(handleSubmit)"></template>
     </Form>
     
+    <SubscriptionsList
+      v-if="!isRegister() && props.id"
+      :account-id="props.id"
+      embedded
+      :before-embedded-action="beforeEmbeddedListAction"
+    />
+
     <!-- Global alert messages -->
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
     </div>
-    
-    <!-- Store loading and error states -->
-    <div v-if="loading || initialLoading" class="text-center m-5">
-      <span class="spinner-border spinner-border-lg align-center"></span>
-      <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
-    </div>
-
-    <SubscriptionsList v-if="!isRegister() && props.id" :account-id="props.id" />
     
   </div>
 </template>
