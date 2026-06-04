@@ -38,7 +38,7 @@ const playlistsStore = usePlaylistsStore()
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(deviceGroupsStore)
-const { playlists, loading: playlistsLoading, error: playlistsError } = storeToRefs(playlistsStore)
+const { playlists, loading: playlistsLoading } = storeToRefs(playlistsStore)
 const authStore = useAuthStore()
 const { playlists_per_page: itemsPerPage, playlists_page: page } = storeToRefs(authStore)
 
