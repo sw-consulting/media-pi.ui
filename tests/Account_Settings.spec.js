@@ -113,10 +113,15 @@ const mountSettings = (props = {}) => mount({
         props: ['name', 'label', 'fieldType', 'options', 'placeholder', 'addTooltip', 'removeTooltip', 'hasError']
       },
       SubscriptionsList: {
-        template: '<div data-test="subscriptions-list" :data-account-id="accountId" :data-embedded="embedded ? \'true\' : \'false\'"></div>',
+        template: `
+          <div data-test="subscriptions-list" :data-account-id="accountId" :data-embedded="embedded ? 'true' : 'false'">
+            <button data-test="embedded-subscriptions-action" @click="beforeEmbeddedAction && beforeEmbeddedAction()"></button>
+          </div>
+        `,
         props: {
           accountId: Number,
-          embedded: Boolean
+          embedded: Boolean,
+          beforeEmbeddedAction: Function
         }
       }
     }
@@ -188,6 +193,17 @@ describe('Account_Settings.vue', () => {
     )
   })
 
+  it('shows store loading as a header action indicator', async () => {
+    accountsStore.loading = true
+
+    const wrapper = mountSettings({ register: true })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="settings-loading-indicator"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="settings-loading-indicator"] .spinner-border-m').exists()).toBe(true)
+    expect(wrapper.find('.spinner-border-lg').exists()).toBe(false)
+  })
+
   it('loads account managers by account for non-admin users', async () => {
     authStore = {
       isAdministrator: false,
@@ -237,6 +253,29 @@ describe('Account_Settings.vue', () => {
       name: 'Test Account',
       userIds: [1, 2]
     })
+  })
+
+  it('saves the account before an embedded subscription action without leaving the form', async () => {
+    accountsStore.account = {
+      id: 1,
+      name: 'Cafe',
+      userIds: [1]
+    }
+    const wrapper = mountSettings({
+      register: false,
+      id: 1,
+      submitValues: { name: 'Embedded Save', managers: [2] }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="embedded-subscriptions-action"]').trigger('click')
+    await flushPromises()
+
+    expect(accountsStore.update).toHaveBeenCalledWith(1, {
+      name: 'Embedded Save',
+      userIds: [2]
+    })
+    expect(routerGo).not.toHaveBeenCalled()
   })
 
   it('handles header cancel action', async () => {

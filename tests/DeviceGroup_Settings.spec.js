@@ -539,8 +539,9 @@ describe('DeviceGroup_Settings.vue', () => {
     const wrapper = mountSettings({ register: true, accountId: 5 })
     await flushPromises()
     
-    expect(wrapper.text()).toContain('Сохранение...')
-    expect(wrapper.find('.spinner-border-lg').exists()).toBe(true)
+    expect(wrapper.find('[data-test="settings-loading-indicator"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="settings-loading-indicator"] .spinner-border-m').exists()).toBe(true)
+    expect(wrapper.find('.spinner-border-lg').exists()).toBe(false)
   })
 
   it('handles successive form submissions correctly', async () => {

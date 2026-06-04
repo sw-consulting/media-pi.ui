@@ -152,6 +152,9 @@ async function onSubmit (values) {
       <div class="header-with-actions">
         <h1 class="primary-heading">{{ isRegister() ? 'Новое устройство' : 'Настройки устройства' }}</h1>
         <div class="header-actions-container">
+          <div v-if="loading || initialLoading" class="header-actions header-actions-group" data-test="settings-loading-indicator">
+            <span class="spinner-border spinner-border-m"></span>
+          </div>
           <div class="header-actions header-actions-group">
             <ActionButton
               data-test="save-device-button"
@@ -208,10 +211,6 @@ async function onSubmit (values) {
       {{ alert.message }}
     </div>
 
-    <div v-if="loading || initialLoading" class="text-center m-5">
-      <span class="spinner-border spinner-border-lg align-center"></span>
-      <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
-    </div>
   </div>
 </template>
 

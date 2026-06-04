@@ -255,6 +255,49 @@ describe('Videos_List.vue', () => {
     expect(wrapper.find('.alert-dismissable').exists()).toBe(false)
   })
 
+  it('runs the embedded action hook before editing a video', async () => {
+    videosStore.videos.value = [{ id: 3, title: 'Clip', accountId: 0, categoryId: 9 }]
+    const beforeEmbeddedAction = vi.fn(async () => false)
+
+    const wrapper = mount(VideosList, {
+      props: {
+        embedded: true,
+        fixedScope: 'category:9',
+        beforeEmbeddedAction
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="edit-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(router.push).not.toHaveBeenCalled()
+  })
+
+  it('runs the embedded action hook before deleting a video', async () => {
+    videosStore.videos.value = [{ id: 4, title: 'Clip', accountId: 0, categoryId: 9 }]
+    const beforeEmbeddedAction = vi.fn(async () => false)
+
+    const wrapper = mount(VideosList, {
+      props: {
+        embedded: true,
+        fixedScope: 'category:9',
+        beforeEmbeddedAction
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="delete-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(confirmation.confirmDelete).not.toHaveBeenCalled()
+    expect(videosStore.remove).not.toHaveBeenCalled()
+  })
+
   it('loads videos for default and changed account selection', async () => {
     accountsStore.accounts.value = [{ id: 5, name: 'Five' }]
     videosStore.videos.value = [{ id: 1, title: 'Account video', accountId: 5, categoryId: 0 }]

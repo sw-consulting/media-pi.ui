@@ -183,6 +183,45 @@ describe('Subscriptions_List.vue', () => {
     expect(wrapper.find('.data-table').attributes('data-density')).toBe('compact')
   })
 
+  it('runs the embedded action hook before creating a subscription', async () => {
+    accountsStore.subscriptions.value = {
+      subscriptions: [],
+      availableCategories: [
+        { id: 9, title: 'Sports', free: false }
+      ]
+    }
+    const beforeEmbeddedAction = vi.fn(async () => false)
+
+    const wrapper = mountList({ embedded: true, beforeEmbeddedAction })
+    await flushPromises()
+
+    await wrapper.find('[data-test="create-subscription-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  it('runs the embedded action hook before deleting a subscription', async () => {
+    accountsStore.subscriptions.value = {
+      subscriptions: [
+        { categoryId: 7, categoryTitle: 'Premium', categoryFree: false, startDate: '2026-06-01', endDate: '2026-06-30' }
+      ],
+      availableCategories: []
+    }
+    const beforeEmbeddedAction = vi.fn(async () => false)
+
+    const wrapper = mountList({ embedded: true, beforeEmbeddedAction })
+    await flushPromises()
+
+    await wrapper.find('[data-test="delete-subscription-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(confirmation.confirmDelete).not.toHaveBeenCalled()
+    expect(accountsStore.deleteSubscription).not.toHaveBeenCalled()
+  })
+
   it('renders multiple subscriptions for the same category', async () => {
     accountsStore.subscriptions.value = {
       subscriptions: [

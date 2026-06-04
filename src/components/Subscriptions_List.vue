@@ -36,6 +36,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  beforeEmbeddedAction: {
+    type: Function,
+    default: null
+  },
   mode: {
     type: String,
     default: 'account',
@@ -234,9 +238,18 @@ function filterSubscriptions(value, query, item) {
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
 }
 
-function createSubscription() {
+function runBeforeEmbeddedAction() {
+  if (!props.embedded || typeof props.beforeEmbeddedAction !== 'function') return true
+  return Promise.resolve(props.beforeEmbeddedAction())
+    .then(result => result !== false)
+    .catch(() => false)
+}
+
+async function createSubscription() {
   if (isCategoryMode.value) {
     if (!canCreateSubscription.value) return
+    const canProceed = runBeforeEmbeddedAction()
+    if (canProceed !== true && !await canProceed) return
     router.push({
       path: `/category/${props.categoryId}/subscription/create`,
       query: props.categoryTitle ? { categoryTitle: props.categoryTitle } : {}
@@ -245,6 +258,8 @@ function createSubscription() {
   }
 
   if (!canCreateSubscription.value) return
+  const canProceed = runBeforeEmbeddedAction()
+  if (canProceed !== true && !await canProceed) return
   router.push(`/account/${props.accountId}/subscription/create`)
 }
 
@@ -272,8 +287,10 @@ function getRowCategoryId(item) {
   return isCategoryMode.value ? props.categoryId : item?.categoryId
 }
 
-function editSubscription(item) {
+async function editSubscription(item) {
   if (!canEditRowSubscription(item)) return
+  const canProceed = runBeforeEmbeddedAction()
+  if (canProceed !== true && !await canProceed) return
   router.push(`/account/${getRowAccountId(item)}/subscription/edit/${getRowCategoryId(item)}`)
 }
 
@@ -303,6 +320,8 @@ async function deleteSubscriptionPayload(item, forcePlaylistCleanup = false) {
 
 async function deleteSubscription(item) {
   if (!canDeleteRowSubscription(item)) return
+  const canProceed = runBeforeEmbeddedAction()
+  if (canProceed !== true && !await canProceed) return
   const confirmed = await confirmDelete(
     isCategoryMode.value
       ? item.accountName || `Лицевой счёт ${item.accountId}`

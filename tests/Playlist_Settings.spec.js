@@ -918,6 +918,17 @@ describe('Playlist_Settings.vue', () => {
     expect(playlistsStore.create).toHaveBeenCalledWith(expect.objectContaining({ title: 'Header Save' }))
   })
 
+  it('shows store loading as a header action indicator', async () => {
+    playlistsStore.loading.value = true
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="settings-loading-indicator"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="settings-loading-indicator"] .spinner-border-m').exists()).toBe(true)
+    expect(wrapper.find('.spinner-border-lg').exists()).toBe(false)
+  })
+
   it('dismisses alert via close button', async () => {
     playlistsStore.create = vi.fn().mockRejectedValue({ status: 409 })
     const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'My Playlist' } })

@@ -106,18 +106,28 @@ const mountSettings = (props = {}) => mount({
         props: {
           title: String,
           embedded: Boolean,
-          fixedScope: String
+          fixedScope: String,
+          beforeEmbeddedAction: Function
         },
-        template: '<div data-test="category-videos-list" :data-title="title" :data-embedded="embedded ? \'true\' : \'false\'" :data-fixed-scope="fixedScope"></div>'
+        template: `
+          <div data-test="category-videos-list" :data-title="title" :data-embedded="embedded ? 'true' : 'false'" :data-fixed-scope="fixedScope">
+            <button data-test="embedded-videos-action" @click="beforeEmbeddedAction && beforeEmbeddedAction()"></button>
+          </div>
+        `
       },
       SubscriptionsList: {
         props: {
           mode: String,
           categoryId: Number,
           categoryTitle: String,
-          embedded: Boolean
+          embedded: Boolean,
+          beforeEmbeddedAction: Function
         },
-        template: '<div data-test="category-subscriptions-list" :data-mode="mode" :data-category-id="categoryId" :data-category-title="categoryTitle" :data-embedded="embedded ? \'true\' : \'false\'"></div>'
+        template: `
+          <div data-test="category-subscriptions-list" :data-mode="mode" :data-category-id="categoryId" :data-category-title="categoryTitle" :data-embedded="embedded ? 'true' : 'false'">
+            <button data-test="embedded-subscriptions-action" @click="beforeEmbeddedAction && beforeEmbeddedAction()"></button>
+          </div>
+        `
       }
     },
     mocks: {
@@ -278,6 +288,95 @@ describe('Category_Settings.vue', () => {
     )
   })
 
+  it('saves the category before an embedded videos action without leaving the form', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: false }
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: 'Embedded Save' }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="embedded-videos-action"]').trigger('click')
+    await flushPromises()
+
+    expect(categoriesStore.update).toHaveBeenCalledWith(9, {
+      title: 'Embedded Save',
+      free: false
+    })
+    expect(routerGo).not.toHaveBeenCalled()
+  })
+
+  it('saves the category before an embedded subscriptions action without leaving the form', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: false }
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: 'Subscription Save' }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="embedded-subscriptions-action"]').trigger('click')
+    await flushPromises()
+
+    expect(categoriesStore.update).toHaveBeenCalledWith(9, {
+      title: 'Subscription Save',
+      free: false
+    })
+    expect(routerGo).not.toHaveBeenCalled()
+  })
+
+  it('keeps the category form open when embedded action save needs playlist cleanup confirmation', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: true }
+    categoriesStore.update = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 2,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            {
+              playlistId: 11,
+              title: 'Morning',
+              filename: 'morning.m3u',
+              accountId: 1,
+              accountName: 'Cafe',
+              removedItemCount: 2
+            }
+          ]
+        }
+      })
+      .mockResolvedValueOnce()
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: 'Existing' }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="category-free-checkbox"]').setValue(false)
+    await wrapper.find('[data-test="embedded-videos-action"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-dialog"]').exists()).toBe(true)
+    expect(routerGo).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(categoriesStore.update).toHaveBeenLastCalledWith(9, {
+      title: 'Existing',
+      free: false,
+      forcePlaylistCleanup: true
+    })
+    expect(routerGo).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="playlist-impact-dialog"]').exists()).toBe(false)
+  })
+
   it('renders the shared alert below embedded category lists', async () => {
     categoriesStore.category = { id: 9, title: 'Existing', free: false }
     alertStore.alert.value = { message: 'Category alert', type: 'alert-danger' }
@@ -295,6 +394,19 @@ describe('Category_Settings.vue', () => {
     expect(wrapper.html().indexOf('data-test="category-subscriptions-section"')).toBeLessThan(
       wrapper.html().indexOf('alert-dismissable')
     )
+  })
+
+  it('shows store loading as a header action indicator', async () => {
+    categoriesStore.loading.value = true
+
+    const wrapper = mountSettings({
+      submitValues: { title: 'Movies' }
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="settings-loading-indicator"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="settings-loading-indicator"] .spinner-border-m').exists()).toBe(true)
+    expect(wrapper.find('.spinner-border-lg').exists()).toBe(false)
   })
 
   it('hides but keeps category subscriptions mounted when free access is enabled', async () => {

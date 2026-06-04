@@ -191,6 +191,17 @@ describe('Video_Settings.vue', () => {
     expect(routerGo).toHaveBeenCalledWith(-1)
   })
 
+  it('shows store loading as a header action indicator', async () => {
+    videosStore.loading.value = true
+
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="settings-loading-indicator"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="settings-loading-indicator"] .spinner-border-m').exists()).toBe(true)
+    expect(wrapper.find('.spinner-border-lg').exists()).toBe(false)
+  })
+
   it('does not send category for account-linked videos', async () => {
     authStore = { user: { roles: [], accountIds: [42] } }
     videosStore.video.value = { id: 10, title: 'Account Clip', accountId: 42, categoryId: 0 }
