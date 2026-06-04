@@ -12,6 +12,7 @@ import { useAccountsStore } from '@/stores/accounts.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
+import { runBeforeEmbeddedAction } from '@/helpers/embedded.action.helpers.js'
 import { formatRuDate } from '@/helpers/date.format.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
@@ -238,17 +239,10 @@ function filterSubscriptions(value, query, item) {
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
 }
 
-function runBeforeEmbeddedAction() {
-  if (!props.embedded || typeof props.beforeEmbeddedAction !== 'function') return true
-  return Promise.resolve(props.beforeEmbeddedAction())
-    .then(result => result !== false)
-    .catch(() => false)
-}
-
 async function createSubscription() {
   if (isCategoryMode.value) {
     if (!canCreateSubscription.value) return
-    const canProceed = runBeforeEmbeddedAction()
+    const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
     if (canProceed !== true && !await canProceed) return
     router.push({
       path: `/category/${props.categoryId}/subscription/create`,
@@ -258,7 +252,7 @@ async function createSubscription() {
   }
 
   if (!canCreateSubscription.value) return
-  const canProceed = runBeforeEmbeddedAction()
+  const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
   router.push(`/account/${props.accountId}/subscription/create`)
 }
@@ -289,7 +283,7 @@ function getRowCategoryId(item) {
 
 async function editSubscription(item) {
   if (!canEditRowSubscription(item)) return
-  const canProceed = runBeforeEmbeddedAction()
+  const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
   router.push(`/account/${getRowAccountId(item)}/subscription/edit/${getRowCategoryId(item)}`)
 }
@@ -320,7 +314,7 @@ async function deleteSubscriptionPayload(item, forcePlaylistCleanup = false) {
 
 async function deleteSubscription(item) {
   if (!canDeleteRowSubscription(item)) return
-  const canProceed = runBeforeEmbeddedAction()
+  const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
   const confirmed = await confirmDelete(
     isCategoryMode.value

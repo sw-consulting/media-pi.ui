@@ -14,6 +14,7 @@ import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
+import { runBeforeEmbeddedAction } from '@/helpers/embedded.action.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import ModalWindow from '@/components/ModalWindow.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
@@ -365,16 +366,9 @@ onMounted(async () => {
   }
 })
 
-function runBeforeEmbeddedAction() {
-  if (!props.embedded || typeof props.beforeEmbeddedAction !== 'function') return true
-  return Promise.resolve(props.beforeEmbeddedAction())
-    .then(result => result !== false)
-    .catch(() => false)
-}
-
 async function triggerUpload() {
   if (!fileInput.value) return
-  const canProceed = runBeforeEmbeddedAction()
+  const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
   fileInput.value.value = null
   fileInput.value.click()
@@ -448,7 +442,7 @@ function handleVideoPlaybackError(message) {
 
 async function openVideo(item) {
   if (!item?.id) return
-  const canProceed = runBeforeEmbeddedAction()
+  const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
   alertStore.clear()
   try {
@@ -461,14 +455,14 @@ async function openVideo(item) {
 
 async function editVideo(item) {
   if (!canManageVideo(item)) return
-  const canProceed = runBeforeEmbeddedAction()
+  const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
   router.push(`/video/edit/${item.id}`)
 }
 
 async function deleteVideo(item) {
   if (!canManageVideo(item)) return
-  const canProceed = runBeforeEmbeddedAction()
+  const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
   const confirmed = await confirmDelete(item.title || item.originalFilename || 'видеофайл', 'видеофайл')
   if (!confirmed) return
@@ -501,7 +495,7 @@ function summarizeBatchDeleteResult(result, requestedCount) {
 async function deleteSelectedVideos() {
   const ids = [...selectedVideoIds.value]
   if (!ids.length || !canManageSelectedScope.value) return
-  const canProceed = runBeforeEmbeddedAction()
+  const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
 
   const confirmed = await confirmAction(`Удалить выбранные видеофайлы (${ids.length})?`, {
@@ -600,7 +594,7 @@ function cancelPlaylistCleanup() {
 
 async function openBatchCategoryDialog() {
   if (!canUpdateSelectedCategory.value) return
-  const canProceed = runBeforeEmbeddedAction()
+  const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
   batchCategoryId.value = 0
   batchCategoryDialog.value = true

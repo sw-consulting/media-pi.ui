@@ -278,7 +278,7 @@ function onSubmit(values) {
       <div class="header-with-actions">
         <h1 class="primary-heading">{{ getTitle() }}</h1>
         <div class="header-actions-container">
-          <div v-if="user?.loading || usersLoading" class="header-actions header-actions-group" data-test="settings-loading-indicator">
+          <div v-if="usersLoading" class="header-actions header-actions-group" data-test="settings-loading-indicator">
             <span class="spinner-border spinner-border-m"></span>
           </div>
           <div class="header-actions header-actions-group">
