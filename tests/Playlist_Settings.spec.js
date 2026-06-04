@@ -1497,6 +1497,15 @@ describe('Playlist_Settings.vue', () => {
     expect(alertStore.error).toHaveBeenCalledWith('Required')
   })
 
+  it('returns false from onInvalidSubmit and shows the validation alert', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const child = wrapper.findComponent(PlaylistSettings)
+    expect(child.vm.$.setupState.onInvalidSubmit({ errors: { title: 'Required' } })).toBe(false)
+    expect(alertStore.error).toHaveBeenCalledWith('Required')
+  })
+
   it('search filter handles null video fields gracefully', async () => {
     videosStore.getAllByAccount = vi.fn(async (accountId) => {
       if (accountId !== 1) return []

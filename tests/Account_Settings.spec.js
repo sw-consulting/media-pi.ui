@@ -295,6 +295,15 @@ describe('Account_Settings.vue', () => {
     expect(routerGo).toHaveBeenCalledWith(-1)
   })
 
+  it('returns false from onInvalidSubmit and shows the validation alert', async () => {
+    const wrapper = mountSettings({ register: true })
+    await flushPromises()
+
+    const child = wrapper.findComponent(AccountSettings)
+    expect(child.vm.$.setupState.onInvalidSubmit({ errors: { name: 'Name error' } })).toBe(false)
+    expect(alertStore.error).toHaveBeenCalledWith('Name error')
+  })
+
   it('shows account load error when account is missing', async () => {
     accountsStore.account = null
 

@@ -269,6 +269,15 @@ describe('Subscription_Settings.vue', () => {
     expect(alertStore.error).toHaveBeenCalledWith('Выберите категорию')
   })
 
+  it('returns false from onInvalidSubmit and shows the validation alert', async () => {
+    const wrapper = mountSettings({ errors: { categoryId: 'Выберите категорию' } })
+    await flushPromises()
+
+    const child = wrapper.findComponent(SubscriptionSettings)
+    expect(child.vm.$.setupState.onInvalidSubmit({ errors: { categoryId: 'Выберите категорию' } })).toBe(false)
+    expect(alertStore.error).toHaveBeenCalledWith('Выберите категорию')
+  })
+
   it('loads and updates an existing subscription', async () => {
     accountsStore.getSubscriptions = vi.fn().mockResolvedValue({
       subscriptions: [

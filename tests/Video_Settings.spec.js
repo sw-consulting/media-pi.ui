@@ -340,6 +340,16 @@ describe('Video_Settings.vue', () => {
     expect(routerGo).toHaveBeenCalledWith(-1)
   })
 
+  it('shows validation errors via the alert store on invalid submit', async () => {
+    const wrapper = mountSettings({ showValidationError: true })
+    await flushPromises()
+
+    await wrapper.find('[data-test="save-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать название')
+  })
+
   it('opens current video in playback dialog from the header film button', async () => {
     const wrapper = mountSettings()
     await flushPromises()

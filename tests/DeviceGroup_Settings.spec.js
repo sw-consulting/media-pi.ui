@@ -634,6 +634,15 @@ describe('DeviceGroup_Settings.vue', () => {
     expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать имя')
   })
 
+  it('returns false from onInvalidSubmit and shows the validation alert', async () => {
+    const wrapper = mountSettings({ register: true, accountId: 5 })
+    await flushPromises()
+
+    const child = wrapper.findComponent(DeviceGroupSettings)
+    expect(child.vm.$.setupState.onInvalidSubmit({ errors: { name: 'Необходимо указать имя' } })).toBe(false)
+    expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать имя')
+  })
+
   it('displays field with correct properties', async () => {
     const wrapper = mountSettings({ register: true, accountId: 5, isSubmitting: true })
     await flushPromises()

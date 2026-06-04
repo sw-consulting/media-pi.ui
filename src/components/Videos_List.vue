@@ -334,15 +334,16 @@ async function refreshCommonVideos() {
 }
 
 const refreshVideos = async () => {
+  const requestedScope = selectedScope.value
   try {
-    if (selectedScope.value === undefined || selectedScope.value === null) {
+    if (requestedScope === undefined || requestedScope === null) {
       if (isScopeFixed.value) loadedFixedScope.value = null
       return true
     }
-    const scope = selectedScopeInfo.value
+    const scope = parseVideoScope(requestedScope)
     if (scope.type === 'common') {
       await refreshCommonVideos()
-      if (isScopeFixed.value) loadedFixedScope.value = selectedScope.value
+      if (isScopeFixed.value && selectedScope.value === requestedScope) loadedFixedScope.value = requestedScope
       return true
     }
 
@@ -352,7 +353,7 @@ const refreshVideos = async () => {
         ? { categoryId: scope.categoryId }
         : {}
     )
-    if (isScopeFixed.value) loadedFixedScope.value = selectedScope.value
+    if (isScopeFixed.value && selectedScope.value === requestedScope) loadedFixedScope.value = requestedScope
     return true
   } catch (err) {
     alertStore.error('Не удалось загрузить информацию о видеофайлах: ' + (err?.message || err))

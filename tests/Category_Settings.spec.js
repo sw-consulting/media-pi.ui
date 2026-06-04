@@ -584,6 +584,15 @@ describe('Category_Settings.vue', () => {
     expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать название')
   })
 
+  it('returns false from onInvalidSubmit and shows the validation alert', async () => {
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    const child = wrapper.findComponent(CategorySettings)
+    expect(child.vm.$.setupState.onInvalidSubmit({ errors: { title: 'Необходимо указать название' } })).toBe(false)
+    expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать название')
+  })
+
   it('handles cancel button click', async () => {
     const wrapper = mountSettings()
     await flushPromises()
