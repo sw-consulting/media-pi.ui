@@ -372,6 +372,61 @@ describe('Videos_List.vue', () => {
     expect(wrapper.text()).toContain('Fresh category video')
   })
 
+  it('ignores a late fixed-scope refresh after the fixed scope changes', async () => {
+    const pendingCategoryRefreshes = []
+    const pendingCommonRefreshes = []
+    videosStore.getAllByAccount.mockImplementation((accountId, options) => new Promise(resolve => {
+      if (options?.categoryId === 44) {
+        pendingCategoryRefreshes.push(resolve)
+        return
+      }
+      pendingCommonRefreshes.push(resolve)
+    }))
+
+    const wrapper = mount(VideosList, {
+      props: { fixedScope: 'category:44' },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { categoryId: 44 })
+    expect(wrapper.find('[data-test="table-empty"]').exists()).toBe(true)
+
+    await wrapper.setProps({ fixedScope: 'common:all' })
+    await flushPromises()
+
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, {})
+
+    videosStore.videos.value = [{ id: 201, title: 'Late category video', accountId: 0, categoryId: 44 }]
+    pendingCategoryRefreshes.forEach(resolve => resolve(videosStore.videos.value))
+    await flushPromises()
+
+    expect(wrapper.vm.loadedFixedScope).toBeNull()
+    expect(wrapper.find('[data-test="table-empty"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Late category video')
+
+    videosStore.videos.value = [{ id: 202, title: 'Latest common video', accountId: 0, categoryId: 0 }]
+    pendingCommonRefreshes.forEach(resolve => resolve(videosStore.videos.value))
+    await flushPromises()
+
+    expect(wrapper.vm.loadedFixedScope).toBe('common:all')
+    expect(wrapper.text()).toContain('Latest common video')
+  })
+
+  it('clears loadedFixedScope when selectedScope becomes null for a fixed scope', async () => {
+    const wrapper = mount(VideosList, {
+      props: { fixedScope: 'common:all' },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    wrapper.vm.loadedFixedScope = 'common:all'
+    wrapper.vm.selectedScope = null
+
+    await expect(wrapper.vm.refreshVideos()).resolves.toBe(true)
+    expect(wrapper.vm.loadedFixedScope).toBeNull()
+  })
+
   it('runs the embedded action hook before opening batch category dialog', async () => {
     videosStore.videos.value = [{ id: 5, title: 'Clip', accountId: 0, categoryId: 9 }]
     const beforeEmbeddedAction = vi.fn(async () => false)

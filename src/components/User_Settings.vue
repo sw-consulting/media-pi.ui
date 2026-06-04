@@ -17,6 +17,7 @@ import { getRoleName, isManager } from '@/helpers/user.helpers.js'
 import { useRolesStore } from '@/stores/roles.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route'
+import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
 const alertStore = useAlertStore()
@@ -265,12 +266,17 @@ function onSubmit(values) {
   }
 }
 
+function onInvalidSubmit(context) {
+  return showFormValidationErrors(alertStore, context)
+}
+
 </script>
 
 <template>
   <div class="settings form-2 form-compact">
     <Form
       @submit="onSubmit"
+      @invalid-submit="onInvalidSubmit"
       :initial-values="user"
       :validation-schema="schema"
       v-slot="{ errors, isSubmitting, handleSubmit }"
@@ -398,15 +404,6 @@ function onSubmit(values) {
           </li>
         </ul>
      </div>
-      <div v-if="errors.lastName" class="alert alert-danger mt-3 mb-0">{{ errors.lastName }}</div>
-      <div v-if="errors.firstName" class="alert alert-danger mt-3 mb-0">{{ errors.firstName }}</div>
-      <div v-if="errors.patronymic" class="alert alert-danger mt-3 mb-0">
-        {{ errors.patronymic }}
-      </div>
-      <div v-if="errors.email" class="alert alert-danger mt-3 mb-0">{{ errors.email }}</div>
-      <div v-if="errors.accountIds" class="alert alert-danger mt-3 mb-0">{{ errors.accountIds }}</div>
-      <div v-if="errors.password" class="alert alert-danger mt-3 mb-0">{{ errors.password }}</div>
-      <div v-if="errors.password2" class="alert alert-danger mt-3 mb-0">{{ errors.password2 }}</div>
     </Form>
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>

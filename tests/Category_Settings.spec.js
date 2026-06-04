@@ -75,7 +75,7 @@ const mountSettings = (props = {}) => mount({
       Form: {
         template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" /></form>',
         props: ['validationSchema', 'initialValues'],
-        emits: ['submit'],
+        emits: ['submit', 'invalid-submit'],
         data() {
           return {
             errors: props.showValidationError ? { title: 'Необходимо указать название' } : {},
@@ -84,9 +84,17 @@ const mountSettings = (props = {}) => mount({
         },
         methods: {
           handleSubmit(submit) {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             return submit({ ...this.initialValues, ...(props.submitValues || {}) })
           },
           onSubmit() {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             this.$emit('submit', { ...this.initialValues, ...(props.submitValues || {}) })
           }
         }
@@ -570,7 +578,19 @@ describe('Category_Settings.vue', () => {
     const wrapper = mountSettings({ showValidationError: true })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Необходимо указать название')
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать название')
+  })
+
+  it('returns false from onInvalidSubmit and shows the validation alert', async () => {
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    const child = wrapper.findComponent(CategorySettings)
+    expect(child.vm.$.setupState.onInvalidSubmit({ errors: { title: 'Необходимо указать название' } })).toBe(false)
+    expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать название')
   })
 
   it('handles cancel button click', async () => {

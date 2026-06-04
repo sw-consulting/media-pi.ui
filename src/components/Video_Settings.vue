@@ -19,6 +19,7 @@ import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js
 import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { createCategoryOptions } from '@/helpers/video.scope.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
+import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 
@@ -194,6 +195,10 @@ function cancelPlaylistCleanup() {
   playlistImpactDialog.value = false
   pendingVideoPayload.value = null
 }
+
+function onInvalidSubmit(context) {
+  return showFormValidationErrors(alertStore, context)
+}
 </script>
 
 <template>
@@ -202,6 +207,7 @@ function cancelPlaylistCleanup() {
       :validation-schema="schema"
       :initial-values="video"
       @submit="onSubmit"
+      @invalid-submit="onInvalidSubmit"
       v-slot="{ errors, isSubmitting, handleSubmit }"
     >
       <div class="header-with-actions">
@@ -309,8 +315,6 @@ function cancelPlaylistCleanup() {
           data-test="video-category-select"
         />
       </div>
-
-      <div v-if="errors.title" class="alert alert-danger mt-3 mb-0">{{ errors.title }}</div>
     </Form>
 
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">

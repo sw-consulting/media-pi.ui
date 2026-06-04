@@ -13,6 +13,7 @@ import { useDeviceGroupsStore } from '@/stores/device.groups.store.js'
 import { usePlaylistsStore } from '@/stores/playlists.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
@@ -37,7 +38,7 @@ const playlistsStore = usePlaylistsStore()
 const alertStore = useAlertStore()
 const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(deviceGroupsStore)
-const { playlists, loading: playlistsLoading, error: playlistsError } = storeToRefs(playlistsStore)
+const { playlists, loading: playlistsLoading } = storeToRefs(playlistsStore)
 const authStore = useAuthStore()
 const { playlists_per_page: itemsPerPage, playlists_page: page } = storeToRefs(authStore)
 
@@ -196,6 +197,10 @@ async function onSubmit (values) {
     }
   }
 }
+
+function onInvalidSubmit(context) {
+  return showFormValidationErrors(alertStore, context)
+}
 </script>
 
 <template>
@@ -204,6 +209,7 @@ async function onSubmit (values) {
       :validation-schema="schema"
       :initial-values="group"
       @submit="onSubmit"
+      @invalid-submit="onInvalidSubmit"
       v-slot="{ errors, isSubmitting, handleSubmit }"
     >
       <div class="header-with-actions">
@@ -296,8 +302,6 @@ async function onSubmit (values) {
           </template>
         </v-data-table>
       </v-card>
-
-      <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
     </Form>
 
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
