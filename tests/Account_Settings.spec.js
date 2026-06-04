@@ -82,7 +82,7 @@ const mountSettings = (props = {}) => mount({
       Form: {
         template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" /></form>',
         props: ['validationSchema', 'initialValues'],
-        emits: ['submit'],
+        emits: ['submit', 'invalid-submit'],
         data() {
           return {
             errors: props.errors || {},
@@ -91,9 +91,17 @@ const mountSettings = (props = {}) => mount({
         },
         methods: {
           handleSubmit(submit) {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             return submit(props.submitValues || { name: 'Test Account', managers: [1, '2', ''] })
           },
           onSubmit() {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             this.$emit('submit', props.submitValues || { name: 'Test Account', managers: [1, '2', ''] })
           }
         }
@@ -285,6 +293,15 @@ describe('Account_Settings.vue', () => {
     await wrapper.find('[data-test="cancel-account-button"]').trigger('click')
 
     expect(routerGo).toHaveBeenCalledWith(-1)
+  })
+
+  it('returns false from onInvalidSubmit and shows the validation alert', async () => {
+    const wrapper = mountSettings({ register: true })
+    await flushPromises()
+
+    const child = wrapper.findComponent(AccountSettings)
+    expect(child.vm.$.setupState.onInvalidSubmit({ errors: { name: 'Name error' } })).toBe(false)
+    expect(alertStore.error).toHaveBeenCalledWith('Name error')
   })
 
   it('shows account load error when account is missing', async () => {

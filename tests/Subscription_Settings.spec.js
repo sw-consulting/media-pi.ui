@@ -66,7 +66,7 @@ function mountSettings(props = {}) {
         Form: {
           template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" /></form>',
           props: ['validationSchema', 'initialValues'],
-          emits: ['submit'],
+          emits: ['submit', 'invalid-submit'],
           data() {
             return {
               errors: props.errors || {},
@@ -75,9 +75,17 @@ function mountSettings(props = {}) {
           },
           methods: {
             handleSubmit(submit) {
+              if (Object.keys(this.errors || {}).length) {
+                this.$emit('invalid-submit', { errors: this.errors })
+                return false
+              }
               return submit({ ...this.initialValues, ...(props.submitValues || {}) })
             },
             onSubmit() {
+              if (Object.keys(this.errors || {}).length) {
+                this.$emit('invalid-submit', { errors: this.errors })
+                return false
+              }
               this.$emit('submit', { ...this.initialValues, ...(props.submitValues || {}) })
             }
           }
@@ -258,6 +266,15 @@ describe('Subscription_Settings.vue', () => {
     await wrapper.find('[data-test="form"]').trigger('submit')
     await flushPromises()
 
+    expect(alertStore.error).toHaveBeenCalledWith('Выберите категорию')
+  })
+
+  it('returns false from onInvalidSubmit and shows the validation alert', async () => {
+    const wrapper = mountSettings({ errors: { categoryId: 'Выберите категорию' } })
+    await flushPromises()
+
+    const child = wrapper.findComponent(SubscriptionSettings)
+    expect(child.vm.$.setupState.onInvalidSubmit({ errors: { categoryId: 'Выберите категорию' } })).toBe(false)
     expect(alertStore.error).toHaveBeenCalledWith('Выберите категорию')
   })
 

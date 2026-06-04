@@ -323,6 +323,11 @@ describe('Videos_List.vue', () => {
 
   it('resolves a pending fixed scope before opening the upload picker', async () => {
     let wrapper
+    let resolveRefresh
+    videosStore.videos.value = [{ id: 99, title: 'Stale common video', accountId: 0, categoryId: 0 }]
+    videosStore.getAllByAccount.mockImplementationOnce(() => new Promise(resolve => {
+      resolveRefresh = resolve
+    }))
     const beforeEmbeddedAction = vi.fn(async () => {
       await wrapper.setProps({
         fixedScope: 'category:44',
@@ -344,6 +349,8 @@ describe('Videos_List.vue', () => {
     expect(accountsStore.getAll).not.toHaveBeenCalled()
     expect(videosStore.getAllByAccount).not.toHaveBeenCalled()
     expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="table-empty"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Stale common video')
     expect(wrapper.find('[data-test="upload-video-button"]').element.disabled).toBe(false)
 
     const fileInput = wrapper.find('input[type="file"]')
@@ -354,7 +361,70 @@ describe('Videos_List.vue', () => {
 
     expect(beforeEmbeddedAction).toHaveBeenCalled()
     expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { categoryId: 44 })
+    expect(wrapper.find('[data-test="table-empty"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Stale common video')
     expect(clickSpy).toHaveBeenCalled()
+
+    videosStore.videos.value = [{ id: 100, title: 'Fresh category video', accountId: 0, categoryId: 44 }]
+    resolveRefresh(videosStore.videos.value)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Fresh category video')
+  })
+
+  it('ignores a late fixed-scope refresh after the fixed scope changes', async () => {
+    const pendingCategoryRefreshes = []
+    const pendingCommonRefreshes = []
+    videosStore.getAllByAccount.mockImplementation((accountId, options) => new Promise(resolve => {
+      if (options?.categoryId === 44) {
+        pendingCategoryRefreshes.push(resolve)
+        return
+      }
+      pendingCommonRefreshes.push(resolve)
+    }))
+
+    const wrapper = mount(VideosList, {
+      props: { fixedScope: 'category:44' },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { categoryId: 44 })
+    expect(wrapper.find('[data-test="table-empty"]').exists()).toBe(true)
+
+    await wrapper.setProps({ fixedScope: 'common:all' })
+    await flushPromises()
+
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, {})
+
+    videosStore.videos.value = [{ id: 201, title: 'Late category video', accountId: 0, categoryId: 44 }]
+    pendingCategoryRefreshes.forEach(resolve => resolve(videosStore.videos.value))
+    await flushPromises()
+
+    expect(wrapper.vm.loadedFixedScope).toBeNull()
+    expect(wrapper.find('[data-test="table-empty"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Late category video')
+
+    videosStore.videos.value = [{ id: 202, title: 'Latest common video', accountId: 0, categoryId: 0 }]
+    pendingCommonRefreshes.forEach(resolve => resolve(videosStore.videos.value))
+    await flushPromises()
+
+    expect(wrapper.vm.loadedFixedScope).toBe('common:all')
+    expect(wrapper.text()).toContain('Latest common video')
+  })
+
+  it('clears loadedFixedScope when selectedScope becomes null for a fixed scope', async () => {
+    const wrapper = mount(VideosList, {
+      props: { fixedScope: 'common:all' },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    wrapper.vm.loadedFixedScope = 'common:all'
+    wrapper.vm.selectedScope = null
+
+    await expect(wrapper.vm.refreshVideos()).resolves.toBe(true)
+    expect(wrapper.vm.loadedFixedScope).toBeNull()
   })
 
   it('runs the embedded action hook before opening batch category dialog', async () => {

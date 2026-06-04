@@ -13,6 +13,7 @@ import { resolveAll } from './helpers/test-utils'
 const FormStub = {
   name: 'Form',
   props: ['initialValues'],
+  emits: ['submit', 'invalid-submit'],
   template: '<form @submit.prevent="$emit(\'submit\', initialValues)"><slot :errors="{}" :isSubmitting="false" :handleSubmit="handleSubmit" /></form>',
   methods: {
     handleSubmit(submit) {
@@ -388,5 +389,16 @@ describe('User_Settings.vue real component', () => {
     await resolveAll()
     expect(routerPush).toHaveBeenCalledWith('/users')
   })
-})
 
+  it('shows validation errors via the alert store on invalid submit', async () => {
+    const wrapper = mount(Parent, {
+      props: { register: true },
+      global: { stubs: stubs() }
+    })
+    await resolveAll()
+
+    const child = wrapper.findComponent(UserSettings)
+    expect(child.vm.$.setupState.onInvalidSubmit({ errors: { email: 'Необходимо указать email' } })).toBe(false)
+    expect(errorAlert).toHaveBeenCalledWith('Необходимо указать email')
+  })
+})

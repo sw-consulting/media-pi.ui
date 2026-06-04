@@ -88,10 +88,12 @@ const localSortBy = ref([])
 const localPage = ref(1)
 const accessibleCategoryIds = ref(new Set())
 const accessInfoLoaded = ref(false)
+const loadedFixedScope = ref(null)
 const hasFixedScope = computed(() => props.fixedScope !== null && props.fixedScope !== undefined)
+const isPendingFixedScope = computed(() => props.pendingFixedScope && !hasFixedScope.value)
 const isScopeFixed = computed(() => hasFixedScope.value || props.pendingFixedScope)
 const canResolvePendingScope = computed(() => (
-  props.pendingFixedScope && props.embedded && typeof props.beforeEmbeddedAction === 'function'
+  isPendingFixedScope.value && props.embedded && typeof props.beforeEmbeddedAction === 'function'
 ))
 
 const accessibleCategories = computed(() => (
@@ -104,6 +106,11 @@ const scopeOptions = computed(() => {
 })
 const selectedScopeInfo = computed(() => parseVideoScope(selectedScope.value))
 const categoryOptions = computed(() => createCategoryOptions(categories.value || []))
+const displayedVideos = computed(() => (
+  !isScopeFixed.value || (selectedScope.value && loadedFixedScope.value === selectedScope.value)
+    ? (videos.value || [])
+    : []
+))
 
 const uploadProgressTitle = computed(() => {
   if (uploadPhase.value === 'processing') return 'Обработка видеофайлов'
@@ -327,11 +334,16 @@ async function refreshCommonVideos() {
 }
 
 const refreshVideos = async () => {
+  const requestedScope = selectedScope.value
   try {
-    if (selectedScope.value === undefined || selectedScope.value === null) return true
-    const scope = selectedScopeInfo.value
+    if (requestedScope === undefined || requestedScope === null) {
+      if (isScopeFixed.value) loadedFixedScope.value = null
+      return true
+    }
+    const scope = parseVideoScope(requestedScope)
     if (scope.type === 'common') {
       await refreshCommonVideos()
+      if (isScopeFixed.value && selectedScope.value === requestedScope) loadedFixedScope.value = requestedScope
       return true
     }
 
@@ -341,6 +353,7 @@ const refreshVideos = async () => {
         ? { categoryId: scope.categoryId }
         : {}
     )
+    if (isScopeFixed.value && selectedScope.value === requestedScope) loadedFixedScope.value = requestedScope
     return true
   } catch (err) {
     alertStore.error('Не удалось загрузить информацию о видеофайлах: ' + (err?.message || err))
@@ -646,7 +659,7 @@ function filterVideos(value, query, item) {
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
 }
 
-watch(videos, (current) => {
+watch(displayedVideos, (current) => {
   const currentIds = new Set((current || []).map(video => video.id))
   selectedVideoIds.value = selectedVideoIds.value.filter(id => currentIds.has(id))
 })
@@ -838,7 +851,7 @@ watch(videos, (current) => {
     <div v-else class="videos-list-subsection-divider"></div>
 
     <v-card :class="{ 'videos-list-card-embedded': props.embedded }">
-      <div v-if="videos?.length">
+      <div v-if="displayedVideos?.length">
         <v-text-field
           v-model="tableSearch"
           :append-inner-icon="mdiMagnify"
@@ -858,7 +871,7 @@ watch(videos, (current) => {
         v-model:page="tablePage"
         v-model="selectedVideoIds"
         :headers="headers"
-        :items="videos"
+        :items="displayedVideos"
         :search="tableSearch"
         v-model:sort-by="tableSortBy"
         :custom-filter="filterVideos"

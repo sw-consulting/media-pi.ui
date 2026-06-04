@@ -74,7 +74,7 @@ const mountSettings = (props = {}) => mount({
           </div>
         `,
         props: ['validation-schema', 'initial-values'],
-        emits: ['submit'],
+        emits: ['submit', 'invalid-submit'],
         data() {
           return {
             errors: props.showValidationError ? { name: 'Необходимо указать имя', ipAddress: 'Необходимо указать IP адрес' } : {},
@@ -83,9 +83,17 @@ const mountSettings = (props = {}) => mount({
         },
         methods: {
           handleSubmit(submit) {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             return submit({ name: props.submitName || 'Test Device', ipAddress: props.submitIp || '1.2.3.4' })
           },
           onSubmit() {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             this.$emit('submit', { name: props.submitName || 'Test Device', ipAddress: props.submitIp || '1.2.3.4' })
           }
         }
@@ -440,8 +448,12 @@ describe('Device_Settings.vue', () => {
       const wrapper = mountSettings({ showValidationError: true })
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Необходимо указать имя')
-      expect(wrapper.text()).toContain('Необходимо указать IP адрес')
+      await wrapper.find('[data-test="save-device-button"]').trigger('click')
+      await flushPromises()
+
+      expect(alertStore.error).toHaveBeenCalledWith(
+        'Необходимо указать имя; Необходимо указать IP адрес'
+      )
     })
 
     it('shows loading state when devicesStore loading is true', async () => {

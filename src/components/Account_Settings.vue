@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { UserRoleConstants } from '@/helpers/user.helpers.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 import SubscriptionsList from '@/components/Subscriptions_List.vue'
 
@@ -189,6 +190,10 @@ async function saveBeforeEmbeddedAction(values) {
 async function onSubmit(values) {
   await saveAccountPayload(values)
 }
+
+function onInvalidSubmit(context) {
+  return showFormValidationErrors(alertStore, context)
+}
 </script>
 
 <template>
@@ -197,6 +202,7 @@ async function onSubmit(values) {
       :validation-schema="schema"
       :initial-values="account"
       @submit="onSubmit"
+      @invalid-submit="onInvalidSubmit"
       v-slot="{ errors, isSubmitting, handleSubmit }"
     >
       <div class="header-with-actions">
@@ -257,10 +263,6 @@ async function onSubmit(values) {
           </li>
         </ul>
       </div>
-
-      <!-- Form validation errors -->
-      <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
-      <div v-if="errors.managers" class="alert alert-danger mt-3 mb-0">{{ errors.managers }}</div>
       <template v-if="captureEmbeddedActionHandler(handleSubmit)"></template>
     </Form>
     
