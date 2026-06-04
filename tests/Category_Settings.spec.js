@@ -11,6 +11,7 @@ import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 const routerGo = vi.hoisted(() => vi.fn())
 
 const categoriesStore = {
+  categories: ref([]),
   category: null,
   loading: ref(false),
   getById: vi.fn(),
@@ -107,10 +108,11 @@ const mountSettings = (props = {}) => mount({
           title: String,
           embedded: Boolean,
           fixedScope: String,
+          pendingFixedScope: Boolean,
           beforeEmbeddedAction: Function
         },
         template: `
-          <div data-test="category-videos-list" :data-title="title" :data-embedded="embedded ? 'true' : 'false'" :data-fixed-scope="fixedScope">
+          <div data-test="category-videos-list" :data-title="title" :data-embedded="embedded ? 'true' : 'false'" :data-fixed-scope="fixedScope" :data-pending-fixed-scope="pendingFixedScope ? 'true' : 'false'">
             <button data-test="embedded-videos-action" @click="beforeEmbeddedAction && beforeEmbeddedAction()"></button>
           </div>
         `
@@ -139,6 +141,7 @@ const mountSettings = (props = {}) => mount({
 describe('Category_Settings.vue', () => {
   beforeEach(() => {
     authStore = { isAdministrator: true }
+    categoriesStore.categories.value = []
     categoriesStore.category = null
     categoriesStore.loading.value = false
     categoriesStore.getById = vi.fn().mockResolvedValue()
@@ -174,6 +177,34 @@ describe('Category_Settings.vue', () => {
     await flushPromises()
 
     expect(categoriesStore.create).toHaveBeenCalledWith({ title: 'Premium', free: false })
+  })
+
+  it('creates a new category before the first embedded videos action and keeps the form open', async () => {
+    categoriesStore.create = vi.fn(async (payload) => {
+      categoriesStore.categories.value = [{ id: 44, ...payload }]
+      return { id: 44, ...payload }
+    })
+
+    const wrapper = mountSettings({
+      submitValues: { title: 'Fresh Category' }
+    })
+    await flushPromises()
+
+    let videosList = wrapper.find('[data-test="category-videos-list"]')
+    expect(videosList.exists()).toBe(true)
+    expect(videosList.attributes('data-fixed-scope')).toBeUndefined()
+    expect(videosList.attributes('data-pending-fixed-scope')).toBe('true')
+
+    await wrapper.find('[data-test="embedded-videos-action"]').trigger('click')
+    await flushPromises()
+
+    expect(categoriesStore.create).toHaveBeenCalledWith({ title: 'Fresh Category', free: true })
+    expect(routerGo).not.toHaveBeenCalled()
+
+    videosList = wrapper.find('[data-test="category-videos-list"]')
+    expect(videosList.attributes('data-fixed-scope')).toBe('category:44')
+    expect(videosList.attributes('data-pending-fixed-scope')).toBe('false')
+    expect(wrapper.find('.primary-heading').text()).toBe('Настройки категории')
   })
 
   it('loads category when editing and updates it', async () => {
@@ -632,6 +663,7 @@ describe('Category_Settings.vue', () => {
 describe('Category_Settings.vue - additional coverage', () => {
   beforeEach(() => {
     authStore = { isAdministrator: true }
+    categoriesStore.categories.value = []
     categoriesStore.category = null
     categoriesStore.loading.value = false
     categoriesStore.getById = vi.fn().mockResolvedValue()

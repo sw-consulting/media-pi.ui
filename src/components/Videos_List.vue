@@ -46,6 +46,10 @@ const props = defineProps({
   fixedScope: {
     type: String,
     default: null
+  },
+  pendingFixedScope: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -84,13 +88,18 @@ const localSortBy = ref([])
 const localPage = ref(1)
 const accessibleCategoryIds = ref(new Set())
 const accessInfoLoaded = ref(false)
+const hasFixedScope = computed(() => props.fixedScope !== null && props.fixedScope !== undefined)
+const isScopeFixed = computed(() => hasFixedScope.value || props.pendingFixedScope)
+const canResolvePendingScope = computed(() => (
+  props.pendingFixedScope && props.embedded && typeof props.beforeEmbeddedAction === 'function'
+))
 
 const accessibleCategories = computed(() => (
   filterAccessibleCategories(categories.value || [], authStore.user, accessibleCategoryIds.value)
 ))
 
 const scopeOptions = computed(() => {
-  if (props.fixedScope) return []
+  if (isScopeFixed.value) return []
   return createVideoScopeOptions(accounts.value || [], accessibleCategories.value, authStore.user, accessibleCategoryIds.value)
 })
 const selectedScopeInfo = computed(() => parseVideoScope(selectedScope.value))
@@ -133,7 +142,12 @@ const headers = computed(() => {
 const selectWidth = computed(() => estimateSelectWidth(scopeOptions.value))
 
 const canManageSelectedScope = computed(() => {
+  if (canResolvePendingScope.value && !hasFixedScope.value) {
+    return isAdministrator(authStore.user)
+  }
+
   const scope = selectedScopeInfo.value
+  if (scope.accountId === null || scope.accountId === undefined) return false
   if (scope.accountId === 0) {
     return isAdministrator(authStore.user)
   }
@@ -146,30 +160,30 @@ const canDeleteSelectedVideos = computed(() => canManageSelectedScope.value && s
 const canUpdateSelectedCategory = computed(() => selectedScopeInfo.value.accountId === 0 && canDeleteSelectedVideos.value)
 const canApplyBatchCategory = computed(() => canUpdateSelectedCategory.value && typeof batchCategoryId.value === 'number')
 const tableItemsPerPage = computed({
-  get: () => props.fixedScope ? localItemsPerPage.value : authStore.videos_per_page,
+  get: () => isScopeFixed.value ? localItemsPerPage.value : authStore.videos_per_page,
   set: value => {
-    if (props.fixedScope) localItemsPerPage.value = value
+    if (isScopeFixed.value) localItemsPerPage.value = value
     else authStore.videos_per_page = value
   }
 })
 const tableSearch = computed({
-  get: () => props.fixedScope ? localSearch.value : authStore.videos_search,
+  get: () => isScopeFixed.value ? localSearch.value : authStore.videos_search,
   set: value => {
-    if (props.fixedScope) localSearch.value = value
+    if (isScopeFixed.value) localSearch.value = value
     else authStore.videos_search = value
   }
 })
 const tableSortBy = computed({
-  get: () => props.fixedScope ? localSortBy.value : authStore.videos_sort_by,
+  get: () => isScopeFixed.value ? localSortBy.value : authStore.videos_sort_by,
   set: value => {
-    if (props.fixedScope) localSortBy.value = value
+    if (isScopeFixed.value) localSortBy.value = value
     else authStore.videos_sort_by = value
   }
 })
 const tablePage = computed({
-  get: () => props.fixedScope ? localPage.value : authStore.videos_page,
+  get: () => isScopeFixed.value ? localPage.value : authStore.videos_page,
   set: value => {
-    if (props.fixedScope) localPage.value = value
+    if (isScopeFixed.value) localPage.value = value
     else authStore.videos_page = value
   }
 })
@@ -214,7 +228,7 @@ function isAbortError(err) {
 }
 
 function ensureSelection(options) {
-  if (props.fixedScope) {
+  if (isScopeFixed.value) {
     selectedScope.value = props.fixedScope
     return
   }
@@ -314,6 +328,7 @@ async function refreshCommonVideos() {
 
 const refreshVideos = async () => {
   try {
+    if (selectedScope.value === undefined || selectedScope.value === null) return true
     const scope = selectedScopeInfo.value
     if (scope.type === 'common') {
       await refreshCommonVideos()
@@ -338,6 +353,11 @@ watch(scopeOptions, (options) => {
   ensureSelection(options)
 }, { immediate: true })
 
+watch(() => props.fixedScope, (scope) => {
+  if (!isScopeFixed.value) return
+  selectedScope.value = scope
+}, { immediate: true })
+
 watch(selectedScope, async () => {
   if (shouldDeferScopeSync()) return
   if (selectedScope.value === undefined || selectedScope.value === null) return
@@ -353,7 +373,7 @@ watch(isUploading, async (visible) => {
 
 onMounted(async () => {
   try {
-    if (!props.fixedScope) {
+    if (!isScopeFixed.value) {
       await accountsStore.getAll()
     }
     await categoriesStore.getAll()
@@ -370,6 +390,8 @@ async function triggerUpload() {
   if (!fileInput.value) return
   const canProceed = runBeforeEmbeddedAction(props.embedded, props.beforeEmbeddedAction)
   if (canProceed !== true && !await canProceed) return
+  await nextTick()
+  if (selectedScope.value === undefined || selectedScope.value === null) return
   fileInput.value.value = null
   fileInput.value.click()
 }
@@ -377,6 +399,10 @@ async function triggerUpload() {
 async function uploadVideos(files) {
   const selectedFiles = Array.from(files || []).filter(Boolean)
   if (!selectedFiles.length) return
+  if (selectedScope.value === undefined || selectedScope.value === null) {
+    alertStore.error('Не выбран раздел для загрузки видеофайлов')
+    return
+  }
   if (!canManageSelectedScope.value) {
     alertStore.error('Недостаточно прав для загрузки видеофайлов в выбранный раздел')
     return
@@ -649,7 +675,7 @@ watch(videos, (current) => {
         <div v-if="loading" class="header-actions header-actions-group">
           <span class="spinner-border spinner-border-m"></span>
         </div>
-        <div v-if="!props.fixedScope" class="header-actions header-actions-group">
+        <div v-if="!isScopeFixed" class="header-actions header-actions-group">
           <v-select            
             v-model="selectedScope"
             :items="scopeOptions"

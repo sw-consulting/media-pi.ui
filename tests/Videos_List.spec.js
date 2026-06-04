@@ -321,6 +321,42 @@ describe('Videos_List.vue', () => {
     expect(fileInput.click).not.toHaveBeenCalled()
   })
 
+  it('resolves a pending fixed scope before opening the upload picker', async () => {
+    let wrapper
+    const beforeEmbeddedAction = vi.fn(async () => {
+      await wrapper.setProps({
+        fixedScope: 'category:44',
+        pendingFixedScope: false
+      })
+      return true
+    })
+
+    wrapper = mount(VideosList, {
+      props: {
+        embedded: true,
+        pendingFixedScope: true,
+        beforeEmbeddedAction
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    expect(accountsStore.getAll).not.toHaveBeenCalled()
+    expect(videosStore.getAllByAccount).not.toHaveBeenCalled()
+    expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="upload-video-button"]').element.disabled).toBe(false)
+
+    const fileInput = wrapper.find('input[type="file"]')
+    const clickSpy = vi.spyOn(fileInput.element, 'click').mockImplementation(() => {})
+
+    await wrapper.find('[data-test="upload-video-button"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeEmbeddedAction).toHaveBeenCalled()
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { categoryId: 44 })
+    expect(clickSpy).toHaveBeenCalled()
+  })
+
   it('runs the embedded action hook before opening batch category dialog', async () => {
     videosStore.videos.value = [{ id: 5, title: 'Clip', accountId: 0, categoryId: 9 }]
     const beforeEmbeddedAction = vi.fn(async () => false)
