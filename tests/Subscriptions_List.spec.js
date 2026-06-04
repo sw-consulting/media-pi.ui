@@ -48,16 +48,16 @@ vi.mock('@sw-consulting/tooling.ui.kit', () => ({
 }))
 
 const globalStubs = {
-  'v-card': { template: '<div><slot /></div>' },
+  'v-card': { template: '<div v-bind="$attrs"><slot /></div>' },
   'v-text-field': {
-    props: ['modelValue'],
+    props: ['modelValue', 'density'],
     emits: ['update:modelValue'],
-    template: '<input data-test="subscription-search" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
+    template: '<input data-test="subscription-search" :data-density="density" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
   },
   'v-data-table': {
-    props: ['items', 'headers', 'customFilter', 'itemValue', 'noDataText', 'noResultsText'],
+    props: ['items', 'headers', 'customFilter', 'itemValue', 'noDataText', 'noResultsText', 'density'],
     template: `
-      <div class="data-table">
+      <div class="data-table" :data-density="density">
         <div v-if="!items.length" data-test="table-empty">{{ noDataText }}</div>
         <div
           v-for="item in items"
@@ -146,6 +146,41 @@ describe('Subscriptions_List.vue', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-test="table-empty"]').text()).toBe('Нет подписок')
+    expect(wrapper.find('[data-test="subscription-search"]').exists()).toBe(false)
+    expect(wrapper.find('.subscriptions-card').classes()).toContain('subscriptions-card--empty')
+  })
+
+  it('shows list alert by default and suppresses it when embedded', async () => {
+    alertStore.alert.value = { message: 'Subscription error', type: 'alert-danger' }
+
+    const wrapper = mountList()
+    await flushPromises()
+
+    expect(wrapper.find('.alert-dismissable').text()).toContain('Subscription error')
+
+    const embeddedWrapper = mountList({ embedded: true })
+    await flushPromises()
+
+    expect(embeddedWrapper.find('.alert-dismissable').exists()).toBe(false)
+  })
+
+  it('renders embedded mode with compact subsection styles', async () => {
+    accountsStore.subscriptions.value = {
+      subscriptions: [
+        { categoryId: 7, categoryTitle: 'Premium', categoryFree: false, startDate: '2026-06-01', endDate: '2026-06-30' }
+      ],
+      availableCategories: []
+    }
+
+    const wrapper = mountList({ embedded: true })
+    await flushPromises()
+
+    expect(wrapper.classes()).toContain('subscriptions-list-embedded')
+    expect(wrapper.find('.subscriptions-list-subsection-header').exists()).toBe(true)
+    expect(wrapper.find('.subscriptions-list-subsection-divider').exists()).toBe(true)
+    expect(wrapper.find('.subscriptions-list-card-embedded').exists()).toBe(true)
+    expect(wrapper.find('[data-test="subscription-search"]').attributes('data-density')).toBe('compact')
+    expect(wrapper.find('.data-table').attributes('data-density')).toBe('compact')
   })
 
   it('renders multiple subscriptions for the same category', async () => {
@@ -162,6 +197,7 @@ describe('Subscriptions_List.vue', () => {
 
     const rows = wrapper.findAll('[data-test="subscription-row"]')
     expect(rows).toHaveLength(2)
+    expect(wrapper.find('.subscriptions-card').classes()).not.toContain('subscriptions-card--empty')
     expect(rows[0].attributes('data-row-id')).not.toBe(rows[1].attributes('data-row-id'))
     expect(wrapper.find('[data-test="create-subscription-button"]').element.disabled).toBe(false)
   })

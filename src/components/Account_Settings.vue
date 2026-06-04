@@ -225,19 +225,19 @@ async function onSubmit(values) {
       <div v-if="errors.managers" class="alert alert-danger mt-3 mb-0">{{ errors.managers }}</div>
     </Form>
     
-    <!-- Global alert messages -->
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
-    
     <!-- Store loading and error states -->
     <div v-if="loading || initialLoading" class="text-center m-5">
       <span class="spinner-border spinner-border-lg align-center"></span>
       <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
     </div>
 
-    <SubscriptionsList v-if="!isRegister() && props.id" :account-id="props.id" />
+    <SubscriptionsList v-if="!isRegister() && props.id" :account-id="props.id" embedded />
+
+    <!-- Global alert messages -->
+    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
+      {{ alert.message }}
+    </div>
     
   </div>
 </template>

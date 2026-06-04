@@ -32,6 +32,10 @@ const props = defineProps({
     required: false,
     default: ''
   },
+  embedded: {
+    type: Boolean,
+    default: false
+  },
   mode: {
     type: String,
     default: 'account',
@@ -323,8 +327,8 @@ function cancelPlaylistCleanup() {
 </script>
 
 <template>
-  <div class="subscriptions-section settings table-3">
-    <div class="header-with-actions">
+  <div class="subscriptions-section settings table-3" :class="{ 'subscriptions-list-embedded': props.embedded }">
+    <div class="header-with-actions" :class="{ 'subscriptions-list-subsection-header': props.embedded }">
       <h2 class="secondary-heading">Подписки</h2>
       <div v-if="canManageSubscriptions" class="header-actions-container">
         <div v-if="isBusy" class="header-actions header-actions-group">
@@ -342,14 +346,22 @@ function cancelPlaylistCleanup() {
         </div>
       </div>
     </div>
+    <div v-if="props.embedded" class="subscriptions-list-subsection-divider"></div>
 
-    <v-card>
+    <v-card
+      class="subscriptions-card"
+      :class="{
+        'subscriptions-card--empty': !subscriptionRows.length,
+        'subscriptions-list-card-embedded': props.embedded
+      }"
+    >
       <div v-if="subscriptionRows.length">
         <v-text-field
           v-model="authStore.subscriptions_search"
           :append-inner-icon="mdiMagnify"
           label="Поиск по подпискам"
           variant="solo"
+          :density="props.embedded ? 'compact' : undefined"
           hide-details
         />
       </div>
@@ -367,6 +379,7 @@ function cancelPlaylistCleanup() {
         v-model:sort-by="authStore.subscriptions_sort_by"
         :custom-filter="filterSubscriptions"
         item-value="subscriptionRowId"
+        :density="props.embedded ? 'compact' : undefined"
         class="elevation-1"
       >
         <template v-if="canManageSubscriptions" v-slot:[`item.actions`]="{ item }">
@@ -394,7 +407,7 @@ function cancelPlaylistCleanup() {
       </v-data-table>
     </v-card>
 
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+    <div v-if="!props.embedded && alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
     </div>
@@ -416,5 +429,48 @@ function cancelPlaylistCleanup() {
 
 .subscriptions-section .secondary-heading {
   margin: 0;
+}
+
+.subscriptions-list-embedded .subscriptions-list-subsection-header {
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 8px;
+}
+
+.subscriptions-list-embedded .header-actions {
+  gap: 0.125rem;
+  padding: 0.25rem;
+  border-color: #d0d7de;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.subscriptions-list-subsection-divider {
+  height: 1px;
+  margin: 0 0 12px;
+  background: #e0e0e0;
+}
+
+.subscriptions-list-card-embedded {
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.subscriptions-list-embedded :deep(.v-data-table thead th),
+.subscriptions-list-embedded :deep(.v-data-table-server thead th),
+.subscriptions-list-embedded :deep(.v-table thead th),
+.subscriptions-list-embedded :deep(.v-table > .v-table__wrapper > table > thead > tr > th) {
+  font-size: 0.9rem !important;
+}
+
+.subscriptions-list-embedded :deep(.v-data-table__td) {
+  font-size: 0.875rem;
+}
+
+.subscriptions-card--empty {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
 }
 </style>

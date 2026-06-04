@@ -113,8 +113,11 @@ const mountSettings = (props = {}) => mount({
         props: ['name', 'label', 'fieldType', 'options', 'placeholder', 'addTooltip', 'removeTooltip', 'hasError']
       },
       SubscriptionsList: {
-        template: '<div data-test="subscriptions-list" :data-account-id="accountId"></div>',
-        props: ['accountId']
+        template: '<div data-test="subscriptions-list" :data-account-id="accountId" :data-embedded="embedded ? \'true\' : \'false\'"></div>',
+        props: {
+          accountId: Number,
+          embedded: Boolean
+        }
       }
     }
   }
@@ -165,6 +168,24 @@ describe('Account_Settings.vue', () => {
     expect(accountsStore.getById).toHaveBeenCalledWith(1)
     expect(wrapper.find('[data-test="manager-field-array"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="subscriptions-list"]').attributes('data-account-id')).toBe('1')
+    expect(wrapper.find('[data-test="subscriptions-list"]').attributes('data-embedded')).toBe('true')
+  })
+
+  it('renders the shared alert below embedded subscriptions', async () => {
+    accountsStore.account = {
+      id: 1,
+      name: 'Cafe',
+      userIds: [1]
+    }
+    alertStore.alert = { message: 'Account alert', type: 'alert-danger' }
+
+    const wrapper = mountSettings({ register: false, id: 1 })
+    await flushPromises()
+
+    expect(wrapper.find('.alert-dismissable').text()).toContain('Account alert')
+    expect(wrapper.html().indexOf('data-test="subscriptions-list"')).toBeLessThan(
+      wrapper.html().indexOf('alert-dismissable')
+    )
   })
 
   it('loads account managers by account for non-admin users', async () => {

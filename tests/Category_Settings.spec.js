@@ -114,9 +114,10 @@ const mountSettings = (props = {}) => mount({
         props: {
           mode: String,
           categoryId: Number,
-          categoryTitle: String
+          categoryTitle: String,
+          embedded: Boolean
         },
-        template: '<div data-test="category-subscriptions-list" :data-mode="mode" :data-category-id="categoryId" :data-category-title="categoryTitle"></div>'
+        template: '<div data-test="category-subscriptions-list" :data-mode="mode" :data-category-id="categoryId" :data-category-title="categoryTitle" :data-embedded="embedded ? \'true\' : \'false\'"></div>'
       }
     },
     mocks: {
@@ -271,8 +272,28 @@ describe('Category_Settings.vue', () => {
     expect(subscriptionsList.attributes('data-mode')).toBe('category')
     expect(subscriptionsList.attributes('data-category-id')).toBe('9')
     expect(subscriptionsList.attributes('data-category-title')).toBe('Existing')
+    expect(subscriptionsList.attributes('data-embedded')).toBe('true')
     expect(wrapper.html().indexOf('data-test="category-videos-list"')).toBeLessThan(
       wrapper.html().indexOf('data-test="category-subscriptions-section"')
+    )
+  })
+
+  it('renders the shared alert below embedded category lists', async () => {
+    categoriesStore.category = { id: 9, title: 'Existing', free: false }
+    alertStore.alert.value = { message: 'Category alert', type: 'alert-danger' }
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.alert-dismissable').text()).toContain('Category alert')
+    expect(wrapper.html().indexOf('data-test="category-videos-list"')).toBeLessThan(
+      wrapper.html().indexOf('alert-dismissable')
+    )
+    expect(wrapper.html().indexOf('data-test="category-subscriptions-section"')).toBeLessThan(
+      wrapper.html().indexOf('alert-dismissable')
     )
   })
 

@@ -216,16 +216,6 @@ function cancelPlaylistCleanup() {
       <div v-if="errors.title" class="alert alert-danger mt-3 mb-0">{{ errors.title }}</div>
     </Form>
 
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
-
-    <div v-if="loading || initialLoading" class="text-center m-5">
-      <span class="spinner-border spinner-border-lg align-center"></span>
-      <div class="mt-2">{{ loading ? 'Сохранение...' : 'Загрузка...' }}</div>
-    </div>
-
     <VideosList
       v-if="!isRegister() && props.id"
       class="mt-8"
@@ -244,7 +234,13 @@ function cancelPlaylistCleanup() {
         mode="category"
         :category-id="props.id"
         :category-title="category.title"
+        embedded
       />
+    </div>
+
+    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
+      {{ alert.message }}
     </div>
 
     <PlaylistAccessImpactDialog

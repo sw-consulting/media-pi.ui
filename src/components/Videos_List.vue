@@ -871,7 +871,7 @@ watch(videos, (current) => {
       :title="videoDialogTitle"
       @playback-error="handleVideoPlaybackError"
     />
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
+    <div v-if="!props.embedded && alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
       <button @click="alertStore.clear()" class="btn btn-link close">×</button>
       {{ alert.message }}
     </div>

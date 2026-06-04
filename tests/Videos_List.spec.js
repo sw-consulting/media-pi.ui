@@ -228,6 +228,8 @@ describe('Videos_List.vue', () => {
   })
 
   it('renders embedded mode as a subordinate subsection', async () => {
+    alertStore.alert.value = { message: 'Video alert', type: 'alert-danger' }
+
     const wrapper = mount(VideosList, {
       props: {
         title: 'Видеофайлы',
@@ -250,6 +252,7 @@ describe('Videos_List.vue', () => {
     expect(wrapper.find('hr.hr').exists()).toBe(false)
     expect(wrapper.find('.videos-list-subsection-divider').exists()).toBe(true)
     expect(wrapper.find('.videos-list-card-embedded').exists()).toBe(true)
+    expect(wrapper.find('.alert-dismissable').exists()).toBe(false)
   })
 
   it('loads videos for default and changed account selection', async () => {
