@@ -296,9 +296,6 @@ async function onSubmit (values) {
           </template>
         </v-data-table>
       </v-card>
-      <div v-if="playlistsError" class="text-center m-5">
-        <div class="text-danger">Ошибка при загрузке списка плейлистов: {{ playlistsError }}</div>
-      </div>
 
       <div v-if="errors.name" class="alert alert-danger mt-3 mb-0">{{ errors.name }}</div>
     </Form>

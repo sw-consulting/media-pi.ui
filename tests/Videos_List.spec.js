@@ -323,6 +323,11 @@ describe('Videos_List.vue', () => {
 
   it('resolves a pending fixed scope before opening the upload picker', async () => {
     let wrapper
+    let resolveRefresh
+    videosStore.videos.value = [{ id: 99, title: 'Stale common video', accountId: 0, categoryId: 0 }]
+    videosStore.getAllByAccount.mockImplementationOnce(() => new Promise(resolve => {
+      resolveRefresh = resolve
+    }))
     const beforeEmbeddedAction = vi.fn(async () => {
       await wrapper.setProps({
         fixedScope: 'category:44',
@@ -344,6 +349,8 @@ describe('Videos_List.vue', () => {
     expect(accountsStore.getAll).not.toHaveBeenCalled()
     expect(videosStore.getAllByAccount).not.toHaveBeenCalled()
     expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="table-empty"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Stale common video')
     expect(wrapper.find('[data-test="upload-video-button"]').element.disabled).toBe(false)
 
     const fileInput = wrapper.find('input[type="file"]')
@@ -354,7 +361,15 @@ describe('Videos_List.vue', () => {
 
     expect(beforeEmbeddedAction).toHaveBeenCalled()
     expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { categoryId: 44 })
+    expect(wrapper.find('[data-test="table-empty"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Stale common video')
     expect(clickSpy).toHaveBeenCalled()
+
+    videosStore.videos.value = [{ id: 100, title: 'Fresh category video', accountId: 0, categoryId: 44 }]
+    resolveRefresh(videosStore.videos.value)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Fresh category video')
   })
 
   it('runs the embedded action hook before opening batch category dialog', async () => {
