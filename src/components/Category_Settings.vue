@@ -14,6 +14,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
+import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import VideosList from '@/components/Videos_List.vue'
 import SubscriptionsList from '@/components/Subscriptions_List.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
@@ -236,6 +237,10 @@ function cancelPlaylistCleanup() {
   pendingCategoryPayload.value = null
   pendingCategoryNavigate.value = true
 }
+
+function onInvalidSubmit(context) {
+  return showFormValidationErrors(alertStore, context)
+}
 </script>
 
 <template>
@@ -244,6 +249,7 @@ function cancelPlaylistCleanup() {
       :validation-schema="schema"
       :initial-values="category"
       @submit="onSubmit"
+      @invalid-submit="onInvalidSubmit"
       v-slot="{ errors, isSubmitting, handleSubmit }"
     >
       <div class="header-with-actions">
@@ -306,8 +312,6 @@ function cancelPlaylistCleanup() {
           <label for="category-free">Доступ без подписки</label>
         </div>
       </div>
-
-      <div v-if="errors.title" class="alert alert-danger mt-3 mb-0">{{ errors.title }}</div>
       <template v-if="captureEmbeddedActionHandler(handleSubmit)"></template>
     </Form>
 

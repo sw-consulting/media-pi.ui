@@ -16,6 +16,7 @@ import { useCategoriesStore } from '@/stores/categories.store.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
+import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import { createAccountOptions } from '@/helpers/account.options.js'
 import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { getVideoCategoryTitle } from '@/helpers/video.scope.helpers.js'
@@ -593,6 +594,10 @@ async function onSubmit(values) {
     }
   }
 }
+
+function onInvalidSubmit(context) {
+  return showFormValidationErrors(alertStore, context)
+}
 </script>
 
 <template>
@@ -602,6 +607,7 @@ async function onSubmit(values) {
       :validation-schema="schema"
       :initial-values="playlist"
       @submit="onSubmit"
+      @invalid-submit="onInvalidSubmit"
       v-slot="{ errors, isSubmitting, handleSubmit }"
     >
       <div class="header-with-actions">
@@ -878,8 +884,6 @@ async function onSubmit(values) {
           </v-data-table>
         </div>
       </div>
-
-      <div v-if="errors.title" class="alert alert-danger mt-3 mb-0">{{ errors.title }}</div>
     </Form>
 
     <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">

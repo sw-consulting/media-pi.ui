@@ -107,7 +107,7 @@ const mountSettings = (props = {}) => mount({
           </div>
         `,
         props: ['validation-schema', 'initial-values'],
-        emits: ['submit'],
+        emits: ['submit', 'invalid-submit'],
         data() {
           return {
             errors: props.showValidationError ? { name: 'Необходимо указать имя' } : {},
@@ -116,9 +116,17 @@ const mountSettings = (props = {}) => mount({
         },
         methods: {
           handleSubmit(submit) {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             return submit({ name: props.submitValue || 'Test Group' })
           },
           onSubmit() {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             this.$emit('submit', { name: props.submitValue || 'Test Group' })
           }
         }
@@ -620,8 +628,10 @@ describe('DeviceGroup_Settings.vue', () => {
     const wrapper = mountSettings({ register: true, accountId: 5, showValidationError: true })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Необходимо указать имя')
-    expect(wrapper.find('.alert-danger').exists()).toBe(true)
+    await wrapper.find('[data-test="save-device-group-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать имя')
   })
 
   it('displays field with correct properties', async () => {

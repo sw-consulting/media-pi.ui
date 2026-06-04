@@ -98,15 +98,23 @@ const mountSettings = (props = {}) => mount({
       Form: {
         template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="false" :handleSubmit="handleSubmit" /></form>',
         props: ['initialValues'],
-        emits: ['submit'],
+        emits: ['submit', 'invalid-submit'],
         data() {
           return { errors: props.showValidationError ? { title: 'Необходимо указать название' } : {} }
         },
         methods: {
           handleSubmit(submit) {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             return submit({ ...this.initialValues, ...(props.submitValues || {}) })
           },
           onSubmit() {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             this.$emit('submit', { ...this.initialValues, ...(props.submitValues || {}) })
           }
         }

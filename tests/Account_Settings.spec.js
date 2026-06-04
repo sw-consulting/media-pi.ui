@@ -82,7 +82,7 @@ const mountSettings = (props = {}) => mount({
       Form: {
         template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" /></form>',
         props: ['validationSchema', 'initialValues'],
-        emits: ['submit'],
+        emits: ['submit', 'invalid-submit'],
         data() {
           return {
             errors: props.errors || {},
@@ -91,9 +91,17 @@ const mountSettings = (props = {}) => mount({
         },
         methods: {
           handleSubmit(submit) {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             return submit(props.submitValues || { name: 'Test Account', managers: [1, '2', ''] })
           },
           onSubmit() {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             this.$emit('submit', props.submitValues || { name: 'Test Account', managers: [1, '2', ''] })
           }
         }

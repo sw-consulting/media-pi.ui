@@ -109,7 +109,7 @@ const mountSettings = (props = {}) => mount({
       Form: {
         template: '<form data-test="form" @submit.prevent="onSubmit"><slot :errors="errors" :isSubmitting="isSubmitting" :handleSubmit="handleSubmit" /></form>',
         props: ['validationSchema', 'initialValues'],
-        emits: ['submit'],
+        emits: ['submit', 'invalid-submit'],
         data() {
           return {
             errors: props.showValidationError ? { title: 'Required' } : {},
@@ -118,9 +118,17 @@ const mountSettings = (props = {}) => mount({
         },
         methods: {
           handleSubmit(submit) {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             return submit({ ...this.initialValues, ...(props.submitValues || {}) })
           },
           onSubmit() {
+            if (Object.keys(this.errors || {}).length) {
+              this.$emit('invalid-submit', { errors: this.errors })
+              return false
+            }
             this.$emit('submit', { ...this.initialValues, ...(props.submitValues || {}) })
           }
         }
@@ -1483,8 +1491,10 @@ describe('Playlist_Settings.vue', () => {
     const wrapper = mountSettings({ accountId: 1, showValidationError: true })
     await flushPromises()
 
-    // The form stub exposes errors.title = 'Required', which triggers the v-if="errors.title" block
-    expect(wrapper.text()).toContain('Required')
+    await wrapper.find('[data-test="save-playlist-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Required')
   })
 
   it('search filter handles null video fields gracefully', async () => {

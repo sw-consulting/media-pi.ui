@@ -13,6 +13,7 @@ import { resolveAll } from './helpers/test-utils'
 const FormStub = {
   name: 'Form',
   props: ['initialValues'],
+  emits: ['submit', 'invalid-submit'],
   template: '<form @submit.prevent="$emit(\'submit\', initialValues)"><slot :errors="{}" :isSubmitting="false" :handleSubmit="handleSubmit" /></form>',
   methods: {
     handleSubmit(submit) {

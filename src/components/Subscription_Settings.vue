@@ -14,6 +14,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
+import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 
 const props = defineProps({
@@ -279,6 +280,10 @@ function cancelPlaylistCleanup() {
   playlistImpactDialog.value = false
   pendingSubscriptionSave.value = null
 }
+
+function onInvalidSubmit(context) {
+  return showFormValidationErrors(alertStore, context)
+}
 </script>
 
 <template>
@@ -287,6 +292,7 @@ function cancelPlaylistCleanup() {
       :validation-schema="schema"
       :initial-values="subscription"
       @submit="onSubmit"
+      @invalid-submit="onInvalidSubmit"
       v-slot="{ errors, isSubmitting, handleSubmit }"
     >
       <div class="header-with-actions">
@@ -395,9 +401,6 @@ function cancelPlaylistCleanup() {
           />
         </div>
       </div>
-
-      <div v-if="errors.startDate" class="alert alert-danger mt-3 mb-0">{{ errors.startDate }}</div>
-      <div v-if="errors.endDate" class="alert alert-danger mt-3 mb-0">{{ errors.endDate }}</div>
       <div v-if="isRegister() && !categoryOptions.length" class="alert alert-info mt-3 mb-0">
         Нет категорий для подписки
       </div>
