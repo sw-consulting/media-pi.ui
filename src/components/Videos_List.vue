@@ -531,10 +531,14 @@ function summarizeBatchDeleteResult(result, requestedCount) {
 
   const failureDetails = failures
     .slice(0, 3)
-    .map(failure => failure?.message || `id=${failure?.id}`)
+    .map(failure => failure?.message || formatVideoFailureFallback(failure))
     .join('; ')
   const remainingCount = failures.length > 3 ? `; ещё ${failures.length - 3}` : ''
   alertStore.error(`Удалено видеофайлов: ${deletedCount}. Не удалось удалить: ${failures.length}. ${failureDetails}${remainingCount}`)
+}
+
+function formatVideoFailureFallback(failure) {
+  return failure?.id == null ? 'неизвестный видеофайл' : `видеофайл с ID ${failure.id}`
 }
 
 async function deleteSelectedVideos() {
@@ -577,7 +581,7 @@ function summarizeBatchCategoryResult(result, requestedCount) {
 
   const failureDetails = failures
     .slice(0, 3)
-    .map(failure => failure?.message || `id=${failure?.id}`)
+    .map(failure => failure?.message || formatVideoFailureFallback(failure))
     .join('; ')
   const remainingCount = failures.length > 3 ? `; ещё ${failures.length - 3}` : ''
   alertStore.error(`Обновлено видеофайлов: ${updatedCount}. Не удалось обновить: ${failures.length}. ${failureDetails}${remainingCount}`)
