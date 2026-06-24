@@ -1141,6 +1141,11 @@ describe('Playlist_Settings.vue', () => {
     await flushPromises()
 
     expect(alertStore.alert.value).not.toBeNull()
+    const hrEl = wrapper.find('hr.hr').element
+    const alertEl = wrapper.find('.alert-dismissable').element
+    const searchInputEl = wrapper.find('[data-test="video-search-input"]').element
+    expect(hrEl.compareDocumentPosition(alertEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(searchInputEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await wrapper.find('.alert .close').trigger('click')
     expect(alertStore.clear).toHaveBeenCalled()
   })

@@ -15,6 +15,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 
 const props = defineProps({
@@ -44,7 +45,6 @@ const props = defineProps({
 const accountsStore = useAccountsStore()
 const authStore = useAuthStore()
 const alertStore = useAlertStore()
-const { alert } = storeToRefs(alertStore)
 const { loading, account, accounts } = storeToRefs(accountsStore)
 
 const subscription = ref({ categoryId: props.categoryId || '', startDate: '', endDate: '' })
@@ -327,6 +327,7 @@ function onInvalidSubmit(context) {
         </div>
       </div>
       <hr class="hr" />
+      <AlertOutput />
 
       <div v-if="hasFixedAccount" class="form-group">
         <label for="accountName" class="label">Лицевой счёт:</label>
@@ -405,11 +406,6 @@ function onInvalidSubmit(context) {
         Нет категорий для подписки
       </div>
     </Form>
-
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
 
     <PlaylistAccessImpactDialog
       v-model="playlistImpactDialog"

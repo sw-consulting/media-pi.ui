@@ -17,6 +17,7 @@ import { useConfirmation } from '@/helpers/confirmation.js'
 import { runBeforeEmbeddedAction } from '@/helpers/embedded.action.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import { getDuplicateOriginalFilenameMessage, isDuplicateOriginalFilenameError } from '@/helpers/video.original.filename.conflict.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 import ModalWindow from '@/components/ModalWindow.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 import VideoViewDialog from '@/components/Video_View_Dialog.vue'
@@ -65,7 +66,6 @@ const { confirmDelete, confirmAction } = useConfirmation()
 const { videos, loading, videoPreview } = storeToRefs(videosStore)
 const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
 const { loading: categoriesLoading, categories } = storeToRefs(categoriesStore)
-const { alert } = storeToRefs(alertStore)
 
 const selectedScope = ref(props.fixedScope)
 const fileInput = ref(null)
@@ -878,7 +878,8 @@ watch(displayedVideos, (current) => {
       </div>
     </div>
     <hr v-if="!props.embedded" class="hr" />
-    <div v-else class="videos-list-subsection-divider"></div>
+    <AlertOutput :show="!props.embedded" />
+    <div v-if="props.embedded" class="videos-list-subsection-divider"></div>
 
     <v-card :class="{ 'videos-list-card-embedded': props.embedded }">
       <div v-if="displayedVideos?.length">
@@ -960,10 +961,6 @@ watch(displayedVideos, (current) => {
       :title="videoDialogTitle"
       @playback-error="handleVideoPlaybackError"
     />
-    <div v-if="!props.embedded && alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
   </div>
 </template>
 

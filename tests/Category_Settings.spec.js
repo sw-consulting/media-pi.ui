@@ -416,7 +416,7 @@ describe('Category_Settings.vue', () => {
     expect(wrapper.find('[data-test="playlist-impact-dialog"]').exists()).toBe(false)
   })
 
-  it('renders the shared alert below embedded category lists', async () => {
+  it('renders the shared alert below the header divider and before page content', async () => {
     categoriesStore.category = { id: 9, title: 'Existing', free: false }
     alertStore.alert.value = { message: 'Category alert', type: 'alert-danger' }
 
@@ -427,12 +427,15 @@ describe('Category_Settings.vue', () => {
     await flushPromises()
 
     expect(wrapper.find('.alert-dismissable').text()).toContain('Category alert')
-    expect(wrapper.html().indexOf('data-test="category-videos-list"')).toBeLessThan(
-      wrapper.html().indexOf('alert-dismissable')
-    )
-    expect(wrapper.html().indexOf('data-test="category-subscriptions-section"')).toBeLessThan(
-      wrapper.html().indexOf('alert-dismissable')
-    )
+    const hrEl = wrapper.find('hr.hr').element
+    const alertEl = wrapper.find('.alert-dismissable').element
+    const titleFieldEl = wrapper.find('[data-test="title-field"]').element
+    const videosListEl = wrapper.find('[data-test="category-videos-list"]').element
+    const subscriptionsSectionEl = wrapper.find('[data-test="category-subscriptions-section"]').element
+    expect(hrEl.compareDocumentPosition(alertEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(titleFieldEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(videosListEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(subscriptionsSectionEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('shows store loading as a header action indicator', async () => {

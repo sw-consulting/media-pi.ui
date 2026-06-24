@@ -6,9 +6,9 @@
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
 import router from '@/router'
-import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 
 const schema = Yup.object().shape({
   email: Yup.string()
@@ -17,7 +17,6 @@ const schema = Yup.object().shape({
 })
 
 const alertStore = useAlertStore()
-const { alert } = storeToRefs(alertStore)
 
 function onSubmit(values) {
   const authStore = useAuthStore()
@@ -47,6 +46,7 @@ function onSubmit(values) {
   <div class="settings form-1">
     <h1 class="orange">Восстановление пароля</h1>
     <hr class="hr" />
+    <AlertOutput />
     <Form @submit="onSubmit" :validation-schema="schema" v-slot="{ errors, isSubmitting }">
       <div class="form-group">
         <label for="email" class="label">Адрес электронной почты:</label>
@@ -67,9 +67,5 @@ function onSubmit(values) {
       </div>
       <div v-if="errors.email" class="alert alert-danger mt-3 mb-0">{{ errors.email }}</div>
     </Form>
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
   </div>
 </template>

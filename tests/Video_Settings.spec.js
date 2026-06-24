@@ -416,6 +416,11 @@ describe('Video_Settings.vue', () => {
 
     const closeButton = wrapper.find('.alert-dismissable .btn-link.close')
     expect(closeButton.exists()).toBe(true)
+    const hrEl = wrapper.find('hr.hr').element
+    const alertEl = wrapper.find('.alert-dismissable').element
+    const accountNameEl = wrapper.find('[data-test="video-account-name"]').element
+    expect(hrEl.compareDocumentPosition(alertEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(accountNameEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await closeButton.trigger('click')
 
     expect(alertStore.clear).toHaveBeenCalled()

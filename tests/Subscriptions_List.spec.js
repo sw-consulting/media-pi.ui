@@ -157,10 +157,16 @@ describe('Subscriptions_List.vue', () => {
     await flushPromises()
 
     expect(wrapper.find('.alert-dismissable').text()).toContain('Subscription error')
+    const hrEl = wrapper.find('hr.hr').element
+    const alertEl = wrapper.find('.alert-dismissable').element
+    const cardEl = wrapper.find('.subscriptions-card').element
+    expect(hrEl.compareDocumentPosition(alertEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(cardEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
     const embeddedWrapper = mountList({ embedded: true })
     await flushPromises()
 
+    expect(embeddedWrapper.find('hr.hr').exists()).toBe(false)
     expect(embeddedWrapper.find('.alert-dismissable').exists()).toBe(false)
   })
 

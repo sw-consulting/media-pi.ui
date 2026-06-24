@@ -238,6 +238,20 @@ describe('Videos_List.vue', () => {
     expect(wrapper.find('.videos-list-subsection-divider').exists()).toBe(false)
   })
 
+  it('renders the top-level alert below the header divider and before table content', async () => {
+    alertStore.alert.value = { message: 'Video alert', type: 'alert-danger' }
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.find('.alert-dismissable').text()).toContain('Video alert')
+    const hrEl = wrapper.find('hr.hr').element
+    const alertEl = wrapper.find('.alert-dismissable').element
+    const tableEmptyEl = wrapper.find('[data-test="table-empty"]').element
+    expect(hrEl.compareDocumentPosition(alertEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(tableEmptyEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('renders embedded mode as a subordinate subsection', async () => {
     alertStore.alert.value = { message: 'Video alert', type: 'alert-danger' }
 
@@ -1757,6 +1771,12 @@ describe('Videos_List.vue', () => {
     alertStore.alert.value = { message: 'some error', type: 'alert-danger' }
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
+
+    const hrEl = wrapper.find('hr.hr').element
+    const alertEl = wrapper.find('.alert-dismissable').element
+    const tableEmptyEl = wrapper.find('[data-test="table-empty"]').element
+    expect(hrEl.compareDocumentPosition(alertEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(tableEmptyEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
     const closeBtn = wrapper.find('.btn-link.close')
     await closeBtn.trigger('click')
