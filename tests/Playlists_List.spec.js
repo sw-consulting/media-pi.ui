@@ -67,11 +67,13 @@ const globalStubs = {
     template: '<select @change="emitValue"><option v-for="item in items" :key="item.value" :value="item.value">{{ item.title }}</option></select>'
   },
   'v-data-table': {
-    props: ['items', 'noDataText', 'noResultsText'],
+    props: ['items', 'headers', 'noDataText', 'noResultsText'],
     template: `
       <div class="data-table">
+        <div v-for="header in headers" :key="header.key" :data-test="'table-header-' + header.key">{{ header.title }}</div>
         <div v-if="!items.length" data-test="table-empty">{{ noDataText }}</div>
         <div v-for="item in items" :key="item.id">
+          <slot name="item.updatedAt" :item="item" />
           <slot name="item.totalFileSizeBytes" :item="item" />
           <slot name="item.totalDurationSeconds" :item="item" />
           <slot name="item.actions" :item="item" />
@@ -137,6 +139,53 @@ describe('Playlists_List.vue', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('1.0 КБ')
     expect(wrapper.text()).toContain('1:05')
+  })
+
+  it('renders updated playlist timestamp column', async () => {
+    playlistsStore.playlists.value = [{
+      id: 2,
+      updatedAt: '2026-06-24T12:15:30',
+      createdAt: '2026-06-23T10:00:00'
+    }]
+    const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="table-header-updatedAt"]').text()).toBe('Создан/Изменён')
+    expect(wrapper.text()).toContain('24.06.2026')
+    expect(wrapper.text()).toContain('12:15:30')
+  })
+
+  it('falls back to created timestamp when updatedAt is missing', async () => {
+    playlistsStore.playlists.value = [{
+      id: 3,
+      updatedAt: null,
+      createdAt: '2026-06-23T10:05:40'
+    }]
+    const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('23.06.2026')
+    expect(wrapper.text()).toContain('10:05:40')
+  })
+
+  it('matches playlist search against formatted timestamp', async () => {
+    const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.vm.filterPlaylists(null, '24.06.2026', {
+      raw: {
+        title: 'Playlist',
+        filename: 'playlist.m3u',
+        updatedAt: '2026-06-24T12:15:30'
+      }
+    })).toBe(true)
+    expect(wrapper.vm.filterPlaylists(null, '25.06.2026', {
+      raw: {
+        title: 'Playlist',
+        filename: 'playlist.m3u',
+        updatedAt: '2026-06-24T12:15:30'
+      }
+    })).toBe(false)
   })
 
   it('disables create-playlist-button when account list is empty', async () => {

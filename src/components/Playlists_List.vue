@@ -16,6 +16,7 @@ import { useConfirmation } from '@/helpers/confirmation.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { createAccountOptions, estimateSelectWidth } from '@/helpers/account.options.js'
 import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
+import { formatRuDateTime } from '@/helpers/date.format.js'
 
 const playlistsStore = usePlaylistsStore()
 const accountsStore = useAccountsStore()
@@ -33,7 +34,8 @@ const accountOptions = computed(() => createAccountOptions(accounts.value || [],
 
 const headers = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
-  { title: 'Описание', align: 'start', key: 'title', width: '25%' },
+  { title: 'Описание', align: 'start', key: 'title', width: '22%' },
+  { title: 'Создан/Изменён', align: 'start', key: 'updatedAt', width: '18%' },
   { title: 'Размер', align: 'start', key: 'totalFileSizeBytes', width: '15%' },
   { title: 'Длительность', align: 'start', key: 'totalDurationSeconds', width: '15%' },
   { title: 'Видео', align: 'start', key: 'videoCount', width: '10%' }
@@ -81,10 +83,19 @@ function filterPlaylists(value, query, item) {
   return [
     rawPlaylist.title,
     rawPlaylist.filename,
+    formatPlaylistUpdatedAt(rawPlaylist),
     rawPlaylist.totalFileSizeBytes,
     rawPlaylist.totalDurationSeconds,
     rawPlaylist.videoCount
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
+}
+
+function getPlaylistTimestamp(item) {
+  return item?.updatedAt || item?.createdAt || null
+}
+
+function formatPlaylistUpdatedAt(item) {
+  return formatRuDateTime(getPlaylistTimestamp(item))
 }
 
 function createPlaylist() {
@@ -173,6 +184,9 @@ async function deletePlaylist(item) {
       >
         <template v-slot:[`item.totalFileSizeBytes`]="{ item }">
           {{ formatFileSize(item.totalFileSizeBytes) }}
+        </template>
+        <template v-slot:[`item.updatedAt`]="{ item }">
+          {{ formatPlaylistUpdatedAt(item) }}
         </template>
         <template v-slot:[`item.totalDurationSeconds`]="{ item }">
           {{ formatDuration(item.totalDurationSeconds) }}
