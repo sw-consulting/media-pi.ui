@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import PlaylistSettings from '@/components/Playlist_Settings.vue'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 
@@ -151,8 +151,8 @@ const mountSettings = (props = {}) => mount({
         emits: ['update:modelValue']
       },
       'v-data-table': {
-        props: ['headers', 'items', 'loading', 'loadingText', 'noDataText', 'sortBy'],
-        emits: ['update:sort-by'],
+        props: ['headers', 'items', 'loading', 'loadingText', 'noDataText', 'sortBy', 'itemsPerPage', 'page'],
+        emits: ['update:sort-by', 'update:itemsPerPage', 'update:page'],
         data() {
           return {
             sortKey: null,
@@ -160,7 +160,7 @@ const mountSettings = (props = {}) => mount({
           }
         },
         computed: {
-          renderedItems() {
+          sortedItems() {
             if (!this.sortKey) return this.items
             const header = (this.headers || []).find(item => item.key === this.sortKey)
             const sorted = [...(this.items || [])]
@@ -176,6 +176,15 @@ const mountSettings = (props = {}) => mount({
               return this.sortOrder === 'desc' ? -compare : compare
             })
             return sorted
+          },
+          renderedItems() {
+            const items = this.sortedItems || []
+            const perPage = Number(this.itemsPerPage)
+            if (perPage === -1 || !Number.isInteger(perPage) || perPage <= 0) return items
+
+            const page = Math.max(1, Number(this.page) || 1)
+            const start = (page - 1) * perPage
+            return items.slice(start, start + perPage)
           }
         },
         methods: {
@@ -216,6 +225,9 @@ const mountSettings = (props = {}) => mount({
               <slot name="item.mediaInfo" :item="item" />
               <slot name="item.actions" :item="item" />
             </div>
+            <button data-test="set-page-1" type="button" @click="$emit('update:page', 1)" />
+            <button data-test="set-page-2" type="button" @click="$emit('update:page', 2)" />
+            <button data-test="set-items-per-page-25" type="button" @click="$emit('update:itemsPerPage', 25)" />
           </div>
         `
       }
@@ -265,6 +277,39 @@ function getAvailableTableTitles(wrapper) {
     .map(item => item.text())
 }
 
+function createAuthStore(overrides = {}) {
+  return reactive({
+    user: { roles: [1], accountIds: [] },
+    playlists_per_page: 10,
+    playlists_page: 1,
+    videos_per_page: 10,
+    videos_page: 1,
+    playlist_available_videos_per_page: 10,
+    playlist_available_videos_page: 1,
+    ...overrides
+  })
+}
+
+function createAvailableVideo(id, overrides = {}) {
+  const paddedId = String(id).padStart(2, '0')
+  return {
+    id,
+    title: `Video ${paddedId}`,
+    originalFilename: `video-${paddedId}.mp4`,
+    fileSizeBytes: id * 1024,
+    durationSeconds: id * 10,
+    accountId: 1,
+    ...overrides
+  }
+}
+
+function mockAccountAvailableVideos(videos) {
+  videosStore.getAllByAccount = vi.fn(async (accountId) => {
+    if (accountId !== 1) return []
+    return videos
+  })
+}
+
 async function sortAvailableTableBy(wrapper, key) {
   const sortButton = getAvailableTable(wrapper).find(`[data-test="sort-${key}"]`)
   expect(sortButton.exists()).toBe(true)
@@ -283,7 +328,7 @@ async function sortPlaylistTableBy(wrapper, key) {
 
 describe('Playlist_Settings.vue', () => {
   beforeEach(() => {
-    authStore = { user: { roles: [1], accountIds: [] } }
+    authStore = createAuthStore()
     playlistsStore.playlist = null
     playlistsStore.getById = vi.fn().mockResolvedValue()
     playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([])
@@ -617,6 +662,121 @@ describe('Playlist_Settings.vue', () => {
 
     const callArg = playlistsStore.create.mock.calls[0][0]
     expect(callArg.items).toEqual([{ videoId: 11, position: 1 }])
+  })
+
+  it('paginates available videos with the persisted first page by default', async () => {
+    mockAccountAvailableVideos(Array.from({ length: 12 }, (_, index) => createAvailableVideo(index + 1)))
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(getAvailableTableTitles(wrapper)).toHaveLength(10)
+    expect(getAvailableTableTitles(wrapper)).toContain('Video 01')
+    expect(getAvailableTableTitles(wrapper)).toContain('Video 10')
+    expect(getAvailableTableTitles(wrapper)).not.toContain('Video 11')
+  })
+
+  it('shows the next available-video page when persisted page changes', async () => {
+    mockAccountAvailableVideos(Array.from({ length: 12 }, (_, index) => createAvailableVideo(index + 1)))
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await getAvailableTable(wrapper).find('[data-test="set-page-2"]').trigger('click')
+    await flushPromises()
+
+    expect(authStore.playlist_available_videos_page).toBe(2)
+    expect(getAvailableTableTitles(wrapper)).toEqual(['Video 11', 'Video 12'])
+  })
+
+  it('select-all selects only the current available-video page', async () => {
+    mockAccountAvailableVideos(Array.from({ length: 12 }, (_, index) => createAvailableVideo(index + 1)))
+
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: 'Current Page Playlist' }
+    })
+    await flushPromises()
+
+    await getAvailableTable(wrapper).find('[data-test="set-page-2"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-test="available-select-all"]').setValue(true)
+    await clickBatchAdd(wrapper)
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(playlistsStore.create.mock.calls[0][0].items).toEqual([
+      { videoId: 11, position: 1 },
+      { videoId: 12, position: 2 }
+    ])
+  })
+
+  it('keeps selections across available-video pages before batch add', async () => {
+    mockAccountAvailableVideos(Array.from({ length: 12 }, (_, index) => createAvailableVideo(index + 1)))
+
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: 'Multi Page Playlist' }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="available-select-all"]').setValue(true)
+    await getAvailableTable(wrapper).find('[data-test="set-page-2"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-test="available-select-all"]').setValue(true)
+    await clickBatchAdd(wrapper)
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(playlistsStore.create.mock.calls[0][0].items).toEqual(
+      Array.from({ length: 12 }, (_, index) => ({ videoId: index + 1, position: index + 1 }))
+    )
+  })
+
+  it('resets available-video pagination to page one when search changes', async () => {
+    mockAccountAvailableVideos(Array.from({ length: 12 }, (_, index) => createAvailableVideo(index + 1)))
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await getAvailableTable(wrapper).find('[data-test="set-page-2"]').trigger('click')
+    await flushPromises()
+    expect(authStore.playlist_available_videos_page).toBe(2)
+
+    await wrapper.find('[data-test="video-search-input"]').setValue('Video 01')
+    await flushPromises()
+
+    expect(authStore.playlist_available_videos_page).toBe(1)
+    expect(getAvailableTableTitles(wrapper)).toEqual(['Video 01'])
+  })
+
+  it('uses persisted available-video pagination independently from other list state', async () => {
+    authStore = createAuthStore({
+      playlists_per_page: -1,
+      playlists_page: 5,
+      videos_per_page: 50,
+      videos_page: 7,
+      playlist_available_videos_per_page: 25,
+      playlist_available_videos_page: 2
+    })
+    mockAccountAvailableVideos(Array.from({ length: 30 }, (_, index) => createAvailableVideo(index + 1)))
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    expect(getAvailableTableTitles(wrapper)).toEqual(['Video 26', 'Video 27', 'Video 28', 'Video 29', 'Video 30'])
+
+    await getAvailableTable(wrapper).find('[data-test="set-page-1"]').trigger('click')
+    await flushPromises()
+
+    expect(authStore.playlist_available_videos_page).toBe(1)
+    expect(authStore.playlist_available_videos_per_page).toBe(25)
+    expect(authStore.playlists_page).toBe(5)
+    expect(authStore.playlists_per_page).toBe(-1)
+    expect(authStore.videos_page).toBe(7)
+    expect(authStore.videos_per_page).toBe(50)
   })
 
   it('filters available videos by formatted size and duration', async () => {
@@ -1206,7 +1366,7 @@ describe('Playlist_Settings.vue', () => {
   })
 
   it('clears available videos when user has no account options', async () => {
-    authStore = { user: null }
+    authStore = createAuthStore({ user: null })
     const wrapper = mountSettings({ accountId: 1 })
     await flushPromises()
 

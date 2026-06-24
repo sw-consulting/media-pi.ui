@@ -30,6 +30,8 @@ const listStateDefaults = Object.freeze({
   playlists_search: '',
   playlists_sort_by: [],
   playlists_page: 1,
+  playlist_available_videos_per_page: 10,
+  playlist_available_videos_page: 1,
   categories_per_page: 10,
   categories_search: '',
   categories_sort_by: [],
@@ -131,6 +133,8 @@ export const useAuthStore = defineStore('auth', () => {
   const playlists_search = ref(defaultListState.playlists_search)
   const playlists_sort_by = ref(defaultListState.playlists_sort_by)
   const playlists_page = ref(defaultListState.playlists_page)
+  const playlist_available_videos_per_page = ref(defaultListState.playlist_available_videos_per_page)
+  const playlist_available_videos_page = ref(defaultListState.playlist_available_videos_page)
   const categories_per_page = ref(defaultListState.categories_per_page)
   const categories_search = ref(defaultListState.categories_search)
   const categories_sort_by = ref(defaultListState.categories_sort_by)
@@ -159,6 +163,8 @@ export const useAuthStore = defineStore('auth', () => {
     playlists_search,
     playlists_sort_by,
     playlists_page,
+    playlist_available_videos_per_page,
+    playlist_available_videos_page,
     categories_per_page,
     categories_search,
     categories_sort_by,
@@ -407,6 +413,8 @@ export const useAuthStore = defineStore('auth', () => {
     playlists_search,
     playlists_sort_by,
     playlists_page,
+    playlist_available_videos_per_page,
+    playlist_available_videos_page,
     categories_per_page,
     categories_search,
     categories_sort_by,

@@ -19,6 +19,7 @@ import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import { createAccountOptions } from '@/helpers/account.options.js'
 import { compareMediaInfo, createFileSizeSearchTokens, formatDuration, formatFileSize } from '@/helpers/media.format.js'
+import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { getVideoCategoryTitle } from '@/helpers/video.scope.helpers.js'
 import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 
@@ -175,6 +176,31 @@ const sortedFilteredAvailableVideos = computed(() => {
   return sorted
 })
 
+const availableVideosItemsPerPage = computed({
+  get: () => authStore.playlist_available_videos_per_page ?? 10,
+  set: value => {
+    authStore.playlist_available_videos_per_page = value
+  }
+})
+
+const availableVideosPage = computed({
+  get: () => authStore.playlist_available_videos_page ?? 1,
+  set: value => {
+    authStore.playlist_available_videos_page = value
+  }
+})
+
+const currentPageAvailableVideos = computed(() => {
+  const items = sortedFilteredAvailableVideos.value
+  const perPage = Number(availableVideosItemsPerPage.value)
+  if (perPage === -1) return items
+  if (!Number.isInteger(perPage) || perPage <= 0) return items
+
+  const page = Math.max(1, Number(availableVideosPage.value) || 1)
+  const start = (page - 1) * perPage
+  return items.slice(start, start + perPage)
+})
+
 const playlistVideoDetails = computed(() => playlistItems.value.map((item, index) => {
   const video = availableVideoMap.value.get(item.videoId)
   const title = video?.title || video?.originalFilename || `Видео #${item.videoId}`
@@ -197,7 +223,7 @@ const playlistVideoDetails = computed(() => playlistItems.value.map((item, index
 const totalVideoCount = computed(() => playlistItems.value.length)
 const totalFileSize = computed(() => playlistVideoDetails.value.reduce((sum, item) => sum + (Number(item.fileSize) || 0), 0))
 const totalDuration = computed(() => playlistVideoDetails.value.reduce((sum, item) => sum + (Number(item.duration) || 0), 0))
-const visibleAvailableVideoIds = computed(() => sortedFilteredAvailableVideos.value.map(video => video.id))
+const visibleAvailableVideoIds = computed(() => currentPageAvailableVideos.value.map(video => video.id))
 const visiblePlaylistItemKeys = computed(() => playlistVideoDetails.value.map(item => item.key))
 const hasSelectedAvailableVideos = computed(() => selectedAvailableVideoIds.value.length > 0)
 const hasSelectedPlaylistItems = computed(() => selectedPlaylistItemKeys.value.length > 0)
@@ -235,6 +261,14 @@ watch(videoAccountOptions, async (options) => {
 watch(availableVideos, (videos) => {
   const availableIds = new Set((videos || []).map(video => video.id))
   selectedAvailableVideoIds.value = selectedAvailableVideoIds.value.filter(id => availableIds.has(id))
+})
+
+watch(videoSearch, () => {
+  availableVideosPage.value = 1
+})
+
+watch([sortedFilteredAvailableVideos, availableVideosItemsPerPage], () => {
+  clampAvailableVideosPage()
 })
 
 watch(playlistItems, (items) => {
@@ -335,6 +369,27 @@ async function openVideo(item) {
 
 function createMediaInfo(fileSize, duration) {
   return { fileSize, duration }
+}
+
+function getAvailableVideosPageCount() {
+  const perPage = Number(availableVideosItemsPerPage.value)
+  if (perPage === -1) return 1
+  if (!Number.isInteger(perPage) || perPage <= 0) return 1
+  return Math.max(1, Math.ceil(sortedFilteredAvailableVideos.value.length / perPage))
+}
+
+function clampAvailableVideosPage() {
+  const maxPage = getAvailableVideosPageCount()
+  const currentPage = Number(availableVideosPage.value)
+
+  if (!Number.isInteger(currentPage) || currentPage < 1) {
+    availableVideosPage.value = 1
+    return
+  }
+
+  if (currentPage > maxPage) {
+    availableVideosPage.value = maxPage
+  }
 }
 
 function compareDisplayText(a, b) {
@@ -796,9 +851,12 @@ function onInvalidSubmit(context) {
             :headers="availableVideoHeaders"
             :items="sortedFilteredAvailableVideos"
             v-model:sort-by="availableSortBy"
+            v-model:items-per-page="availableVideosItemsPerPage"
+            v-model:page="availableVideosPage"
             item-value="id"
-            :items-per-page="-1"
-            hide-default-footer
+            :items-per-page-options="itemsPerPageOptions"
+            items-per-page-text="Видеофайлов на странице"
+            page-text="{0}-{1} из {2}"
             density="compact"
             class="playlist-table elevation-1"
             :loading="videosLoading"
