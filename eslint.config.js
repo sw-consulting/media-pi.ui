@@ -66,6 +66,7 @@ export default [
         sessionStorage: 'readonly',
         URLSearchParams: 'readonly',
         URL: 'readonly',
+        Node: 'readonly',
         TextDecoder: 'readonly',
         TextEncoder: 'readonly',
         AbortController: 'readonly',

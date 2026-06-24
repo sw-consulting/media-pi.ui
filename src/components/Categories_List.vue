@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 
 const categoriesStore = useCategoriesStore()
 const authStore = useAuthStore()
@@ -20,7 +21,6 @@ const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 
 const { categories, loading } = storeToRefs(categoriesStore)
-const { alert } = storeToRefs(alertStore)
 
 const headers = computed(() => {
   const baseHeaders = [
@@ -96,6 +96,7 @@ async function deleteCategory(item) {
       </div>
     </div>
     <hr class="hr" />
+    <AlertOutput />
 
     <v-card>
       <div v-if="categories?.length">
@@ -148,9 +149,5 @@ async function deleteCategory(item) {
         </template>
       </v-data-table>
     </v-card>
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
   </div>
 </template>

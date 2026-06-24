@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { formatFileSize } from '@/helpers/media.format.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 import ScreenshotViewDialog from '@/components/Screenshot_View_Dialog.vue'
 
 const props = defineProps({
@@ -28,7 +29,6 @@ const { confirmDelete } = useConfirmation()
 
 const { screenshots, screenshot, loading: screenshotsLoading, totalCount } = storeToRefs(screenshotsStore)
 const { device, loading: deviceLoading } = storeToRefs(devicesStore)
-const { alert } = storeToRefs(alertStore)
 
 const fromValue = ref('')
 const toValue = ref('')
@@ -235,6 +235,7 @@ onBeforeUnmount(() => {
     </div>
 
     <hr class="hr" />
+    <AlertOutput />
 
     <div class="screenshots-filters">
       <label class="screenshots-filter-field">
@@ -326,11 +327,6 @@ onBeforeUnmount(() => {
         </template>
       </v-data-table-server>
     </v-card>
-
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button class="btn btn-link close" @click="alertStore.clear()">×</button>
-      {{ alert.message }}
-    </div>
 
     <ScreenshotViewDialog
       v-model="screenshotDialogOpen"

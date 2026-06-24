@@ -18,10 +18,10 @@ import { useRolesStore } from '@/stores/roles.store.js'
 import { useAccountsStore } from '@/stores/accounts.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
 const alertStore = useAlertStore()
-const { alert } = storeToRefs(alertStore)
 
 const rolesStore = useRolesStore()
 const accountsStore = useAccountsStore()
@@ -309,6 +309,7 @@ function onInvalidSubmit(context) {
         </div>
       </div>
       <hr class="hr" />
+      <AlertOutput />
 
       <div class="form-group">
         <label for="lastName" class="label">Фамилия:</label>
@@ -405,10 +406,6 @@ function onInvalidSubmit(context) {
         </ul>
      </div>
     </Form>
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
   </div>
   <div v-if="user?.error" class="text-center m-5">
     <div class="text-danger">Ошибка при загрузке информации о пользователе: {{ user.error }}</div>

@@ -21,6 +21,7 @@ import { createCategoryOptions } from '@/helpers/video.scope.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import { getDuplicateOriginalFilenameMessage, isDuplicateOriginalFilenameError } from '@/helpers/video.original.filename.conflict.js'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 
@@ -36,7 +37,6 @@ const accountsStore = useAccountsStore()
 const categoriesStore = useCategoriesStore()
 const alertStore = useAlertStore()
 const authStore = useAuthStore()
-const { alert } = storeToRefs(alertStore)
 const { loading, video: loadedVideo, videoPreview } = storeToRefs(videosStore)
 const { account } = storeToRefs(accountsStore)
 const { categories } = storeToRefs(categoriesStore)
@@ -256,6 +256,7 @@ function onInvalidSubmit(context) {
         </div>
       </div>
       <hr class="hr" />
+      <AlertOutput />
 
       <div class="form-group">
         <label for="accountName" class="label">Лицевой счёт:</label>
@@ -321,11 +322,6 @@ function onInvalidSubmit(context) {
         />
       </div>
     </Form>
-
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
 
     <PlaylistAccessImpactDialog
       v-model="playlistImpactDialog"

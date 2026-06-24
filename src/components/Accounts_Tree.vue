@@ -56,6 +56,7 @@ import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { canManageDevice, canManageAccount, canManageDeviceGroup } from '@/helpers/user.helpers.js'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
+import AlertOutput from '@/components/AlertOutput.vue'
 import InlineAssignment from '@/components/InlineAssignment.vue'
 
 const router = useRouter()
@@ -65,7 +66,6 @@ const devicesStore = useDevicesStore()
 const deviceGroupsStore = useDeviceGroupsStore()
 const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
-const { alert } = storeToRefs(alertStore)
 const deviceStatusesStore = useDeviceStatusesStore()
 
 // State for account assignment
@@ -423,6 +423,7 @@ onBeforeUnmount(() => {
   <div class="settings table-3 tree-container">
     <h1 class="primary-heading">{{ accountsCaption || 'Информация не доступна' }}</h1>
     <hr class="hr" />
+    <AlertOutput />
 
     <v-card>
       <div v-if="loading" class="text-center m-5">
@@ -585,12 +586,6 @@ onBeforeUnmount(() => {
         Нет данных для отображения
       </v-alert>
     </v-card>
-
-    <!-- Global alert messages -->
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
   </div>
 </template>
 

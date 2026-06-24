@@ -21,3 +21,7 @@ config.global.components = {
   'v-tooltip': tooltipStub
 }
 
+if (globalThis.HTMLMediaElement) {
+  globalThis.HTMLMediaElement.prototype.play = vi.fn(() => Promise.resolve())
+  globalThis.HTMLMediaElement.prototype.pause = vi.fn()
+}

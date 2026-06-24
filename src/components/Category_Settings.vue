@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 import VideosList from '@/components/Videos_List.vue'
 import SubscriptionsList from '@/components/Subscriptions_List.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
@@ -34,7 +35,6 @@ const props = defineProps({
 const categoriesStore = useCategoriesStore()
 const alertStore = useAlertStore()
 const authStore = useAuthStore()
-const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(categoriesStore)
 
 if (!authStore.isAdministrator) {
@@ -284,6 +284,7 @@ function onInvalidSubmit(context) {
         </div>
       </div>
       <hr class="hr" />
+      <AlertOutput />
 
       <div class="form-group">
         <label for="title" class="label">Название:</label>
@@ -338,11 +339,6 @@ function onInvalidSubmit(context) {
         embedded
         :before-embedded-action="beforeEmbeddedListAction"
       />
-    </div>
-
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
     </div>
 
     <PlaylistAccessImpactDialog

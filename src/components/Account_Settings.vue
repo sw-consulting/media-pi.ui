@@ -16,6 +16,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { UserRoleConstants } from '@/helpers/user.helpers.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 import SubscriptionsList from '@/components/Subscriptions_List.vue'
 
@@ -35,7 +36,6 @@ const accountsStore = useAccountsStore()
 const usersStore = useUsersStore()
 const authStore = useAuthStore()
 const alertStore = useAlertStore()
-const { alert } = storeToRefs(alertStore)
 
 const schema = Yup.object().shape({
   name: Yup.string().required('Необходимо указать имя'),
@@ -233,6 +233,7 @@ function onInvalidSubmit(context) {
         </div>
       </div>
       <hr class="hr" />
+      <AlertOutput />
 
       <div class="form-group">
         <label for="name" class="label">Название:</label>
@@ -272,12 +273,6 @@ function onInvalidSubmit(context) {
       embedded
       :before-embedded-action="beforeEmbeddedListAction"
     />
-
-    <!-- Global alert messages -->
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
     
   </div>
 </template>
