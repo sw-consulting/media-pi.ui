@@ -17,6 +17,7 @@ import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { createAccountOptions, estimateSelectWidth } from '@/helpers/account.options.js'
 import { createFileSizeSearchTokens, formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { formatRuDateTime } from '@/helpers/date.format.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 
 const playlistsStore = usePlaylistsStore()
 const accountsStore = useAccountsStore()
@@ -26,7 +27,6 @@ const { confirmDelete } = useConfirmation()
 
 const { playlists, loading } = storeToRefs(playlistsStore)
 const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
-const { alert } = storeToRefs(alertStore)
 
 const selectedAccountId = ref(null)
 
@@ -159,6 +159,7 @@ async function deletePlaylist(item) {
       </div>
     </div>
     <hr class="hr" />
+    <AlertOutput />
 
     <v-card>
       <div v-if="playlists?.length">
@@ -217,9 +218,5 @@ async function deletePlaylist(item) {
         </template>
       </v-data-table>
     </v-card>
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
   </div>
 </template>

@@ -21,6 +21,7 @@ import { createAccountOptions } from '@/helpers/account.options.js'
 import { compareMediaInfo, createFileSizeSearchTokens, formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { getVideoCategoryTitle } from '@/helpers/video.scope.helpers.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 
 const props = defineProps({
@@ -44,7 +45,6 @@ const accountsStore = useAccountsStore()
 const categoriesStore = useCategoriesStore()
 const authStore = useAuthStore()
 const alertStore = useAlertStore()
-const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(playlistsStore)
 const { videoPreview } = storeToRefs(videosStore)
 
@@ -682,6 +682,7 @@ function onInvalidSubmit(context) {
         </div>
       </div>
       <hr class="hr" />
+      <AlertOutput />
 
       <div class="form-group">
         <label class="label-1">Лицевой счёт:</label>
@@ -935,11 +936,6 @@ function onInvalidSubmit(context) {
         </div>
       </div>
     </Form>
-
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
 
     <VideoViewDialog
       v-model="videoDialogOpen"

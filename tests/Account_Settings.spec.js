@@ -184,7 +184,7 @@ describe('Account_Settings.vue', () => {
     expect(wrapper.find('[data-test="subscriptions-list"]').attributes('data-embedded')).toBe('true')
   })
 
-  it('renders the shared alert below embedded subscriptions', async () => {
+  it('renders the shared alert below the header divider and before page content', async () => {
     accountsStore.account = {
       id: 1,
       name: 'Cafe',
@@ -196,9 +196,13 @@ describe('Account_Settings.vue', () => {
     await flushPromises()
 
     expect(wrapper.find('.alert-dismissable').text()).toContain('Account alert')
-    expect(wrapper.html().indexOf('data-test="subscriptions-list"')).toBeLessThan(
-      wrapper.html().indexOf('alert-dismissable')
-    )
+    const hrEl = wrapper.find('hr.hr').element
+    const alertEl = wrapper.find('.alert-dismissable').element
+    const managerFieldsEl = wrapper.find('[data-test="manager-field-array"]').element
+    const subscriptionsListEl = wrapper.find('[data-test="subscriptions-list"]').element
+    expect(hrEl.compareDocumentPosition(alertEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(managerFieldsEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alertEl.compareDocumentPosition(subscriptionsListEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('shows store loading as a header action indicator', async () => {

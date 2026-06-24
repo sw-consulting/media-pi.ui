@@ -49,8 +49,8 @@ onMounted(async () => {
 
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 const alertStore = useAlertStore()
-const { alert } = storeToRefs(alertStore)
 
 const { confirmDelete } = useConfirmation()
 
@@ -180,6 +180,7 @@ const headers = [
       </div>
     </div>
     <hr class="hr" />
+    <AlertOutput />
 
     <v-card>
       <div v-if="enhancedUsers?.length">
@@ -235,9 +236,5 @@ const headers = [
         </template>
       </v-data-table>
     </v-card>
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
   </div>
 </template>

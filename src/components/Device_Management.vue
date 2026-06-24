@@ -15,6 +15,7 @@ import { timeouts } from '@/helpers/config.js'
 import { formatRuDateTime } from '@/helpers/date.format.js'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
+import AlertOutput from '@/components/AlertOutput.vue'
 
 const props = defineProps({
   deviceId: { type: Number, required: true }
@@ -24,8 +25,6 @@ const devicesStore = useDevicesStore()
 const deviceStatusesStore = useDeviceStatusesStore()
 const alertStore = useAlertStore()
 const router = useRouter()
-const alertRefs = storeToRefs(alertStore) || {}
-const alert = alertRefs.alert
 
 const clearAlert = () => {
   if (alertStore && typeof alertStore.clear === 'function') alertStore.clear()
@@ -751,6 +750,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <hr class="hr" />
+    <AlertOutput />
 
     <!-- Device Information Section -->
     <div class="form-group mt-4 form-group-add">
@@ -959,12 +959,6 @@ onBeforeUnmount(() => {
           @click="shutdown"
         />
       </div>
-    </div>
-
-    <!-- Alert Section -->
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
     </div>
   </div>
 </template>

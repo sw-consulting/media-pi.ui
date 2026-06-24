@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { canManageAccountById } from '@/helpers/user.helpers.js'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 
 const props = defineProps({
   register: {
@@ -34,7 +35,6 @@ const props = defineProps({
 const devicesStore = useDevicesStore()
 const alertStore = useAlertStore()
 const authStore = useAuthStore()
-const { alert } = storeToRefs(alertStore)
 const { loading } = storeToRefs(devicesStore)
 const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'
@@ -183,6 +183,7 @@ function onInvalidSubmit(context) {
         </div>
       </div>
       <hr class="hr" />
+      <AlertOutput />
 
       <div class="form-group">
         <label for="name" class="label">Название:</label>
@@ -208,11 +209,6 @@ function onInvalidSubmit(context) {
         />
       </div>
     </Form>
-
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
 
   </div>
 </template>

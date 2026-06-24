@@ -6,10 +6,10 @@
 import { ref } from 'vue'
 import { Form, Field } from 'vee-validate'
 import * as Yup from 'yup'
-import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useRolesStore } from '@/stores/roles.store.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 
@@ -26,7 +26,6 @@ const schema = Yup.object().shape({
 const showPassword = ref(false)
 
 const alertStore = useAlertStore()
-const { alert } = storeToRefs(alertStore)
 
 function onSubmit(values) {
   const authStore = useAuthStore()
@@ -50,6 +49,7 @@ function onSubmit(values) {
   <div class="settings form-1">
     <h1 class="primary-heading">Вход</h1>
     <hr class="hr" />
+    <AlertOutput />
     <Form @submit="onSubmit" :validation-schema="schema" v-slot="{ errors, isSubmitting }">
       <div class="form-group">
         <label for="login_email" class="label">Адрес электронной почты:</label>
@@ -114,9 +114,5 @@ function onSubmit(values) {
         {{ errors.login_password }}
       </div>
     </Form>
-    <div v-if="alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
   </div>
 </template>

@@ -17,6 +17,7 @@ import { formatRuDate } from '@/helpers/date.format.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import { canManageAccountById } from '@/helpers/user.helpers.js'
+import AlertOutput from '@/components/AlertOutput.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 
 const props = defineProps({
@@ -54,7 +55,6 @@ const alertStore = useAlertStore()
 const { confirmDelete } = useConfirmation()
 
 const { accounts, subscriptions, loading } = storeToRefs(accountsStore)
-const { alert } = storeToRefs(alertStore)
 
 const playlistImpactDialog = ref(false)
 const playlistImpact = ref(null)
@@ -359,6 +359,8 @@ function cancelPlaylistCleanup() {
         </div>
       </div>
     </div>
+    <hr v-if="!props.embedded" class="hr" />
+    <AlertOutput :show="!props.embedded" />
     <div v-if="props.embedded" class="subscriptions-list-subsection-divider"></div>
 
     <v-card
@@ -419,11 +421,6 @@ function cancelPlaylistCleanup() {
         </template>
       </v-data-table>
     </v-card>
-
-    <div v-if="!props.embedded && alert" class="alert alert-dismissable mt-3 mb-0" :class="alert.type">
-      <button @click="alertStore.clear()" class="btn btn-link close">×</button>
-      {{ alert.message }}
-    </div>
 
     <PlaylistAccessImpactDialog
       v-model="playlistImpactDialog"
