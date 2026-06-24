@@ -84,6 +84,16 @@ vi.mock('@sw-consulting/tooling.ui.kit', () => ({
   }
 }))
 
+function createDuplicateOriginalFilenameError(message) {
+  const error = new Error(message)
+  error.status = 409
+  error.data = {
+    msg: message,
+    reason: 'duplicateOriginalFilename'
+  }
+  return error
+}
+
 const mountSettings = (props = {}) => mount({
   template: '<Suspense><VideoSettings v-bind="$attrs" /></Suspense>',
   components: { VideoSettings },
@@ -265,6 +275,21 @@ describe('Video_Settings.vue', () => {
       categoryId: 4,
       forcePlaylistCleanup: true
     })
+  })
+
+  it('shows duplicate category conflict without playlist cleanup or navigation', async () => {
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с таким именем [filename = clip.mp4]'
+    videosStore.update = vi.fn().mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
+    const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="video-category-select"]').setValue('4')
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(false)
+    expect(routerGo).not.toHaveBeenCalled()
   })
 
   it('redirects when current user cannot manage the video', async () => {

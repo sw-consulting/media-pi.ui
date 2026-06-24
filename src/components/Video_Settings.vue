@@ -19,6 +19,7 @@ import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js
 import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { createCategoryOptions } from '@/helpers/video.scope.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
+import { getDuplicateOriginalFilenameMessage, isDuplicateOriginalFilenameError } from '@/helpers/video.original.filename.conflict.js'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 import VideoViewDialog from '@/components/Video_View_Dialog.vue'
@@ -124,6 +125,10 @@ async function saveVideoPayload(payload, forcePlaylistCleanup = false) {
     await videosStore.update(props.id, updatePayload)
     router.go(-1)
   } catch (err) {
+    if (isDuplicateOriginalFilenameError(err)) {
+      alertStore.error(getDuplicateOriginalFilenameMessage(err))
+      return
+    }
     if (isPlaylistAccessImpactError(err) && !forcePlaylistCleanup) {
       playlistImpact.value = err.data
       pendingVideoPayload.value = payload
