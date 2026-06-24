@@ -863,7 +863,7 @@ describe('Videos_List.vue', () => {
   })
 
   it('shows duplicate upload conflict and closes upload progress', async () => {
-    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с таким именем [filename = test.mp4]'
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с именем "test.mp4"'
     videosStore.uploadFiles.mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
@@ -1080,7 +1080,7 @@ describe('Videos_List.vue', () => {
     videosStore.removeBatch.mockResolvedValueOnce({
       requestedCount: 2,
       deletedIds: [18],
-      failures: [{ id: 19, reason: 'notFound', message: 'Не удалось найти видеофайл [id=19]' }]
+      failures: [{ id: 19, reason: 'notFound', message: 'Видеофайл с ID 19 не найден' }]
     })
 
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
@@ -1090,7 +1090,7 @@ describe('Videos_List.vue', () => {
     await flushPromises()
 
     expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Удалено видеофайлов: 1. Не удалось удалить: 1.'))
-    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось найти видеофайл [id=19]'))
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Видеофайл с ID 19 не найден'))
   })
 
   it('does not hide batch delete refresh failures with a delete summary', async () => {
@@ -1267,7 +1267,7 @@ describe('Videos_List.vue', () => {
     videosStore.updateCategoryBatch.mockResolvedValueOnce({
       requestedCount: 2,
       updatedIds: [50],
-      failures: [{ id: 51, message: 'Не удалось обновить категорию [id=51]' }]
+      failures: [{ id: 51, message: 'Не удалось обновить категорию видеофайла с ID 51' }]
     })
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
@@ -1278,11 +1278,11 @@ describe('Videos_List.vue', () => {
     await flushPromises()
 
     expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Обновлено видеофайлов: 1. Не удалось обновить: 1.'))
-    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категорию [id=51]'))
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категорию видеофайла с ID 51'))
   })
 
   it('shows duplicate filename failures in partial batch category update summary', async () => {
-    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с таким именем [filename = public.mp4]'
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с именем "public.mp4"'
     videosStore.videos.value = [
       { id: 50, title: 'First', accountId: 0, categoryId: 0 },
       { id: 51, title: 'Second', accountId: 0, categoryId: 0 }
@@ -1321,7 +1321,7 @@ describe('Videos_List.vue', () => {
     await wrapper.vm.updateSelectedVideoCategory()
     await flushPromises()
 
-    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('id=53'))
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('видеофайл с ID 53'))
   })
 
   it('shows truncated message for batch category update with more than 3 failures', async () => {
@@ -1363,7 +1363,7 @@ describe('Videos_List.vue', () => {
   })
 
   it('shows duplicate category update conflict without playlist cleanup', async () => {
-    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с таким именем [filename = public.mp4]'
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с именем "public.mp4"'
     videosStore.videos.value = [{ id: 70, title: 'Video', accountId: 0 }]
     videosStore.updateCategoryBatch.mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
@@ -1411,7 +1411,7 @@ describe('Videos_List.vue', () => {
     await wrapper.vm.deleteSelectedVideos()
     await flushPromises()
 
-    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('id=81'))
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('видеофайл с ID 81'))
   })
 
   it('shows truncated message for batch delete with more than 3 failures', async () => {

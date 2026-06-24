@@ -65,7 +65,7 @@ function cancel() {
           {{ playlist.accountName }} / {{ playlist.title }}
         </div>
         <div class="impact-playlist-meta">
-          {{ playlist.filename || `id=${playlist.playlistId}` }} · удалено включений: {{ playlist.removedItemCount }}
+          {{ playlist.filename || `ID ${playlist.playlistId}` }} · удалено включений: {{ playlist.removedItemCount }}
         </div>
       </div>
     </div>
