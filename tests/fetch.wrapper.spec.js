@@ -304,6 +304,10 @@ describe('fetchWrapper', () => {
 
   it('handles HTTP error in postFile with progress', async () => {
     expect.assertions(3)
+    const errorBody = {
+      msg: 'File too large',
+      reason: 'duplicateOriginalFilename'
+    }
     const formData = new FormData()
     const xhr = {
       upload: {},
@@ -312,7 +316,7 @@ describe('fetchWrapper', () => {
       send: vi.fn(function () {
         this.status = 413
         this.statusText = 'Payload Too Large'
-        this.responseText = JSON.stringify({ msg: 'File too large' })
+        this.responseText = JSON.stringify(errorBody)
         this.onload()
       })
     }
@@ -323,7 +327,7 @@ describe('fetchWrapper', () => {
     } catch (error) {
       expect(error.message).toBe('File too large')
       expect(error.status).toBe(413)
-      expect(error.data).toEqual({ msg: 'File too large' })
+      expect(error.data).toEqual(errorBody)
     }
   })
 

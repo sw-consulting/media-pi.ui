@@ -16,6 +16,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { runBeforeEmbeddedAction } from '@/helpers/embedded.action.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
+import { getDuplicateOriginalFilenameMessage, isDuplicateOriginalFilenameError } from '@/helpers/video.original.filename.conflict.js'
 import ModalWindow from '@/components/ModalWindow.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
 import VideoViewDialog from '@/components/Video_View_Dialog.vue'
@@ -442,7 +443,11 @@ async function uploadVideos(files) {
     await refreshVideos()
   } catch (err) {
     if (!isAbortError(err)) {
-      alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+      if (isDuplicateOriginalFilenameError(err)) {
+        alertStore.error(getDuplicateOriginalFilenameMessage(err))
+      } else {
+        alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+      }
     }
   } finally {
     isUploading.value = false
@@ -592,6 +597,10 @@ async function updateSelectedVideoCategory() {
       summarizeBatchCategoryResult(result, ids.length)
     }
   } catch (err) {
+    if (isDuplicateOriginalFilenameError(err)) {
+      alertStore.error(getDuplicateOriginalFilenameMessage(err))
+      return
+    }
     if (isPlaylistAccessImpactError(err)) {
       playlistImpact.value = err.data
       pendingCategoryUpdate.value = { ids, categoryId: batchCategoryId.value }
@@ -620,7 +629,11 @@ async function confirmPlaylistCleanup() {
       summarizeBatchCategoryResult(result, pending.ids.length)
     }
   } catch (err) {
-    alertStore.error('Не удалось обновить категории видеофайлов: ' + (err?.message || err))
+    if (isDuplicateOriginalFilenameError(err)) {
+      alertStore.error(getDuplicateOriginalFilenameMessage(err))
+    } else {
+      alertStore.error('Не удалось обновить категории видеофайлов: ' + (err?.message || err))
+    }
   } finally {
     categorySaving.value = false
   }
