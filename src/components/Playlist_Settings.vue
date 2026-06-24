@@ -1000,6 +1000,8 @@ function onInvalidSubmit(context) {
   align-items: center;
   justify-content: center;
   width: 100%;
+  min-height: 100%;
+  line-height: 1;
 }
 
 .playlist-table-checkbox input {
@@ -1022,6 +1024,7 @@ function onInvalidSubmit(context) {
 :deep(.playlist-table th),
 :deep(.playlist-table td) {
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .playlist-title-cell {
