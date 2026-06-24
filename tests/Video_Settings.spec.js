@@ -278,7 +278,7 @@ describe('Video_Settings.vue', () => {
   })
 
   it('shows duplicate category conflict without playlist cleanup or navigation', async () => {
-    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с таким именем [filename = clip.mp4]'
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с именем "clip.mp4"'
     videosStore.update = vi.fn().mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
     const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
     await flushPromises()

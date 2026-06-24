@@ -170,6 +170,7 @@ describe('PlaylistAccessImpactDialog.vue', () => {
     const list = wrapper.find('[data-test="playlist-impact-list"]')
     expect(list.text()).toContain('Плейлист #42')
     expect(list.text()).toContain('Лицевой счёт 3')
-    expect(list.text()).toContain('id=42')
+    expect(list.text()).toContain('ID 42')
+    expect(list.text()).not.toContain('id=42')
   })
 })
