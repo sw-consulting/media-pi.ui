@@ -88,6 +88,16 @@ vi.mock('@/helpers/user.helpers.js', () => ({
   canManageAccountById: (u, accountId) => !!(Array.isArray(u?.roles) && u.roles.includes(1)) || (Array.isArray(u?.accountIds) && u.accountIds.includes(accountId))
 }))
 
+function createDuplicateOriginalFilenameError(message) {
+  const error = new Error(message)
+  error.status = 409
+  error.data = {
+    msg: message,
+    reason: 'duplicateOriginalFilename'
+  }
+  return error
+}
+
 const globalStubs = {
   VideoViewDialog: {
     name: 'VideoViewDialog',
@@ -852,6 +862,26 @@ describe('Videos_List.vue', () => {
     expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload + 1)
   })
 
+  it('shows duplicate upload conflict and closes upload progress', async () => {
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с таким именем [filename = test.mp4]'
+    videosStore.uploadFiles.mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    const uploadPromise = wrapper.vm.uploadVideos([file])
+    await nextTick()
+
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(true)
+
+    await uploadPromise
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(alertStore.error).not.toHaveBeenCalledWith(expect.stringContaining('Не удалось загрузить видеофайлы'))
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
+  })
+
   it('shows a refresh phase after upload completes while the list reloads', async () => {
     let refreshCall = 0
     let resolveRefresh
@@ -1251,6 +1281,28 @@ describe('Videos_List.vue', () => {
     expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категорию [id=51]'))
   })
 
+  it('shows duplicate filename failures in partial batch category update summary', async () => {
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с таким именем [filename = public.mp4]'
+    videosStore.videos.value = [
+      { id: 50, title: 'First', accountId: 0, categoryId: 0 },
+      { id: 51, title: 'Second', accountId: 0, categoryId: 0 }
+    ]
+    videosStore.updateCategoryBatch.mockResolvedValueOnce({
+      requestedCount: 2,
+      updatedIds: [50],
+      failures: [{ id: 51, reason: 'duplicateOriginalFilename', message: duplicateMessage }]
+    })
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [50, 51]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining(duplicateMessage))
+  })
+
   it('uses failure id when message is absent in batch category summary', async () => {
     videosStore.videos.value = [
       { id: 52, title: 'A', accountId: 0 },
@@ -1308,6 +1360,22 @@ describe('Videos_List.vue', () => {
     await flushPromises()
 
     expect(alertStore.error).toHaveBeenCalledWith('Не удалось обновить категории видеофайлов: batch failed')
+  })
+
+  it('shows duplicate category update conflict without playlist cleanup', async () => {
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с таким именем [filename = public.mp4]'
+    videosStore.videos.value = [{ id: 70, title: 'Video', accountId: 0 }]
+    videosStore.updateCategoryBatch.mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [70]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(false)
   })
 
   it('does not show batch category update summary when refresh fails', async () => {
