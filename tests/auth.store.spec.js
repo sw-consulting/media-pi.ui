@@ -3,6 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth.store.js'
 import { useStatusStore } from '@/stores/status.store.js'
 import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
@@ -33,6 +34,58 @@ vi.mock('@/stores/status.store.js', () => {
     }))
   }
 })
+
+const listStateStorageKey = 'authListState'
+
+function createDefaultListState() {
+  return {
+    users_per_page: 10,
+    users_search: '',
+    users_sort_by: ['id'],
+    users_page: 1,
+    videos_per_page: 10,
+    videos_search: '',
+    videos_sort_by: [],
+    videos_page: 1,
+    screenshots_per_page: 100,
+    screenshots_sort_by: [{ key: 'id', order: 'asc' }],
+    screenshots_page: 1,
+    playlists_per_page: 10,
+    playlists_search: '',
+    playlists_sort_by: [],
+    playlists_page: 1,
+    categories_per_page: 10,
+    categories_search: '',
+    categories_sort_by: [],
+    categories_page: 1,
+    subscriptions_per_page: 10,
+    subscriptions_search: '',
+    subscriptions_sort_by: [],
+    subscriptions_page: 1
+  }
+}
+
+function createListState(overrides = {}) {
+  return {
+    ...createDefaultListState(),
+    ...overrides
+  }
+}
+
+function expectListState(store, expected) {
+  Object.entries(expected).forEach(([key, value]) => {
+    expect(store[key]).toEqual(value)
+  })
+}
+
+function readPersistedListStates() {
+  return JSON.parse(localStorage.getItem(listStateStorageKey) || '{}')
+}
+
+async function waitForListStatePersistence() {
+  await nextTick()
+  await Promise.resolve()
+}
 
 describe('auth store', () => {
   // Store original localStorage
@@ -65,10 +118,17 @@ describe('auth store', () => {
       expect(store.videos_search).toBe('')
       expect(store.videos_sort_by).toEqual([])
       expect(store.videos_page).toBe(1)
+      expect(store.screenshots_per_page).toBe(100)
+      expect(store.screenshots_sort_by).toEqual([{ key: 'id', order: 'asc' }])
+      expect(store.screenshots_page).toBe(1)
       expect(store.playlists_per_page).toBe(10)
       expect(store.playlists_search).toBe('')
       expect(store.playlists_sort_by).toEqual([])
       expect(store.playlists_page).toBe(1)
+      expect(store.categories_per_page).toBe(10)
+      expect(store.categories_search).toBe('')
+      expect(store.categories_sort_by).toEqual([])
+      expect(store.categories_page).toBe(1)
       expect(store.subscriptions_per_page).toBe(10)
       expect(store.subscriptions_search).toBe('')
       expect(store.subscriptions_sort_by).toEqual([])
@@ -149,6 +209,195 @@ describe('auth store', () => {
       
       expect(store.re_jwt).toBe('recovery-jwt-token')
       expect(store.re_tgt).toBe('recover')
+    })
+  })
+
+  describe('list state persistence', () => {
+    it('loads persisted list params for saved user', () => {
+      const testUser = { id: 7, name: 'Saved User', roles: [1] }
+      const savedState = createListState({
+        users_per_page: 25,
+        users_search: 'ivan',
+        users_sort_by: [{ key: 'email', order: 'desc' }],
+        users_page: 3,
+        videos_per_page: 50,
+        videos_search: 'clip',
+        videos_sort_by: [{ key: 'title', order: 'asc' }],
+        videos_page: 4,
+        screenshots_per_page: 25,
+        screenshots_sort_by: [{ key: 'timeCreated', order: 'desc' }],
+        screenshots_page: 5,
+        playlists_per_page: -1,
+        playlists_search: 'morning',
+        playlists_sort_by: [{ key: 'title', order: 'desc' }],
+        playlists_page: 6,
+        categories_per_page: 50,
+        categories_search: 'news',
+        categories_sort_by: [{ key: 'free', order: 'asc' }],
+        categories_page: 7,
+        subscriptions_per_page: 25,
+        subscriptions_search: 'paid',
+        subscriptions_sort_by: [{ key: 'endDate', order: 'desc' }],
+        subscriptions_page: 8
+      })
+      localStorage.setItem('user', JSON.stringify(testUser))
+      localStorage.setItem(listStateStorageKey, JSON.stringify({
+        [testUser.id]: savedState,
+        99: createListState({ users_search: 'other user' })
+      }))
+
+      const store = useAuthStore()
+
+      expectListState(store, savedState)
+    })
+
+    it('persists all list params for current user and preserves other users', async () => {
+      const testUser = { id: 1, name: 'Current User' }
+      const nextState = createListState({
+        users_per_page: 25,
+        users_search: 'user search',
+        users_sort_by: [{ key: 'email', order: 'asc' }],
+        users_page: 2,
+        videos_per_page: 50,
+        videos_search: 'video search',
+        videos_sort_by: [{ key: 'title', order: 'desc' }],
+        videos_page: 3,
+        screenshots_per_page: 25,
+        screenshots_sort_by: [{ key: 'timeCreated', order: 'desc' }],
+        screenshots_page: 4,
+        playlists_per_page: -1,
+        playlists_search: 'playlist search',
+        playlists_sort_by: [{ key: 'videoCount', order: 'asc' }],
+        playlists_page: 5,
+        categories_per_page: 50,
+        categories_search: 'category search',
+        categories_sort_by: [{ key: 'title', order: 'desc' }],
+        categories_page: 6,
+        subscriptions_per_page: 25,
+        subscriptions_search: 'subscription search',
+        subscriptions_sort_by: [{ key: 'startDate', order: 'asc' }],
+        subscriptions_page: 7
+      })
+      const otherUserState = createListState({ users_search: 'other user state' })
+      localStorage.setItem('user', JSON.stringify(testUser))
+      localStorage.setItem(listStateStorageKey, JSON.stringify({ 2: otherUserState }))
+      const store = useAuthStore()
+      localStorage.setItem.mockClear()
+
+      Object.entries(nextState).forEach(([key, value]) => {
+        store[key] = value
+      })
+      await waitForListStatePersistence()
+
+      const savedStates = readPersistedListStates()
+      expect(savedStates['1']).toEqual(nextState)
+      expect(savedStates['2']).toEqual(otherUserState)
+      expect(localStorage.setItem).toHaveBeenCalledWith(listStateStorageKey, expect.any(String))
+    })
+
+    it('uses defaults when persisted list state JSON is corrupted', () => {
+      localStorage.setItem('user', JSON.stringify({ id: 5, name: 'Broken Storage User' }))
+      localStorage.setItem(listStateStorageKey, 'invalid-json')
+
+      const store = useAuthStore()
+
+      expectListState(store, createDefaultListState())
+    })
+
+    it('ignores invalid persisted list fields and keeps valid fields', () => {
+      const validVideoSort = [{ key: 'title', order: 'asc' }]
+      localStorage.setItem('user', JSON.stringify({ id: 6, name: 'Invalid State User' }))
+      localStorage.setItem(listStateStorageKey, JSON.stringify({
+        6: {
+          users_per_page: 0,
+          users_search: 123,
+          users_sort_by: 'email',
+          users_page: -1,
+          videos_per_page: -1,
+          videos_search: 'valid search',
+          videos_sort_by: validVideoSort,
+          videos_page: 2,
+          screenshots_per_page: 10.5,
+          screenshots_sort_by: null,
+          screenshots_page: '3'
+        }
+      }))
+
+      const store = useAuthStore()
+
+      expect(store.users_per_page).toBe(10)
+      expect(store.users_search).toBe('')
+      expect(store.users_sort_by).toEqual(['id'])
+      expect(store.users_page).toBe(1)
+      expect(store.videos_per_page).toBe(-1)
+      expect(store.videos_search).toBe('valid search')
+      expect(store.videos_sort_by).toEqual(validVideoSort)
+      expect(store.videos_page).toBe(2)
+      expect(store.screenshots_per_page).toBe(100)
+      expect(store.screenshots_sort_by).toEqual([{ key: 'id', order: 'asc' }])
+      expect(store.screenshots_page).toBe(1)
+    })
+
+    it('applies logged-in user list state after login', async () => {
+      const loggedInUser = { id: 8, name: 'Logged In User' }
+      const savedState = createListState({
+        users_page: 4,
+        videos_search: 'loaded after login',
+        categories_sort_by: [{ key: 'title', order: 'asc' }]
+      })
+      localStorage.setItem(listStateStorageKey, JSON.stringify({ 8: savedState }))
+      fetchWrapper.post.mockResolvedValue(loggedInUser)
+      const store = useAuthStore()
+
+      await store.login('test@example.com', 'password')
+
+      expect(store.user).toEqual(loggedInUser)
+      expectListState(store, savedState)
+    })
+
+    it('applies re-authenticated user list state after re process', async () => {
+      const firstUser = { id: 9, name: 'First User' }
+      const nextUser = { id: 10, name: 'Next User' }
+      const firstState = createListState({ users_search: 'first user' })
+      const nextState = createListState({
+        users_search: 'next user',
+        videos_page: 5,
+        subscriptions_per_page: 25
+      })
+      localStorage.setItem('user', JSON.stringify(firstUser))
+      localStorage.setItem(listStateStorageKey, JSON.stringify({
+        9: firstState,
+        10: nextState
+      }))
+      fetchWrapper.put.mockResolvedValue(nextUser)
+      const store = useAuthStore()
+      expectListState(store, firstState)
+      store.re_jwt = 'jwt-token'
+      store.re_tgt = 'reset'
+
+      await store.re()
+
+      expect(store.user).toEqual(nextUser)
+      expectListState(store, nextState)
+    })
+
+    it('resets list params on logout without deleting persisted states', () => {
+      const testUser = { id: 11, name: 'Logout User' }
+      const savedState = createListState({
+        users_search: 'before logout',
+        videos_per_page: 50,
+        screenshots_page: 3
+      })
+      localStorage.setItem('user', JSON.stringify(testUser))
+      localStorage.setItem(listStateStorageKey, JSON.stringify({ 11: savedState }))
+      const store = useAuthStore()
+      expectListState(store, savedState)
+
+      store.logout()
+
+      expect(store.user).toBeNull()
+      expectListState(store, createDefaultListState())
+      expect(readPersistedListStates()['11']).toEqual(savedState)
     })
   })
 
