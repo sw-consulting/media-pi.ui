@@ -1935,6 +1935,64 @@ describe('Videos_List.vue - playlist impact and v-model coverage', () => {
     await flushPromises()
   })
 
+  it('shows duplicate filename error when playlist cleanup confirmation fails', async () => {
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с таким именем [filename = morning.mp4]'
+    videosStore.updateCategoryBatch = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 1,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+          ]
+        }
+      })
+      .mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [31]
+    wrapper.vm.batchCategoryId = 4
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(alertStore.error).not.toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категории видеофайлов'))
+  })
+
+  it('shows generic error when playlist cleanup confirmation fails', async () => {
+    videosStore.updateCategoryBatch = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 1,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+          ]
+        }
+      })
+      .mockRejectedValueOnce(new Error('boom'))
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [31]
+    wrapper.vm.batchCategoryId = 4
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Не удалось обновить категории видеофайлов: boom')
+  })
+
   it('v-model on batchCategoryDialog closes it on update:modelValue false', async () => {
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
