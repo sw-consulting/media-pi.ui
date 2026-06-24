@@ -619,6 +619,29 @@ describe('Playlist_Settings.vue', () => {
     expect(callArg.items).toEqual([{ videoId: 11, position: 1 }])
   })
 
+  it('filters available videos by formatted size and duration', async () => {
+    videosStore.getAllByAccount = vi.fn(async (accountId) => {
+      if (accountId !== 1) return []
+      return [
+        { id: 81, title: 'One KB', originalFilename: 'one-kb.mp4', fileSizeBytes: 1024, durationSeconds: 65, accountId: 1 },
+        { id: 82, title: 'Two KB', originalFilename: 'two-kb.mp4', fileSizeBytes: 2048, durationSeconds: 130, accountId: 1 }
+      ]
+    })
+
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await wrapper.find('[data-test="video-search-input"]').setValue('1.0 КБ')
+    await flushPromises()
+    expect(getAvailableTable(wrapper).text()).toContain('One KB')
+    expect(getAvailableTable(wrapper).text()).not.toContain('Two KB')
+
+    await wrapper.find('[data-test="video-search-input"]').setValue('1:05')
+    await flushPromises()
+    expect(getAvailableTable(wrapper).text()).toContain('One KB')
+    expect(getAvailableTable(wrapper).text()).not.toContain('Two KB')
+  })
+
   it('disables batch buttons without selection and while submitting', async () => {
     const wrapper = mountSettings({ accountId: 1 })
     await flushPromises()

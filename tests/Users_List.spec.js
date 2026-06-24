@@ -52,7 +52,7 @@ vi.mock('@/stores/auth.store.js', () => ({
   useAuthStore: () => ({
     users_per_page: 10,
     users_search: '',
-    users_sort_by: ['id'],
+    users_sort_by: [{ key: 'id', order: 'asc' }],
     users_page: 1
   })
 }))
@@ -471,4 +471,3 @@ describe('Users_List.vue', () => {
     mockUsers.value = originalValue
   })
 })
-

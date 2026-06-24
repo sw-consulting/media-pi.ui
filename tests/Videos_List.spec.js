@@ -145,6 +145,7 @@ const globalStubs = {
           <slot name="item.actions" :item="item" />
           <slot name="item.title" :item="item" />
           <slot v-if="hasCategoryColumn" name="item.categoryTitle" :item="item" />
+          <slot name="item.fileSize" :item="item" />
         </div>
         <button data-test="trigger-items-per-page" @click="$emit('update:itemsPerPage', 5)" />
         <button data-test="trigger-page" @click="$emit('update:page', 2)" />
@@ -274,6 +275,29 @@ describe('Videos_List.vue', () => {
 
     expect(beforeEmbeddedAction).toHaveBeenCalled()
     expect(router.push).not.toHaveBeenCalled()
+  })
+
+  it('formats video file size with the shared formatter', async () => {
+    videosStore.videos.value = [{
+      id: 13,
+      title: 'Formatted Clip',
+      accountId: 0,
+      categoryId: 9,
+      fileSizeBytes: 1048576,
+      fileSize: '1.00 Мб'
+    }]
+
+    const wrapper = mount(VideosList, {
+      props: {
+        embedded: true,
+        fixedScope: 'category:9'
+      },
+      global: { stubs: globalStubs }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('1.0 МБ')
+    expect(wrapper.text()).not.toContain('1.00 Мб')
   })
 
   it('runs the embedded action hook before deleting a video', async () => {
@@ -1116,10 +1140,13 @@ describe('Videos_List.vue', () => {
   it('filterVideos matches by title, filename, fileSize, duration, and accountDisplay', async () => {
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
-    const item = { raw: { title: 'MyClip', originalFilename: 'video.mp4', fileSize: '512MB', duration: '3:45', accountDisplay: 'Station-1', categoryId: null } }
+    const item = { raw: { title: 'MyClip', originalFilename: 'video.mp4', fileSizeBytes: 1024, fileSize: '512MB', duration: '3:45', accountDisplay: 'Station-1', categoryId: null } }
     expect(wrapper.vm.filterVideos(null, 'myclip', item)).toBe(true)
     expect(wrapper.vm.filterVideos(null, 'video.mp4', item)).toBe(true)
     expect(wrapper.vm.filterVideos(null, '512', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, '1024', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, '1.0 кб', item)).toBe(true)
+    expect(wrapper.vm.filterVideos(null, '1.0кб', item)).toBe(true)
     expect(wrapper.vm.filterVideos(null, '3:45', item)).toBe(true)
     expect(wrapper.vm.filterVideos(null, 'station', item)).toBe(true)
     expect(wrapper.vm.filterVideos(null, 'nomatch_xyz', item)).toBe(false)
