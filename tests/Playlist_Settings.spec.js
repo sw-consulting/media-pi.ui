@@ -664,6 +664,18 @@ describe('Playlist_Settings.vue', () => {
     expect(callArg.items).toEqual([{ videoId: 11, position: 1 }])
   })
 
+  it('shows original filename subtitle for videos already added to the playlist', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    await selectAvailableVideo(wrapper, 'Video 1')
+    await clickBatchAdd(wrapper)
+
+    const playlistTable = getPlaylistTable(wrapper)
+    expect(playlistTable.find('.playlist-video-title').text()).toBe('Video 1')
+    expect(playlistTable.find('.playlist-video-sub').text()).toBe('one.mp4')
+  })
+
   it('paginates available videos with the persisted first page by default', async () => {
     mockAccountAvailableVideos(Array.from({ length: 12 }, (_, index) => createAvailableVideo(index + 1)))
 

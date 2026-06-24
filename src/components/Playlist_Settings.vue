@@ -210,6 +210,7 @@ const playlistVideoDetails = computed(() => playlistItems.value.map((item, index
     videoId: item.videoId,
     position: index + 1,
     title,
+    originalFilename: video?.originalFilename,
     fileSize: video?.fileSize,
     duration: video?.duration,
     mediaInfo: createMediaInfo(video?.fileSize, video?.duration),
@@ -753,11 +754,11 @@ function onInvalidSubmit(context) {
               </label>
             </template>
             <template v-slot:[`item.select`]="{ item }">
-              <label class="playlist-table-checkbox" :title="`Выбрать ${item.title}`">
+              <label class="playlist-table-checkbox" :title="`Выбрать ${getVideoTitle(item)}`">
                 <input
                   data-test="playlist-row-select"
                   type="checkbox"
-                  :aria-label="`Выбрать ${item.title}`"
+                  :aria-label="`Выбрать ${getVideoTitle(item)}`"
                   :checked="selectedPlaylistItemKeys.includes(item.key)"
                   :disabled="isSubmitting"
                   @change="togglePlaylistItemSelection(item.key, $event.target.checked)"
@@ -766,7 +767,10 @@ function onInvalidSubmit(context) {
             </template>
             <template v-slot:[`item.title`]="{ item }">
               <div class="playlist-title-cell">
-                <div class="playlist-video-title">{{ item.title }}</div>
+                <div class="playlist-video-title">{{ getVideoTitle(item) }}</div>
+                <div v-if="item.title && item.originalFilename && item.title !== item.originalFilename" class="playlist-video-sub">
+                  {{ item.originalFilename }}
+                </div>
               </div>
             </template>
             <template v-slot:[`item.scopeName`]="{ item }">
