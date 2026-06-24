@@ -64,13 +64,15 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          icons: [
-            '@fortawesome/vue-fontawesome',
-            '@fortawesome/fontawesome-svg-core',
-            '@fortawesome/free-solid-svg-icons',
-            '@fortawesome/free-regular-svg-icons'
-          ]
+        manualChunks(id) {
+          if (
+            id.includes('@fortawesome/vue-fontawesome') ||
+            id.includes('@fortawesome/fontawesome-svg-core') ||
+            id.includes('@fortawesome/free-solid-svg-icons') ||
+            id.includes('@fortawesome/free-regular-svg-icons')
+          ) {
+            return 'icons'
+          }
         }
       }
     }
