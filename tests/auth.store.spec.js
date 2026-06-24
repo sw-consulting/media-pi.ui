@@ -41,7 +41,7 @@ function createDefaultListState() {
   return {
     users_per_page: 10,
     users_search: '',
-    users_sort_by: ['id'],
+    users_sort_by: [{ key: 'id', order: 'asc' }],
     users_page: 1,
     videos_per_page: 10,
     videos_search: '',
@@ -112,7 +112,7 @@ describe('auth store', () => {
       // isAdmin should be falsy when there's no user
       expect(store.users_per_page).toBe(10)
       expect(store.users_search).toBe('')
-      expect(store.users_sort_by).toEqual(['id'])
+      expect(store.users_sort_by).toEqual([{ key: 'id', order: 'asc' }])
       expect(store.users_page).toBe(1)
       expect(store.videos_per_page).toBe(10)
       expect(store.videos_search).toBe('')
@@ -327,7 +327,7 @@ describe('auth store', () => {
 
       expect(store.users_per_page).toBe(10)
       expect(store.users_search).toBe('')
-      expect(store.users_sort_by).toEqual(['id'])
+      expect(store.users_sort_by).toEqual([{ key: 'id', order: 'asc' }])
       expect(store.users_page).toBe(1)
       expect(store.videos_per_page).toBe(-1)
       expect(store.videos_search).toBe('valid search')
@@ -355,7 +355,7 @@ describe('auth store', () => {
       expectListState(store, savedState)
     })
 
-    it('applies re-authenticated user list state after re process', async () => {
+    it('applies re-authenticated user list state after re-authentication', async () => {
       const firstUser = { id: 9, name: 'First User' }
       const nextUser = { id: 10, name: 'Next User' }
       const firstState = createListState({ users_search: 'first user' })

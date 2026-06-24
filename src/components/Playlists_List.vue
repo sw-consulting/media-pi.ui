@@ -15,7 +15,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { createAccountOptions, estimateSelectWidth } from '@/helpers/account.options.js'
-import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
+import { createFileSizeSearchTokens, formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { formatRuDateTime } from '@/helpers/date.format.js'
 
 const playlistsStore = usePlaylistsStore()
@@ -88,7 +88,7 @@ function filterPlaylists(value, query, item) {
     rawPlaylist.title,
     rawPlaylist.filename,
     formatPlaylistUpdatedAt(rawPlaylist),
-    rawPlaylist.totalFileSizeBytes,
+    ...createFileSizeSearchTokens(rawPlaylist.totalFileSizeBytes),
     rawPlaylist.totalDurationSeconds,
     rawPlaylist.videoCount
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))

@@ -17,7 +17,7 @@ const listStateStorageKey = 'authListState'
 const listStateDefaults = Object.freeze({
   users_per_page: 10,
   users_search: '',
-  users_sort_by: ['id'],
+  users_sort_by: [{ key: 'id', order: 'asc' }],
   users_page: 1,
   videos_per_page: 10,
   videos_search: '',

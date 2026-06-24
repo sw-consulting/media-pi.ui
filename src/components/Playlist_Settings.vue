@@ -18,7 +18,7 @@ import { useAlertStore } from '@/stores/alert.store.js'
 import { redirectToDefaultRoute } from '@/helpers/default.route.js'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import { createAccountOptions } from '@/helpers/account.options.js'
-import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
+import { compareMediaInfo, createFileSizeSearchTokens, formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { getVideoCategoryTitle } from '@/helpers/video.scope.helpers.js'
 import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 
@@ -153,7 +153,10 @@ const filteredAvailableVideos = computed(() => {
   return availableVideos.value.filter(video => [
     video.title,
     video.originalFilename,
-    video.scopeName
+    video.scopeName,
+    ...createFileSizeSearchTokens(video.fileSize),
+    video.duration,
+    formatDuration(video.duration)
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(query)))
 })
 
@@ -330,23 +333,8 @@ async function openVideo(item) {
   }
 }
 
-function toSortableMediaNumber(value) {
-  const numberValue = Number(value)
-  return Number.isFinite(numberValue) ? numberValue : 0
-}
-
-function compareMediaNumber(a, b) {
-  return toSortableMediaNumber(a) - toSortableMediaNumber(b)
-}
-
 function createMediaInfo(fileSize, duration) {
   return { fileSize, duration }
-}
-
-function compareMediaInfo(a, b) {
-  const sizeResult = compareMediaNumber(a?.fileSize, b?.fileSize)
-  if (sizeResult !== 0) return sizeResult
-  return compareMediaNumber(a?.duration, b?.duration)
 }
 
 function compareDisplayText(a, b) {

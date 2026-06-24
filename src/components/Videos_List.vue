@@ -22,6 +22,7 @@ import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { canManageAccountById, isAdministrator } from '@/helpers/user.helpers.js'
 import { estimateSelectWidth } from '@/helpers/account.options.js'
+import { createFileSizeSearchTokens, formatFileSize } from '@/helpers/media.format.js'
 import {
   createCategoryOptions,
   createVideoScopeOptions,
@@ -644,6 +645,18 @@ function closeBatchCategoryDialog() {
   batchCategoryDialog.value = false
 }
 
+function formatVideoFileSize(video) {
+  const rawBytes = video?.fileSizeBytes
+  const formatted = formatFileSize(rawBytes)
+  if (formatted !== '—') return formatted
+
+  const legacySize = video?.fileSize
+  if (legacySize === null || legacySize === undefined || legacySize === '') return formatted
+
+  const formattedLegacySize = formatFileSize(legacySize)
+  return formattedLegacySize !== '—' ? formattedLegacySize : legacySize
+}
+
 function filterVideos(value, query, item) {
   if (!query) return true
   const rawVideo = item?.raw
@@ -652,7 +665,7 @@ function filterVideos(value, query, item) {
   return [
     rawVideo.title,
     rawVideo.originalFilename,
-    rawVideo.fileSize,
+    ...createFileSizeSearchTokens(rawVideo.fileSizeBytes, rawVideo.fileSize),
     rawVideo.duration,
     rawVideo.accountDisplay,
     videoCategoryTitle(rawVideo)
@@ -890,6 +903,9 @@ watch(displayedVideos, (current) => {
         </template>
         <template v-slot:[`item.categoryTitle`]="{ item }">
           <span data-test="video-category-label">{{ videoCategoryTitle(item) }}</span>
+        </template>
+        <template v-slot:[`item.fileSize`]="{ item }">
+          {{ formatVideoFileSize(item) }}
         </template>
         <template v-slot:[`item.actions`]="{ item }">
           <div class="actions-container">

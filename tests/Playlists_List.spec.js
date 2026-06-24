@@ -188,6 +188,25 @@ describe('Playlists_List.vue', () => {
     })).toBe(false)
   })
 
+  it('matches playlist search against formatted total file size', async () => {
+    const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const item = {
+      raw: {
+        title: 'Playlist',
+        filename: 'playlist.m3u',
+        totalFileSizeBytes: 1024,
+        totalDurationSeconds: 65,
+        videoCount: 1
+      }
+    }
+
+    expect(wrapper.vm.filterPlaylists(null, '1024', item)).toBe(true)
+    expect(wrapper.vm.filterPlaylists(null, '1.0 кб', item)).toBe(true)
+    expect(wrapper.vm.filterPlaylists(null, '1.0кб', item)).toBe(true)
+    expect(wrapper.vm.filterPlaylists(null, '2.0 кб', item)).toBe(false)
+  })
+
   it('disables create-playlist-button when account list is empty', async () => {
     // accountsStore.accounts.value is already [] from beforeEach
     const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
