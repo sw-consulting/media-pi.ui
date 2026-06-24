@@ -73,7 +73,7 @@ const globalStubs = {
         <div v-for="header in headers" :key="header.key" :data-test="'table-header-' + header.key">{{ header.title }}</div>
         <div v-if="!items.length" data-test="table-empty">{{ noDataText }}</div>
         <div v-for="item in items" :key="item.id">
-          <slot name="item.updatedAt" :item="item" />
+          <slot name="item.updatedAtSortKey" :item="item" />
           <slot name="item.totalFileSizeBytes" :item="item" />
           <slot name="item.totalDurationSeconds" :item="item" />
           <slot name="item.actions" :item="item" />
@@ -150,7 +150,7 @@ describe('Playlists_List.vue', () => {
     const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
     await flushPromises()
 
-    expect(wrapper.find('[data-test="table-header-updatedAt"]').text()).toBe('Создан/Изменён')
+    expect(wrapper.find('[data-test="table-header-updatedAtSortKey"]').text()).toBe('Создан/Изменён')
     expect(wrapper.text()).toContain('24.06.2026')
     expect(wrapper.text()).toContain('12:15:30')
   })

@@ -35,7 +35,7 @@ const accountOptions = computed(() => createAccountOptions(accounts.value || [],
 const headers = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
   { title: 'Описание', align: 'start', key: 'title', width: '22%' },
-  { title: 'Создан/Изменён', align: 'start', key: 'updatedAt', sortable: false, width: '18%' },
+  { title: 'Создан/Изменён', align: 'start', key: 'updatedAtSortKey', width: '18%' },
   { title: 'Размер', align: 'start', key: 'totalFileSizeBytes', width: '15%' },
   { title: 'Длительность', align: 'start', key: 'totalDurationSeconds', width: '15%' },
   { title: 'Видео', align: 'start', key: 'videoCount', width: '10%' }
@@ -43,6 +43,10 @@ const headers = [
 
 const selectWidth = computed(() => estimateSelectWidth(accountOptions.value))
 const isBusy = computed(() => loading.value || accountsLoading.value)
+const playlistItems = computed(() => (playlists.value || []).map(playlist => ({
+  ...playlist,
+  updatedAtSortKey: getPlaylistTimestamp(playlist)
+})))
 
 function ensureSelection(options) {
   const availableValues = options.map(option => option.value)
@@ -175,7 +179,7 @@ async function deletePlaylist(item) {
         page-text="{0}-{1} из {2}"
         v-model:page="authStore.playlists_page"
         :headers="headers"
-        :items="playlists"
+        :items="playlistItems"
         :search="authStore.playlists_search"
         v-model:sort-by="authStore.playlists_sort_by"
         :custom-filter="filterPlaylists"
@@ -185,7 +189,7 @@ async function deletePlaylist(item) {
         <template v-slot:[`item.totalFileSizeBytes`]="{ item }">
           {{ formatFileSize(item.totalFileSizeBytes) }}
         </template>
-        <template v-slot:[`item.updatedAt`]="{ item }">
+        <template v-slot:[`item.updatedAtSortKey`]="{ item }">
           {{ formatPlaylistUpdatedAt(item) }}
         </template>
         <template v-slot:[`item.totalDurationSeconds`]="{ item }">
