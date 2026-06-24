@@ -54,6 +54,8 @@ function createDefaultListState() {
     playlists_search: '',
     playlists_sort_by: [],
     playlists_page: 1,
+    playlist_available_videos_per_page: 10,
+    playlist_available_videos_page: 1,
     categories_per_page: 10,
     categories_search: '',
     categories_sort_by: [],
@@ -125,6 +127,8 @@ describe('auth store', () => {
       expect(store.playlists_search).toBe('')
       expect(store.playlists_sort_by).toEqual([])
       expect(store.playlists_page).toBe(1)
+      expect(store.playlist_available_videos_per_page).toBe(10)
+      expect(store.playlist_available_videos_page).toBe(1)
       expect(store.categories_per_page).toBe(10)
       expect(store.categories_search).toBe('')
       expect(store.categories_sort_by).toEqual([])
@@ -231,6 +235,8 @@ describe('auth store', () => {
         playlists_search: 'morning',
         playlists_sort_by: [{ key: 'title', order: 'desc' }],
         playlists_page: 6,
+        playlist_available_videos_per_page: 25,
+        playlist_available_videos_page: 3,
         categories_per_page: 50,
         categories_search: 'news',
         categories_sort_by: [{ key: 'free', order: 'asc' }],
@@ -269,6 +275,8 @@ describe('auth store', () => {
         playlists_search: 'playlist search',
         playlists_sort_by: [{ key: 'videoCount', order: 'asc' }],
         playlists_page: 5,
+        playlist_available_videos_per_page: 50,
+        playlist_available_videos_page: 2,
         categories_per_page: 50,
         categories_search: 'category search',
         categories_sort_by: [{ key: 'title', order: 'desc' }],
@@ -319,7 +327,9 @@ describe('auth store', () => {
           videos_page: 2,
           screenshots_per_page: 10.5,
           screenshots_sort_by: null,
-          screenshots_page: '3'
+          screenshots_page: '3',
+          playlist_available_videos_per_page: 0,
+          playlist_available_videos_page: '4'
         }
       }))
 
@@ -336,6 +346,8 @@ describe('auth store', () => {
       expect(store.screenshots_per_page).toBe(100)
       expect(store.screenshots_sort_by).toEqual([{ key: 'id', order: 'asc' }])
       expect(store.screenshots_page).toBe(1)
+      expect(store.playlist_available_videos_per_page).toBe(10)
+      expect(store.playlist_available_videos_page).toBe(1)
     })
 
     it('applies logged-in user list state after login', async () => {
