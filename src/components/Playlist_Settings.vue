@@ -628,7 +628,6 @@ async function onSubmit(values) {
     }
     const conflict = await findPlaylistUniquenessConflict(trimmedTitle, finalFilename, accountId)
     if (conflict) {
-      filenameError.value = conflict.message
       alertStore.error(conflict.message)
       return
     }
