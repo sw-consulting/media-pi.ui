@@ -21,6 +21,14 @@ import { createAccountOptions } from '@/helpers/account.options.js'
 import { compareMediaInfo, createFileSizeSearchTokens, formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
 import { getVideoCategoryTitle } from '@/helpers/video.scope.helpers.js'
+import {
+  duplicatePlaylistDescriptionFallbackMessage,
+  duplicatePlaylistFilenameFallbackMessage,
+  getDuplicatePlaylistDescriptionMessage,
+  getDuplicatePlaylistFilenameMessage,
+  isDuplicatePlaylistDescriptionError,
+  isDuplicatePlaylistFilenameError
+} from '@/helpers/playlist.conflict.js'
 import AlertOutput from '@/components/AlertOutput.vue'
 import VideoViewDialog from '@/components/Video_View_Dialog.vue'
 
@@ -572,15 +580,29 @@ function rebuildPositions() {
   }))
 }
 
-async function checkFilenameUnique(filename, accountId) {
+async function findPlaylistUniquenessConflict(title, filename, accountId) {
+  const trimmedTitle = title.trim()
   const trimmed = filename.trim().toLocaleLowerCase()
-  if (!trimmed) return true
   const existing = await playlistsStore.getAllByAccount(accountId)
-  return !(existing || []).some(item => {
-    if (!item?.filename) return false
-    if (props.id && item.id === props.id) return false
-    return item.filename.toLocaleLowerCase() === trimmed
-  })
+  for (const item of existing || []) {
+    if (props.id && item.id === props.id) continue
+
+    if ((item?.title || '').trim() === trimmedTitle) {
+      return {
+        reason: 'description',
+        message: duplicatePlaylistDescriptionFallbackMessage
+      }
+    }
+
+    if (trimmed && item?.filename && item.filename.toLocaleLowerCase() === trimmed) {
+      return {
+        reason: 'filename',
+        message: duplicatePlaylistFilenameFallbackMessage
+      }
+    }
+  }
+
+  return null
 }
 
 function buildItemsPayload() {
@@ -604,10 +626,9 @@ async function onSubmit(values) {
       // reflect into reactive state so UI is consistent
       playlist.value.filename = finalFilename
     }
-    const isUnique = await checkFilenameUnique(finalFilename, accountId)
-    if (!isUnique) {
-      filenameError.value = 'Плейлист с таким именем файла уже существует'
-      alertStore.error(filenameError.value)
+    const conflict = await findPlaylistUniquenessConflict(trimmedTitle, finalFilename, accountId)
+    if (conflict) {
+      alertStore.error(conflict.message)
       return
     }
 
@@ -629,8 +650,12 @@ async function onSubmit(values) {
       redirectToDefaultRoute()
     } else if (err.status === 404) {
       alertStore.error(`Плейлист с ID ${props.id} не найден`)
+    } else if (isDuplicatePlaylistDescriptionError(err)) {
+      alertStore.error(getDuplicatePlaylistDescriptionMessage(err))
+    } else if (isDuplicatePlaylistFilenameError(err)) {
+      alertStore.error(getDuplicatePlaylistFilenameMessage(err))
     } else if (err.status === 409) {
-      alertStore.error('Плейлист с таким названием уже существует')
+      alertStore.error(err?.data?.msg || err.message || 'Конфликт при сохранении плейлиста')
     } else if (err.status === 422) {
       alertStore.error('Проверьте корректность введённых данных')
     } else {
