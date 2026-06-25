@@ -94,6 +94,16 @@ function createDuplicateOriginalFilenameError(message) {
   return error
 }
 
+function createDuplicateVideoDescriptionError(message) {
+  const error = new Error(message)
+  error.status = 409
+  error.data = {
+    msg: message,
+    reason: 'duplicateVideoDescription'
+  }
+  return error
+}
+
 const mountSettings = (props = {}) => mount({
   template: '<Suspense><VideoSettings v-bind="$attrs" /></Suspense>',
   components: { VideoSettings },
@@ -294,6 +304,20 @@ describe('Video_Settings.vue', () => {
     expect(routerGo).not.toHaveBeenCalled()
   })
 
+  it('shows duplicate description conflict without generic update prefix', async () => {
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с описанием "clip.mp4"'
+    videosStore.update = vi.fn().mockRejectedValueOnce(createDuplicateVideoDescriptionError(duplicateMessage))
+    const wrapper = mountSettings({ submitValues: { title: 'clip.mp4' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(alertStore.error).not.toHaveBeenCalledWith(expect.stringContaining('Ошибка при обновлении видеофайла'))
+    expect(routerGo).not.toHaveBeenCalled()
+  })
+
   it('redirects when current user cannot manage the video', async () => {
     authStore = { user: { roles: [], accountIds: [99] } }
     videosStore.video.value = { id: 10, title: 'Locked', accountId: 42, categoryId: 0 }
@@ -466,6 +490,34 @@ describe('Video_Settings.vue', () => {
 
     resolveUpdate()
     await flushPromises()
+  })
+
+  it('cancelPlaylistCleanup closes impact dialog when not saving', async () => {
+    videosStore.update = vi.fn().mockRejectedValueOnce({
+      status: 409,
+      data: {
+        affectedPlaylistCount: 1,
+        affectedItemCount: 1,
+        affectedVideoCount: 1,
+        affectedPlaylists: [
+          { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+        ]
+      }
+    })
+
+    const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="video-category-select"]').setValue('4')
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(true)
+
+    await wrapper.find('[data-test="cancel-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(false)
   })
 
   it('v-model on PlaylistAccessImpactDialog closes dialog on update:modelValue false', async () => {

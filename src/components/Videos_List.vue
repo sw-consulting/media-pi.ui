@@ -17,6 +17,7 @@ import { useConfirmation } from '@/helpers/confirmation.js'
 import { runBeforeEmbeddedAction } from '@/helpers/embedded.action.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import { getDuplicateOriginalFilenameMessage, isDuplicateOriginalFilenameError } from '@/helpers/video.original.filename.conflict.js'
+import { getDuplicateVideoDescriptionMessage, isDuplicateVideoDescriptionError } from '@/helpers/video.description.conflict.js'
 import AlertOutput from '@/components/AlertOutput.vue'
 import ModalWindow from '@/components/ModalWindow.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
@@ -445,6 +446,8 @@ async function uploadVideos(files) {
     if (!isAbortError(err)) {
       if (isDuplicateOriginalFilenameError(err)) {
         alertStore.error(getDuplicateOriginalFilenameMessage(err))
+      } else if (isDuplicateVideoDescriptionError(err)) {
+        alertStore.error(getDuplicateVideoDescriptionMessage(err))
       } else {
         alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
       }
@@ -605,6 +608,10 @@ async function updateSelectedVideoCategory() {
       alertStore.error(getDuplicateOriginalFilenameMessage(err))
       return
     }
+    if (isDuplicateVideoDescriptionError(err)) {
+      alertStore.error(getDuplicateVideoDescriptionMessage(err))
+      return
+    }
     if (isPlaylistAccessImpactError(err)) {
       playlistImpact.value = err.data
       pendingCategoryUpdate.value = { ids, categoryId: batchCategoryId.value }
@@ -635,6 +642,8 @@ async function confirmPlaylistCleanup() {
   } catch (err) {
     if (isDuplicateOriginalFilenameError(err)) {
       alertStore.error(getDuplicateOriginalFilenameMessage(err))
+    } else if (isDuplicateVideoDescriptionError(err)) {
+      alertStore.error(getDuplicateVideoDescriptionMessage(err))
     } else {
       alertStore.error('Не удалось обновить категории видеофайлов: ' + (err?.message || err))
     }
