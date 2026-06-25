@@ -6,14 +6,8 @@ import VideosList from '@/components/Videos_List.vue'
 /* global File, AbortSignal */
 
 let currentUser
+let authStore
 
-const authStore = reactive({
-  user: null,
-  videos_per_page: 10,
-  videos_search: '',
-  videos_sort_by: [],
-  videos_page: 1
-})
 const makeAuthStore = () => {
   authStore.user = currentUser
   return authStore
@@ -197,11 +191,14 @@ describe('Videos_List.vue', () => {
     videosStore.videos.value = []
     videosStore.videoPreview.value = null
     currentUser = { roles: [1], accountIds: [] }
-    authStore.user = currentUser
-    authStore.videos_per_page = 10
-    authStore.videos_search = ''
-    authStore.videos_sort_by = []
-    authStore.videos_page = 1
+    authStore = reactive({
+      user: currentUser,
+      videos_per_page: 10,
+      videos_search: '',
+      videos_sort_by: [],
+      videos_page: 1,
+      videos_scope: null
+    })
     accountsStore.getAll.mockImplementation(async () => accountsStore.accounts.value)
     accountsStore.getSubscriptions.mockImplementation(async () => ({ subscriptions: [], availableCategories: [] }))
     categoriesStore.getAll.mockImplementation(async () => categoriesStore.categories.value)
@@ -1650,6 +1647,7 @@ describe('Videos_List.vue', () => {
   })
 
   it('uses local pagination state and skips account load when fixedScope is provided', async () => {
+    authStore.videos_scope = 'account:9'
     categoriesStore.categories.value = [{ id: 5, title: 'Sports' }]
     const wrapper = mount(VideosList, {
       props: { fixedScope: 'common:all' },
@@ -1659,6 +1657,8 @@ describe('Videos_List.vue', () => {
 
     expect(accountsStore.getAll).not.toHaveBeenCalled()
     expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, {})
+    expect(wrapper.vm.selectedScope).toBe('common:all')
+    expect(authStore.videos_scope).toBe('account:9')
 
     wrapper.vm.tableItemsPerPage = 25
     expect(wrapper.vm.tableItemsPerPage).toBe(25)
@@ -1708,6 +1708,45 @@ describe('Videos_List.vue', () => {
     expect(wrapper.vm.tableSearch).toBe('test')
     expect(wrapper.vm.tableSortBy).toEqual([{ key: 'title', order: 'asc' }])
     expect(wrapper.vm.tablePage).toBe(2)
+  })
+
+  it('restores persisted top-level scope after options load', async () => {
+    authStore.videos_scope = 'account:6'
+    accountsStore.accounts.value = [
+      { id: 5, name: 'Five' },
+      { id: 6, name: 'Six' }
+    ]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.vm.selectedScope).toBe('account:6')
+    expect(authStore.videos_scope).toBe('account:6')
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(6, {})
+  })
+
+  it('persists top-level scope changes', async () => {
+    accountsStore.accounts.value = [{ id: 5, name: 'Five' }]
+    categoriesStore.categories.value = [{ id: 3, title: 'Sports' }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedScope = 'category:3'
+    await nextTick()
+    await flushPromises()
+
+    expect(authStore.videos_scope).toBe('category:3')
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(0, { categoryId: 3 })
+  })
+
+  it('falls back when persisted top-level scope is not available', async () => {
+    authStore.videos_scope = 'account:99'
+    accountsStore.accounts.value = [{ id: 5, name: 'Five' }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.vm.selectedScope).toBe('account:5')
+    expect(authStore.videos_scope).toBe('account:5')
+    expect(videosStore.getAllByAccount).toHaveBeenCalledWith(5, {})
   })
 
   it('triggers file upload dialog when upload button is clicked', async () => {
@@ -1993,6 +2032,7 @@ describe('Videos_List.vue', () => {
     await scopeSelect.setValue('common:all')
 
     expect(wrapper.vm.selectedScope).toBe('common:all')
+    expect(authStore.videos_scope).toBe('common:all')
   })
 
   it('updates batchCategoryId via select element change', async () => {

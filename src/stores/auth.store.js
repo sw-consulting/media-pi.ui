@@ -23,6 +23,7 @@ const listStateDefaults = Object.freeze({
   videos_search: '',
   videos_sort_by: [],
   videos_page: 1,
+  videos_scope: null,
   screenshots_per_page: 100,
   screenshots_sort_by: [{ key: 'id', order: 'asc' }],
   screenshots_page: 1,
@@ -30,6 +31,7 @@ const listStateDefaults = Object.freeze({
   playlists_search: '',
   playlists_sort_by: [],
   playlists_page: 1,
+  playlists_account_id: null,
   playlist_available_videos_per_page: 10,
   playlist_available_videos_page: 1,
   categories_per_page: 10,
@@ -47,6 +49,8 @@ const perPageKeys = new Set(listStateKeys.filter(key => key.endsWith('_per_page'
 const pageKeys = new Set(listStateKeys.filter(key => key.endsWith('_page') && !key.endsWith('_per_page')))
 const searchKeys = new Set(listStateKeys.filter(key => key.endsWith('_search')))
 const sortKeys = new Set(listStateKeys.filter(key => key.endsWith('_sort_by')))
+const nullableStringKeys = new Set(['videos_scope'])
+const nullablePositiveIntegerKeys = new Set(['playlists_account_id'])
 
 function cloneListStateValue(value) {
   if (Array.isArray(value)) {
@@ -74,11 +78,23 @@ function normalizePerPage(value, fallback) {
   return Number.isInteger(value) && (value > 0 || value === -1) ? value : fallback
 }
 
+function normalizeNullableString(value, fallback) {
+  if (value === null || value === undefined) return fallback
+  return typeof value === 'string' ? value : fallback
+}
+
+function normalizeNullablePositiveInteger(value, fallback) {
+  if (value === null || value === undefined) return fallback
+  return normalizePositiveInteger(value, fallback)
+}
+
 function normalizeListStateValue(key, value, fallback) {
   if (perPageKeys.has(key)) return normalizePerPage(value, fallback)
   if (pageKeys.has(key)) return normalizePositiveInteger(value, fallback)
   if (searchKeys.has(key)) return typeof value === 'string' ? value : fallback
   if (sortKeys.has(key)) return Array.isArray(value) ? cloneListStateValue(value) : cloneListStateValue(fallback)
+  if (nullableStringKeys.has(key)) return normalizeNullableString(value, fallback)
+  if (nullablePositiveIntegerKeys.has(key)) return normalizeNullablePositiveInteger(value, fallback)
   return cloneListStateValue(fallback)
 }
 
@@ -126,6 +142,7 @@ export const useAuthStore = defineStore('auth', () => {
   const videos_search = ref(defaultListState.videos_search)
   const videos_sort_by = ref(defaultListState.videos_sort_by)
   const videos_page = ref(defaultListState.videos_page)
+  const videos_scope = ref(defaultListState.videos_scope)
   const screenshots_per_page = ref(defaultListState.screenshots_per_page)
   const screenshots_sort_by = ref(defaultListState.screenshots_sort_by)
   const screenshots_page = ref(defaultListState.screenshots_page)
@@ -133,6 +150,7 @@ export const useAuthStore = defineStore('auth', () => {
   const playlists_search = ref(defaultListState.playlists_search)
   const playlists_sort_by = ref(defaultListState.playlists_sort_by)
   const playlists_page = ref(defaultListState.playlists_page)
+  const playlists_account_id = ref(defaultListState.playlists_account_id)
   const playlist_available_videos_per_page = ref(defaultListState.playlist_available_videos_per_page)
   const playlist_available_videos_page = ref(defaultListState.playlist_available_videos_page)
   const categories_per_page = ref(defaultListState.categories_per_page)
@@ -156,6 +174,7 @@ export const useAuthStore = defineStore('auth', () => {
     videos_search,
     videos_sort_by,
     videos_page,
+    videos_scope,
     screenshots_per_page,
     screenshots_sort_by,
     screenshots_page,
@@ -163,6 +182,7 @@ export const useAuthStore = defineStore('auth', () => {
     playlists_search,
     playlists_sort_by,
     playlists_page,
+    playlists_account_id,
     playlist_available_videos_per_page,
     playlist_available_videos_page,
     categories_per_page,
@@ -406,6 +426,7 @@ export const useAuthStore = defineStore('auth', () => {
     videos_search,
     videos_sort_by,
     videos_page,
+    videos_scope,
     screenshots_per_page,
     screenshots_sort_by,
     screenshots_page,
@@ -413,6 +434,7 @@ export const useAuthStore = defineStore('auth', () => {
     playlists_search,
     playlists_sort_by,
     playlists_page,
+    playlists_account_id,
     playlist_available_videos_per_page,
     playlist_available_videos_page,
     categories_per_page,

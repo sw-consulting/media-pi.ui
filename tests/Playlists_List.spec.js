@@ -4,20 +4,18 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { ref, nextTick } from 'vue'
+import { reactive, ref, nextTick } from 'vue'
 import PlaylistsList from '@/components/Playlists_List.vue'
 
 const routerPush = vi.hoisted(() => vi.fn())
 
 let currentUser
+let authStore
 
-const makeAuthStore = () => ({
-  user: currentUser,
-  playlists_per_page: 10,
-  playlists_search: '',
-  playlists_sort_by: [],
-  playlists_page: 1
-})
+const makeAuthStore = () => {
+  authStore.user = currentUser
+  return authStore
+}
 
 const accountsStore = {
   accounts: ref([]),
@@ -90,6 +88,14 @@ describe('Playlists_List.vue', () => {
     accountsStore.accounts.value = []
     playlistsStore.playlists.value = []
     currentUser = { roles: [1], accountIds: [] }
+    authStore = reactive({
+      user: currentUser,
+      playlists_per_page: 10,
+      playlists_search: '',
+      playlists_sort_by: [],
+      playlists_page: 1,
+      playlists_account_id: null
+    })
   })
 
   it('loads playlists for default and changed account selection', async () => {
@@ -102,11 +108,41 @@ describe('Playlists_List.vue', () => {
     await flushPromises()
     expect(accountsStore.getAll).toHaveBeenCalled()
     expect(playlistsStore.getAllByAccount).toHaveBeenCalledWith(5)
+    expect(authStore.playlists_account_id).toBe(5)
 
     wrapper.vm.selectedAccountId = 6
     await nextTick()
     await flushPromises()
+    expect(authStore.playlists_account_id).toBe(6)
     expect(playlistsStore.getAllByAccount).toHaveBeenCalledWith(6)
+  })
+
+  it('restores persisted account selection after options load', async () => {
+    authStore.playlists_account_id = 6
+    accountsStore.accounts.value = [
+      { id: 5, name: 'Five' },
+      { id: 6, name: 'Six' }
+    ]
+    const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
+
+    await flushPromises()
+    expect(wrapper.vm.selectedAccountId).toBe(6)
+    expect(authStore.playlists_account_id).toBe(6)
+    expect(playlistsStore.getAllByAccount).toHaveBeenCalledWith(6)
+  })
+
+  it('falls back when persisted account selection is not available', async () => {
+    authStore.playlists_account_id = 99
+    accountsStore.accounts.value = [
+      { id: 5, name: 'Five' },
+      { id: 6, name: 'Six' }
+    ]
+    const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
+
+    await flushPromises()
+    expect(wrapper.vm.selectedAccountId).toBe(5)
+    expect(authStore.playlists_account_id).toBe(5)
+    expect(playlistsStore.getAllByAccount).toHaveBeenCalledWith(5)
   })
 
   it('routes to create playlist', async () => {
