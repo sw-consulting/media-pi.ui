@@ -212,6 +212,7 @@ function createUploadProgressState(files) {
   return {
     fileSizes,
     loadedByFile: fileSizes.map(() => 0),
+    loadedBytes: 0,
     totalBytes: fileSizes.reduce((sum, size) => sum + size, 0)
   }
 }
@@ -224,9 +225,11 @@ function setAggregateUploadProgress(state, index, loadedBytes) {
   }
 
   const fileSize = state.fileSizes[index]
-  state.loadedByFile[index] = Math.min(fileSize, Math.max(0, loadedBytes))
-  const loadedTotal = state.loadedByFile.reduce((sum, loaded) => sum + loaded, 0)
-  const nextPercent = Math.min(100, Math.max(0, Math.round((loadedTotal / state.totalBytes) * 100)))
+  const previousLoadedBytes = state.loadedByFile[index]
+  const nextLoadedBytes = Math.min(fileSize, Math.max(0, loadedBytes))
+  state.loadedByFile[index] = nextLoadedBytes
+  state.loadedBytes += nextLoadedBytes - previousLoadedBytes
+  const nextPercent = Math.min(100, Math.max(0, Math.round((state.loadedBytes / state.totalBytes) * 100)))
 
   uploadProgressPercent.value = nextPercent
   uploadPhase.value = nextPercent >= 100 ? 'processing' : 'uploading'
