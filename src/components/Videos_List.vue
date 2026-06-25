@@ -430,8 +430,8 @@ async function loadAccessibleCategoryIds() {
 }
 
 function shouldDeferScopeSync() {
-  if (!isScopeFixed.value && !scopeOptionsReady.value) return true
-  return !props.fixedScope && authStore.user && !isAdministrator(authStore.user) && !accessInfoLoaded.value
+  if (!scopeOptionsReady.value) return true
+  return authStore.user && !isAdministrator(authStore.user) && !accessInfoLoaded.value
 }
 
 function canAccessCommonVideo(video) {
