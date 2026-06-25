@@ -943,6 +943,37 @@ describe('Playlist_Settings.vue', () => {
     randomSpy.mockRestore()
   })
 
+  it('blocks creation when trimmed description is not unique in the account', async () => {
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([{ id: 2, title: 'Morning playlist' }])
+
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: '  Morning playlist  ' }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(playlistsStore.create).not.toHaveBeenCalled()
+    expect(alertStore.error).toHaveBeenCalledWith('Плейлист с таким описанием уже существует')
+  })
+
+  it('allows case-only description differences in the client pre-check', async () => {
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([{ id: 2, title: 'Morning playlist' }])
+
+    const wrapper = mountSettings({
+      accountId: 1,
+      submitValues: { title: 'morning playlist' }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(playlistsStore.create).toHaveBeenCalled()
+  })
+
   it('updates existing playlist', async () => {
     playlistsStore.playlist = {
       id: 9,
@@ -969,6 +1000,58 @@ describe('Playlist_Settings.vue', () => {
       filename: 'old.json',
       items: [{ videoId: 11, position: 1 }]
     })
+  })
+
+  it('blocks update when another playlist has the same trimmed description', async () => {
+    playlistsStore.playlist = {
+      id: 9,
+      title: 'Old Playlist',
+      filename: 'old.json',
+      accountId: 1,
+      items: []
+    }
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([{ id: 10, title: 'Updated' }])
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: ' Updated ', accountId: 1 }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(playlistsStore.update).not.toHaveBeenCalled()
+    expect(alertStore.error).toHaveBeenCalledWith('Плейлист с таким описанием уже существует')
+  })
+
+  it('skips current playlist description while editing', async () => {
+    playlistsStore.playlist = {
+      id: 9,
+      title: 'Same Name',
+      filename: 'same.m3u',
+      accountId: 1,
+      items: []
+    }
+    playlistsStore.getAllByAccount = vi.fn().mockResolvedValue([
+      { id: 9, title: 'Same Name', filename: 'same.m3u' }
+    ])
+
+    const wrapper = mountSettings({
+      register: false,
+      id: 9,
+      submitValues: { title: ' Same Name ', accountId: 1 }
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(playlistsStore.update).toHaveBeenCalledWith(9, expect.objectContaining({
+      title: 'Same Name'
+    }))
+    expect(alertStore.error).not.toHaveBeenCalledWith('Плейлист с таким описанием уже существует')
   })
 
   it('allows creating playlist with no videos', async () => {
@@ -1193,15 +1276,52 @@ describe('Playlist_Settings.vue', () => {
     expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('не найден'))
   })
 
-  it('handles 409 conflict error during submit', async () => {
-    playlistsStore.create = vi.fn().mockRejectedValue({ status: 409 })
+  it('handles backend duplicate description conflicts during submit', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({
+      status: 409,
+      data: {
+        reason: 'duplicatePlaylistDescription',
+        msg: 'Плейлист с описанием "Test" уже существует'
+      }
+    })
     const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
     await flushPromises()
 
     await wrapper.find('[data-test="form"]').trigger('submit')
     await flushPromises()
 
-    expect(alertStore.error).toHaveBeenCalledWith('Плейлист с таким названием уже существует')
+    expect(alertStore.error).toHaveBeenCalledWith('Плейлист с описанием "Test" уже существует')
+  })
+
+  it('handles backend duplicate filename conflicts during submit', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({
+      status: 409,
+      data: {
+        reason: 'duplicatePlaylistFilename',
+        msg: 'Плейлист с именем файла "playlist.m3u" уже существует'
+      }
+    })
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Плейлист с именем файла "playlist.m3u" уже существует')
+  })
+
+  it('uses backend message for unknown 409 conflicts during submit', async () => {
+    playlistsStore.create = vi.fn().mockRejectedValue({
+      status: 409,
+      data: { msg: 'Backend conflict' }
+    })
+    const wrapper = mountSettings({ accountId: 1, submitValues: { title: 'Test' } })
+    await flushPromises()
+
+    await wrapper.find('[data-test="form"]').trigger('submit')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Backend conflict')
   })
 
   it('handles 422 validation error during submit', async () => {
@@ -1704,6 +1824,21 @@ describe('Playlist_Settings.vue', () => {
     const child = wrapper.findComponent(PlaylistSettings)
     expect(child.vm.$.setupState.onInvalidSubmit({ errors: { title: 'Required' } })).toBe(false)
     expect(alertStore.error).toHaveBeenCalledWith('Required')
+  })
+
+  it('guards playlist action handlers when required input is missing', async () => {
+    const wrapper = mountSettings({ accountId: 1 })
+    await flushPromises()
+
+    const state = wrapper.findComponent(PlaylistSettings).vm.$.setupState
+    await state.openVideo({})
+    state.addVideoToPlaylist(null)
+    state.addSelectedVideosToPlaylist()
+    state.removeSelectedPlaylistItems()
+    state.movePlaylistItem(-1, -1)
+
+    expect(videosStore.open).not.toHaveBeenCalled()
+    expect(getPlaylistTable(wrapper).findAll('.playlist-video-row')).toHaveLength(0)
   })
 
   it('search filter handles null video fields gracefully', async () => {
