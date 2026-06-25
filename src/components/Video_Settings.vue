@@ -20,6 +20,7 @@ import { formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { createCategoryOptions } from '@/helpers/video.scope.helpers.js'
 import { isPlaylistAccessImpactError } from '@/helpers/playlist.access.impact.js'
 import { getDuplicateOriginalFilenameMessage, isDuplicateOriginalFilenameError } from '@/helpers/video.original.filename.conflict.js'
+import { getDuplicateVideoDescriptionMessage, isDuplicateVideoDescriptionError } from '@/helpers/video.description.conflict.js'
 import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import AlertOutput from '@/components/AlertOutput.vue'
 import PlaylistAccessImpactDialog from '@/components/PlaylistAccessImpactDialog.vue'
@@ -127,6 +128,10 @@ async function saveVideoPayload(payload, forcePlaylistCleanup = false) {
   } catch (err) {
     if (isDuplicateOriginalFilenameError(err)) {
       alertStore.error(getDuplicateOriginalFilenameMessage(err))
+      return
+    }
+    if (isDuplicateVideoDescriptionError(err)) {
+      alertStore.error(getDuplicateVideoDescriptionMessage(err))
       return
     }
     if (isPlaylistAccessImpactError(err) && !forcePlaylistCleanup) {
