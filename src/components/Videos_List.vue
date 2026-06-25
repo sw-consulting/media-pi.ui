@@ -204,23 +204,65 @@ function resetUploadProgress() {
   uploadProgressIndeterminate.value = true
 }
 
-function handleUploadProgress(progress) {
-  if (!progress?.lengthComputable || progress.percentage === null || progress.percentage === undefined) {
+function createUploadProgressState(files) {
+  const fileSizes = files.map(file => {
+    const size = Number(file?.size || 0)
+    return Number.isFinite(size) && size > 0 ? size : 0
+  })
+  return {
+    fileSizes,
+    loadedByFile: fileSizes.map(() => 0),
+    totalBytes: fileSizes.reduce((sum, size) => sum + size, 0)
+  }
+}
+
+function setAggregateUploadProgress(state, index, loadedBytes) {
+  if (!state.totalBytes) {
+    uploadPhase.value = 'uploading'
     uploadProgressIndeterminate.value = true
     return
   }
 
-  const nextPercent = Math.min(100, Math.max(0, progress.percentage))
+  const fileSize = state.fileSizes[index]
+  state.loadedByFile[index] = Math.min(fileSize, Math.max(0, loadedBytes))
+  const loadedTotal = state.loadedByFile.reduce((sum, loaded) => sum + loaded, 0)
+  const nextPercent = Math.min(100, Math.max(0, Math.round((loadedTotal / state.totalBytes) * 100)))
+
   uploadProgressPercent.value = nextPercent
+  uploadPhase.value = nextPercent >= 100 ? 'processing' : 'uploading'
+  uploadProgressIndeterminate.value = nextPercent >= 100
+}
 
-  if (nextPercent >= 100) {
-    uploadPhase.value = 'processing'
-    uploadProgressIndeterminate.value = true
-    return
+function createAggregateUploadProgressHandler(state, index) {
+  return (progress) => {
+    if (!progress?.lengthComputable) {
+      uploadPhase.value = 'uploading'
+      uploadProgressIndeterminate.value = true
+      return
+    }
+
+    const fileSize = state.fileSizes[index] || progress.total || 0
+    if (!fileSize) {
+      uploadPhase.value = 'uploading'
+      uploadProgressIndeterminate.value = true
+      return
+    }
+
+    if (progress.loaded === null || progress.loaded === undefined) {
+      if (progress.percentage === null || progress.percentage === undefined) {
+        uploadPhase.value = 'uploading'
+        uploadProgressIndeterminate.value = true
+        return
+      }
+    }
+
+    const loadedBytes = progress.loaded ?? Math.round((fileSize * (progress.percentage || 0)) / 100)
+    setAggregateUploadProgress(state, index, loadedBytes)
   }
+}
 
-  uploadPhase.value = 'uploading'
-  uploadProgressIndeterminate.value = false
+function markUploadFileComplete(state, index) {
+  setAggregateUploadProgress(state, index, state.fileSizes[index])
 }
 
 function cancelUpload() {
@@ -235,6 +277,86 @@ function handleUploadProgressKeydown(event) {
 
 function isAbortError(err) {
   return err?.name === 'AbortError'
+}
+
+function getUploadFileName(file) {
+  return file?.name || 'видеофайл'
+}
+
+function getUploadErrorMessage(err) {
+  if (isDuplicateOriginalFilenameError(err)) return getDuplicateOriginalFilenameMessage(err)
+  if (isDuplicateVideoDescriptionError(err)) return getDuplicateVideoDescriptionMessage(err)
+  return err?.message || err
+}
+
+function shouldShowUploadFailureFilename(err) {
+  return !isDuplicateOriginalFilenameError(err) && !isDuplicateVideoDescriptionError(err)
+}
+
+function getOriginalFilenameConflictMessage(originalFilename) {
+  return `В выбранном разделе уже есть видеофайл с именем "${originalFilename}"`
+}
+
+function isVideoInUploadConflictScope(video, scope) {
+  if (scope.accountId === null || scope.accountId === undefined) return false
+
+  const videoAccountId = Number(video?.accountId || 0)
+  if (scope.accountId !== 0) {
+    return videoAccountId === scope.accountId
+  }
+
+  const uploadCategoryId = Number(scope.categoryId || 0)
+  const videoCategoryId = Number(video?.categoryId || 0)
+  return videoAccountId === 0 && videoCategoryId === uploadCategoryId
+}
+
+function createUploadQueue(selectedFiles, scope, failures) {
+  const reservedOriginalFilenames = new Set(
+    (videos.value || [])
+      .filter(video => isVideoInUploadConflictScope(video, scope))
+      .map(video => video?.originalFilename)
+      .filter(Boolean)
+  )
+
+  const uploadQueue = []
+  for (const file of selectedFiles) {
+    const originalFilename = file?.name || ''
+    if (originalFilename && reservedOriginalFilenames.has(originalFilename)) {
+      failures.push({
+        filename: getUploadFileName(file),
+        message: getOriginalFilenameConflictMessage(originalFilename),
+        showFilename: false
+      })
+      continue
+    }
+
+    uploadQueue.push(file)
+    if (originalFilename) {
+      reservedOriginalFilenames.add(originalFilename)
+    }
+  }
+
+  return uploadQueue
+}
+
+function formatUploadFailure(failure) {
+  if (failure.showFilename === false) return failure.message
+  return `"${failure.filename}": ${failure.message}`
+}
+
+function summarizeUploadResult(uploadedCount, failures, cancelled) {
+  const summary = `Загружено видеофайлов: ${uploadedCount}`
+
+  if (!failures.length) {
+    alertStore.success(cancelled ? `${summary}. Загрузка отменена.` : summary)
+    return
+  }
+
+  const failureDetails = failures
+    .map(formatUploadFailure)
+    .join('; ')
+  const cancelSuffix = cancelled ? '. Загрузка отменена.' : ''
+  alertStore.error(`${summary}. Не удалось загрузить: ${failures.length}. ${failureDetails}${cancelSuffix}`)
 }
 
 function ensureSelection(options) {
@@ -423,34 +545,62 @@ async function uploadVideos(files) {
     alertStore.error('Недостаточно прав для загрузки видеофайлов в выбранный раздел')
     return
   }
+  const scope = selectedScopeInfo.value
+  const failures = []
+  const uploadQueue = createUploadQueue(selectedFiles, scope, failures)
+  if (!uploadQueue.length) {
+    if (failures.length) {
+      summarizeUploadResult(0, failures, false)
+    }
+    return
+  }
+
   resetUploadProgress()
   isUploading.value = true
   uploadPhase.value = 'uploading'
   const abortController = new AbortController()
   uploadAbortController.value = abortController
+  let uploadedCount = 0
+  let cancelled = false
   try {
-    const scope = selectedScopeInfo.value
-    const uploadOptions = {
-      onUploadProgress: handleUploadProgress,
-      signal: abortController.signal
-    }
-    if (scope.categoryId !== undefined) {
-      uploadOptions.categoryId = scope.categoryId
+    const progressState = createUploadProgressState(uploadQueue)
+
+    for (let index = 0; index < uploadQueue.length; index++) {
+      const file = uploadQueue[index]
+      const uploadOptions = {
+        onUploadProgress: createAggregateUploadProgressHandler(progressState, index),
+        signal: abortController.signal
+      }
+      if (scope.categoryId !== undefined) {
+        uploadOptions.categoryId = scope.categoryId
+      }
+
+      try {
+        await videosStore.uploadFile(file, scope.accountId, '', uploadOptions)
+        markUploadFileComplete(progressState, index)
+        uploadedCount++
+      } catch (err) {
+        if (isAbortError(err)) {
+          cancelled = true
+          break
+        }
+        failures.push({
+          filename: getUploadFileName(file),
+          message: getUploadErrorMessage(err),
+          showFilename: shouldShowUploadFailureFilename(err)
+        })
+      }
     }
 
-    await videosStore.uploadFiles(selectedFiles, scope.accountId, uploadOptions)
-    uploadPhase.value = 'refreshing'
-    uploadProgressIndeterminate.value = true
-    await refreshVideos()
-  } catch (err) {
-    if (!isAbortError(err)) {
-      if (isDuplicateOriginalFilenameError(err)) {
-        alertStore.error(getDuplicateOriginalFilenameMessage(err))
-      } else if (isDuplicateVideoDescriptionError(err)) {
-        alertStore.error(getDuplicateVideoDescriptionMessage(err))
-      } else {
-        alertStore.error('Не удалось загрузить видеофайлы: ' + (err?.message || err))
+    if (uploadedCount > 0) {
+      uploadPhase.value = 'refreshing'
+      uploadProgressIndeterminate.value = true
+      const refreshed = await refreshVideos()
+      if (refreshed) {
+        summarizeUploadResult(uploadedCount, failures, cancelled)
       }
+    } else if (failures.length && !cancelled) {
+      summarizeUploadResult(uploadedCount, failures, cancelled)
     }
   } finally {
     isUploading.value = false
