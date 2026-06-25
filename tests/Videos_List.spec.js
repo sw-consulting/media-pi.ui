@@ -98,6 +98,16 @@ function createDuplicateOriginalFilenameError(message) {
   return error
 }
 
+function createDuplicateVideoDescriptionError(message) {
+  const error = new Error(message)
+  error.status = 409
+  error.data = {
+    msg: message,
+    reason: 'duplicateVideoDescription'
+  }
+  return error
+}
+
 const globalStubs = {
   VideoViewDialog: {
     name: 'VideoViewDialog',
@@ -903,6 +913,25 @@ describe('Videos_List.vue', () => {
     expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
   })
 
+  it('shows duplicate upload description conflict and closes upload progress', async () => {
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с описанием "test.mp4"'
+    videosStore.uploadFiles.mockRejectedValueOnce(createDuplicateVideoDescriptionError(duplicateMessage))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const uploadPromise = wrapper.vm.uploadVideos([new File(['x'], 'test.mp4', { type: 'video/mp4' })])
+    await nextTick()
+
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(true)
+
+    await uploadPromise
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(alertStore.error).not.toHaveBeenCalledWith(expect.stringContaining('Не удалось загрузить видеофайлы'))
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
+  })
+
   it('shows a refresh phase after upload completes while the list reloads', async () => {
     let refreshCall = 0
     let resolveRefresh
@@ -1396,6 +1425,23 @@ describe('Videos_List.vue', () => {
     await flushPromises()
 
     expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(false)
+  })
+
+  it('shows duplicate category update description conflict without playlist cleanup', async () => {
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с описанием "Video"'
+    videosStore.videos.value = [{ id: 70, title: 'Video', accountId: 0 }]
+    videosStore.updateCategoryBatch.mockRejectedValueOnce(createDuplicateVideoDescriptionError(duplicateMessage))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [70]
+    wrapper.vm.batchCategoryId = 3
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(alertStore.error).not.toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категории видеофайлов'))
     expect(wrapper.find('[data-test="playlist-impact-list"]').exists()).toBe(false)
   })
 
@@ -1977,6 +2023,36 @@ describe('Videos_List.vue - playlist impact and v-model coverage', () => {
         }
       })
       .mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    wrapper.vm.selectedVideoIds = [31]
+    wrapper.vm.batchCategoryId = 4
+    await wrapper.vm.updateSelectedVideoCategory()
+    await flushPromises()
+    await wrapper.find('[data-test="confirm-playlist-impact-button"]').trigger('click')
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(alertStore.error).not.toHaveBeenCalledWith(expect.stringContaining('Не удалось обновить категории видеофайлов'))
+  })
+
+  it('shows duplicate description error when playlist cleanup confirmation fails', async () => {
+    const duplicateMessage = 'В выбранном разделе уже есть видеофайл с описанием "Morning"'
+    videosStore.updateCategoryBatch = vi.fn()
+      .mockRejectedValueOnce({
+        status: 409,
+        data: {
+          affectedPlaylistCount: 1,
+          affectedItemCount: 1,
+          affectedVideoCount: 1,
+          affectedPlaylists: [
+            { playlistId: 11, title: 'Morning', filename: 'morning.m3u', accountId: 1, accountName: 'Cafe', removedItemCount: 1 }
+          ]
+        }
+      })
+      .mockRejectedValueOnce(createDuplicateVideoDescriptionError(duplicateMessage))
 
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
