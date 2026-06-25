@@ -68,7 +68,13 @@ const { videos, loading, videoPreview } = storeToRefs(videosStore)
 const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
 const { loading: categoriesLoading, categories } = storeToRefs(categoriesStore)
 
-const selectedScope = ref(props.fixedScope)
+function getInitialSelectedScope() {
+  if (props.fixedScope !== null && props.fixedScope !== undefined) return props.fixedScope
+  if (props.pendingFixedScope) return props.fixedScope
+  return authStore.videos_scope ?? null
+}
+
+const selectedScope = ref(getInitialSelectedScope())
 const fileInput = ref(null)
 const uploadProgressRef = ref(null)
 const categorySaving = ref(false)
@@ -91,6 +97,7 @@ const localSortBy = ref([])
 const localPage = ref(1)
 const accessibleCategoryIds = ref(new Set())
 const accessInfoLoaded = ref(false)
+const scopeOptionsReady = ref(false)
 const loadedFixedScope = ref(null)
 const hasFixedScope = computed(() => props.fixedScope !== null && props.fixedScope !== undefined)
 const isPendingFixedScope = computed(() => props.pendingFixedScope && !hasFixedScope.value)
@@ -423,6 +430,7 @@ async function loadAccessibleCategoryIds() {
 }
 
 function shouldDeferScopeSync() {
+  if (!isScopeFixed.value && !scopeOptionsReady.value) return true
   return !props.fixedScope && authStore.user && !isAdministrator(authStore.user) && !accessInfoLoaded.value
 }
 
@@ -504,6 +512,9 @@ watch(() => props.fixedScope, (scope) => {
 }, { immediate: true })
 
 watch(selectedScope, async () => {
+  if (!isScopeFixed.value) {
+    authStore.videos_scope = selectedScope.value ?? null
+  }
   if (shouldDeferScopeSync()) return
   if (selectedScope.value === undefined || selectedScope.value === null) return
   selectedVideoIds.value = []
@@ -523,8 +534,15 @@ onMounted(async () => {
     }
     await categoriesStore.getAll()
     await loadAccessibleCategoryIds()
+    scopeOptionsReady.value = true
+    const scopeBeforeSync = selectedScope.value
+    if (!shouldDeferScopeSync()) {
+      ensureSelection(scopeOptions.value)
+    }
     if (selectedScope.value !== undefined && selectedScope.value !== null) {
-      await refreshVideos()
+      if (selectedScope.value === scopeBeforeSync) {
+        await refreshVideos()
+      }
     }
   } catch (err) {
     alertStore.error('Не удалось загрузить справочники видеофайлов: ' + (err?.message || err))

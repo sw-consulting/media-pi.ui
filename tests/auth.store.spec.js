@@ -47,6 +47,7 @@ function createDefaultListState() {
     videos_search: '',
     videos_sort_by: [],
     videos_page: 1,
+    videos_scope: null,
     screenshots_per_page: 100,
     screenshots_sort_by: [{ key: 'id', order: 'asc' }],
     screenshots_page: 1,
@@ -54,6 +55,7 @@ function createDefaultListState() {
     playlists_search: '',
     playlists_sort_by: [],
     playlists_page: 1,
+    playlists_account_id: null,
     playlist_available_videos_per_page: 10,
     playlist_available_videos_page: 1,
     categories_per_page: 10,
@@ -120,6 +122,7 @@ describe('auth store', () => {
       expect(store.videos_search).toBe('')
       expect(store.videos_sort_by).toEqual([])
       expect(store.videos_page).toBe(1)
+      expect(store.videos_scope).toBeNull()
       expect(store.screenshots_per_page).toBe(100)
       expect(store.screenshots_sort_by).toEqual([{ key: 'id', order: 'asc' }])
       expect(store.screenshots_page).toBe(1)
@@ -127,6 +130,7 @@ describe('auth store', () => {
       expect(store.playlists_search).toBe('')
       expect(store.playlists_sort_by).toEqual([])
       expect(store.playlists_page).toBe(1)
+      expect(store.playlists_account_id).toBeNull()
       expect(store.playlist_available_videos_per_page).toBe(10)
       expect(store.playlist_available_videos_page).toBe(1)
       expect(store.categories_per_page).toBe(10)
@@ -228,6 +232,7 @@ describe('auth store', () => {
         videos_search: 'clip',
         videos_sort_by: [{ key: 'title', order: 'asc' }],
         videos_page: 4,
+        videos_scope: 'category:7',
         screenshots_per_page: 25,
         screenshots_sort_by: [{ key: 'timeCreated', order: 'desc' }],
         screenshots_page: 5,
@@ -235,6 +240,7 @@ describe('auth store', () => {
         playlists_search: 'morning',
         playlists_sort_by: [{ key: 'title', order: 'desc' }],
         playlists_page: 6,
+        playlists_account_id: 12,
         playlist_available_videos_per_page: 25,
         playlist_available_videos_page: 3,
         categories_per_page: 50,
@@ -268,6 +274,7 @@ describe('auth store', () => {
         videos_search: 'video search',
         videos_sort_by: [{ key: 'title', order: 'desc' }],
         videos_page: 3,
+        videos_scope: 'common:all',
         screenshots_per_page: 25,
         screenshots_sort_by: [{ key: 'timeCreated', order: 'desc' }],
         screenshots_page: 4,
@@ -275,6 +282,7 @@ describe('auth store', () => {
         playlists_search: 'playlist search',
         playlists_sort_by: [{ key: 'videoCount', order: 'asc' }],
         playlists_page: 5,
+        playlists_account_id: 8,
         playlist_available_videos_per_page: 50,
         playlist_available_videos_page: 2,
         categories_per_page: 50,
@@ -325,9 +333,11 @@ describe('auth store', () => {
           videos_search: 'valid search',
           videos_sort_by: validVideoSort,
           videos_page: 2,
+          videos_scope: 123,
           screenshots_per_page: 10.5,
           screenshots_sort_by: null,
           screenshots_page: '3',
+          playlists_account_id: '4',
           playlist_available_videos_per_page: 0,
           playlist_available_videos_page: '4'
         }
@@ -343,9 +353,11 @@ describe('auth store', () => {
       expect(store.videos_search).toBe('valid search')
       expect(store.videos_sort_by).toEqual(validVideoSort)
       expect(store.videos_page).toBe(2)
+      expect(store.videos_scope).toBeNull()
       expect(store.screenshots_per_page).toBe(100)
       expect(store.screenshots_sort_by).toEqual([{ key: 'id', order: 'asc' }])
       expect(store.screenshots_page).toBe(1)
+      expect(store.playlists_account_id).toBeNull()
       expect(store.playlist_available_videos_per_page).toBe(10)
       expect(store.playlist_available_videos_page).toBe(1)
     })
