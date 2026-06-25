@@ -28,7 +28,8 @@ const { confirmDelete } = useConfirmation()
 const { playlists, loading } = storeToRefs(playlistsStore)
 const { loading: accountsLoading, accounts } = storeToRefs(accountsStore)
 
-const selectedAccountId = ref(null)
+const selectedAccountId = ref(authStore.playlists_account_id ?? null)
+const accountOptionsReady = ref(false)
 
 const accountOptions = computed(() => createAccountOptions(accounts.value || [], authStore.user, { includeCommon: false }))
 
@@ -64,9 +65,14 @@ const refreshPlaylists = async () => {
   }
 }
 
-watch(accountOptions, (options) => ensureSelection(options), { immediate: true })
+watch(accountOptions, (options) => {
+  if (!accountOptionsReady.value) return
+  ensureSelection(options)
+}, { immediate: true })
 
 watch(selectedAccountId, async () => {
+  authStore.playlists_account_id = selectedAccountId.value ?? null
+  if (!accountOptionsReady.value) return
   if (selectedAccountId.value === undefined) return
   await refreshPlaylists()
 }, { immediate: true })
@@ -74,6 +80,12 @@ watch(selectedAccountId, async () => {
 onMounted(async () => {
   try {
     await accountsStore.getAll()
+    accountOptionsReady.value = true
+    const accountBeforeSync = selectedAccountId.value
+    ensureSelection(accountOptions.value)
+    if (selectedAccountId.value === accountBeforeSync && selectedAccountId.value !== null && selectedAccountId.value !== undefined) {
+      await refreshPlaylists()
+    }
   } catch (err) {
     alertStore.error('Не удалось загрузить лицевые счета: ' + (err?.message || err))
   }
