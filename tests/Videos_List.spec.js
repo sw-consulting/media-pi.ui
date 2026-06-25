@@ -280,6 +280,13 @@ describe('Videos_List.vue', () => {
     expect(wrapper.find('.alert-dismissable').exists()).toBe(false)
   })
 
+  it('labels the video title column as description', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    expect(wrapper.vm.headers.find(header => header.key === 'title')?.title).toBe('Описание')
+  })
+
   it('runs the embedded action hook before editing a video', async () => {
     videosStore.videos.value = [{ id: 3, title: 'Clip', accountId: 0, categoryId: 9 }]
     const beforeEmbeddedAction = vi.fn(async () => false)

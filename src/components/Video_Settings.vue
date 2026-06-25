@@ -42,7 +42,7 @@ const { account } = storeToRefs(accountsStore)
 const { categories } = storeToRefs(categoriesStore)
 
 const schema = Yup.object().shape({
-  title: Yup.string().trim().required('Необходимо указать название')
+  title: Yup.string().trim().required('Необходимо указать описание')
 })
 
 const video = ref({ title: '', categoryId: 0, accountId: 0 })
@@ -270,7 +270,7 @@ function onInvalidSubmit(context) {
       </div>
 
       <div class="form-group">
-        <label for="title" class="label">Название:</label>
+        <label for="title" class="label">Описание:</label>
         <Field
           name="title"
           type="text"
@@ -278,7 +278,7 @@ function onInvalidSubmit(context) {
           :disabled="isSubmitting"
           class="form-control input"
           :class="{ 'is-invalid': errors.title }"
-          placeholder="Введите название видеофайла"
+          placeholder="Введите описание видеофайла"
         />
       </div>
 

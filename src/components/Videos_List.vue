@@ -128,7 +128,7 @@ const canCancelUpload = computed(() => uploadPhase.value === 'uploading')
 
 const baseHeaders = [
   { title: '', align: 'center', key: 'actions', sortable: false, width: '5%' },
-  { title: 'Название', align: 'start', key: 'title', width: '42%' },
+  { title: 'Описание', align: 'start', key: 'title', width: '42%' },
   { title: 'Имя файла', align: 'start', key: 'originalFilename', width: '22%' },
   { title: 'Размер', align: 'start', key: 'fileSize', width: '13%' },
   { title: 'Длительность', align: 'start', key: 'duration', width: '13%' },

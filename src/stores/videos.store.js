@@ -51,7 +51,7 @@ export const useVideosStore = defineStore('videos', () => {
   }
 
   const deriveUploadTitle = (file, title = '') => {
-    return (title && title.trim()) ? title.trim() : (file.name ? file.name.replace(/\.[^.]+$/, '') : '')
+    return (title && title.trim()) ? title.trim() : (file.name || '')
   }
 
   async function getAll() {
@@ -203,7 +203,7 @@ export const useVideosStore = defineStore('videos', () => {
       const formData = new globalThis.FormData()
       selectedFiles.forEach(file => {
         formData.append('Files', file)
-        formData.append('Titles', deriveUploadTitle(file, file.name || ''))
+        formData.append('Titles', deriveUploadTitle(file))
       })
       formData.append('AccountId', accountId)
       appendCategoryId(formData, options)
