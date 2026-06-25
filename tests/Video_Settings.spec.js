@@ -110,7 +110,7 @@ const mountSettings = (props = {}) => mount({
         props: ['initialValues'],
         emits: ['submit', 'invalid-submit'],
         data() {
-          return { errors: props.showValidationError ? { title: 'Необходимо указать название' } : {} }
+          return { errors: props.showValidationError ? { title: 'Необходимо указать описание' } : {} }
         },
         methods: {
           handleSubmit(submit) {
@@ -196,6 +196,8 @@ describe('Video_Settings.vue', () => {
     const wrapper = mountSettings({ submitValues: { title: 'Updated Clip' } })
     await flushPromises()
 
+    expect(wrapper.find('label[for="title"]').text()).toBe('Описание:')
+    expect(wrapper.find('[data-test="title-field"]').attributes('placeholder')).toBe('Введите описание видеофайла')
     await wrapper.find('[data-test="video-category-select"]').setValue('4')
     await wrapper.find('[data-test="form"]').trigger('submit')
     await flushPromises()
@@ -372,7 +374,7 @@ describe('Video_Settings.vue', () => {
     await wrapper.find('[data-test="save-video-button"]').trigger('click')
     await flushPromises()
 
-    expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать название')
+    expect(alertStore.error).toHaveBeenCalledWith('Необходимо указать описание')
   })
 
   it('opens current video in playback dialog from the header film button', async () => {

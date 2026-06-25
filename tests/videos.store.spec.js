@@ -312,7 +312,7 @@ describe('videos.store', () => {
     await expect(store.uploadFiles([], 1)).rejects.toThrow('Не выбран видеофайл')
   })
 
-  it('uploadFile derives title from file name when title empty', async () => {
+  it('uploadFile derives title from full file name when title empty', async () => {
     const appendSpy = vi.fn()
     const mockFormData = vi.fn(function () { return { append: appendSpy } })
     global.FormData = mockFormData
@@ -320,7 +320,7 @@ describe('videos.store', () => {
     const store = useVideosStore()
     const file = new File(['data'], 'derived-name.mp4', { type: 'video/mp4' })
     await store.uploadFile(file, 7, '')
-    expect(appendSpy).toHaveBeenCalledWith('Title', 'derived-name')
+    expect(appendSpy).toHaveBeenCalledWith('Title', 'derived-name.mp4')
   })
 
   it('uploadFile throws when missing AccountId (Russian message)', async () => {
