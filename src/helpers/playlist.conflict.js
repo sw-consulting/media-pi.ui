@@ -16,9 +16,9 @@ export function isDuplicatePlaylistFilenameError(err) {
 }
 
 export function getDuplicatePlaylistDescriptionMessage(err) {
-  return err?.data?.msg || err?.message || duplicatePlaylistDescriptionFallbackMessage
+  return err?.message || err?.data?.msg || duplicatePlaylistDescriptionFallbackMessage
 }
 
 export function getDuplicatePlaylistFilenameMessage(err) {
-  return err?.data?.msg || err?.message || duplicatePlaylistFilenameFallbackMessage
+  return err?.message || err?.data?.msg || duplicatePlaylistFilenameFallbackMessage
 }
