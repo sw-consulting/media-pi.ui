@@ -194,24 +194,6 @@ export const useVideosStore = defineStore('videos', () => {
     })
   }
 
-  async function uploadFiles(files, accountId, options = {}) {
-    return handleRequest(async () => {
-      const selectedFiles = Array.from(files || []).filter(Boolean)
-      if (!selectedFiles.length) throw new Error('Не выбран видеофайл')
-      assertUploadTarget(accountId)
-
-      const formData = new globalThis.FormData()
-      selectedFiles.forEach(file => {
-        formData.append('Files', file)
-        formData.append('Titles', deriveUploadTitle(file))
-      })
-      formData.append('AccountId', accountId)
-      appendCategoryId(formData, options)
-
-      return postUploadFile(`${baseUrl}/upload/batch`, formData, options)
-    })
-  }
-
   async function getAllByAccount(accountId, options = {}) {
     return handleRequest(
       async () => {
@@ -252,7 +234,6 @@ export const useVideosStore = defineStore('videos', () => {
     removeBatch,
     updateCategoryBatch,
     uploadFile,
-    uploadFiles,
     getAllByAccount,
   }
 })
