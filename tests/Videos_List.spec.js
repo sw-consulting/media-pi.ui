@@ -50,7 +50,6 @@ const videosStore = {
   }),
   update: vi.fn(async () => ({})),
   uploadFile: vi.fn(async () => ({})),
-  uploadFiles: vi.fn(async () => ({})),
   remove: vi.fn(async () => ({})),
   removeBatch: vi.fn(async () => ({ requestedCount: 0, deletedIds: [], failures: [] })),
   updateCategoryBatch: vi.fn(async () => ({ requestedCount: 0, updatedIds: [], failures: [] }))
@@ -217,7 +216,6 @@ describe('Videos_List.vue', () => {
     })
     videosStore.update.mockImplementation(async () => ({}))
     videosStore.uploadFile.mockImplementation(async () => ({}))
-    videosStore.uploadFiles.mockImplementation(async () => ({}))
     videosStore.remove.mockImplementation(async () => ({}))
     videosStore.removeBatch.mockImplementation(async () => ({ requestedCount: 0, deletedIds: [], failures: [] }))
     videosStore.updateCategoryBatch.mockImplementation(async () => ({ requestedCount: 0, updatedIds: [], failures: [] }))
@@ -577,15 +575,17 @@ describe('Videos_List.vue', () => {
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
     await wrapper.vm.uploadVideos([file])
 
-    expect(videosStore.uploadFiles).toHaveBeenCalledWith(
-      [file],
+    expect(videosStore.uploadFile).toHaveBeenCalledWith(
+      file,
       0,
-      {
+      '',
+      expect.objectContaining({
         categoryId: 4,
         onUploadProgress: expect.any(Function),
         signal: expect.any(AbortSignal)
-      }
+      })
     )
+    expect(alertStore.success).toHaveBeenCalledWith('Загружено видеофайлов: 1')
   })
 
   it('filters category scopes for non-admin users but keeps common files without category', async () => {
@@ -788,7 +788,7 @@ describe('Videos_List.vue', () => {
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
     await wrapper.vm.uploadVideos([file])
-    expect(videosStore.uploadFiles).not.toHaveBeenCalled()
+    expect(videosStore.uploadFile).not.toHaveBeenCalled()
   })
 
   it('uploads file when user has permissions', async () => {
@@ -797,14 +797,16 @@ describe('Videos_List.vue', () => {
     await flushPromises()
     const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
     await wrapper.vm.uploadVideos([file])
-    expect(videosStore.uploadFiles).toHaveBeenCalledWith(
-      [file],
+    expect(videosStore.uploadFile).toHaveBeenCalledWith(
+      file,
       0,
-      {
+      '',
+      expect.objectContaining({
         onUploadProgress: expect.any(Function),
         signal: expect.any(AbortSignal)
-      }
+      })
     )
+    expect(alertStore.success).toHaveBeenCalledWith('Загружено видеофайлов: 1')
   })
 
   it('uploads multiple selected files when user has permissions', async () => {
@@ -815,22 +817,37 @@ describe('Videos_List.vue', () => {
     const file2 = new File(['y'], 'second.mp4', { type: 'video/mp4' })
 
     await wrapper.vm.onFileChange({ target: { files: [file1, file2] } })
+    await flushPromises()
 
-    expect(videosStore.uploadFiles).toHaveBeenCalledWith(
-      [file1, file2],
+    expect(videosStore.uploadFile).toHaveBeenCalledTimes(2)
+    expect(videosStore.uploadFile).toHaveBeenNthCalledWith(
+      1,
+      file1,
       0,
-      {
+      '',
+      expect.objectContaining({
         onUploadProgress: expect.any(Function),
         signal: expect.any(AbortSignal)
-      }
+      })
     )
+    expect(videosStore.uploadFile).toHaveBeenNthCalledWith(
+      2,
+      file2,
+      0,
+      '',
+      expect.objectContaining({
+        onUploadProgress: expect.any(Function),
+        signal: expect.any(AbortSignal)
+      })
+    )
+    expect(alertStore.success).toHaveBeenCalledWith('Загружено видеофайлов: 2')
   })
 
   it('shows total upload progress and disables actions while upload is pending', async () => {
     videosStore.videos.value = [{ id: 1, title: 'Clip', accountId: 0 }]
     let resolveUpload
     let onUploadProgress
-    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+    videosStore.uploadFile.mockImplementation((_file, _accountId, _title, options) => {
       onUploadProgress = options.onUploadProgress
       return new Promise(resolve => {
         resolveUpload = resolve
@@ -841,7 +858,7 @@ describe('Videos_List.vue', () => {
     await flushPromises()
     const callsBeforeUpload = videosStore.getAllByAccount.mock.calls.length
 
-    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    const file = new File(['x'.repeat(100)], 'test.mp4', { type: 'video/mp4' })
     const uploadPromise = wrapper.vm.uploadVideos([file])
     await nextTick()
 
@@ -895,7 +912,7 @@ describe('Videos_List.vue', () => {
 
   it('shows duplicate upload conflict and closes upload progress', async () => {
     const duplicateMessage = 'В выбранном разделе уже есть видеофайл с именем "test.mp4"'
-    videosStore.uploadFiles.mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
+    videosStore.uploadFile.mockRejectedValueOnce(createDuplicateOriginalFilenameError(duplicateMessage))
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
@@ -908,14 +925,83 @@ describe('Videos_List.vue', () => {
     await uploadPromise
     await flushPromises()
 
-    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(alertStore.error).toHaveBeenCalledWith(`Загружено видеофайлов: 0. Не удалось загрузить: 1. ${duplicateMessage}`)
     expect(alertStore.error).not.toHaveBeenCalledWith(expect.stringContaining('Не удалось загрузить видеофайлы'))
     expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
   })
 
+  it('rejects existing filename conflict before uploading file', async () => {
+    videosStore.videos.value = [{ id: 70, title: 'Existing', originalFilename: 'test.mp4', accountId: 0, categoryId: 0 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const callsBeforeUpload = videosStore.getAllByAccount.mock.calls.length
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(videosStore.uploadFile).not.toHaveBeenCalled()
+    expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload)
+    expect(alertStore.error).toHaveBeenCalledWith('Загружено видеофайлов: 0. Не удалось загрузить: 1. В выбранном разделе уже есть видеофайл с именем "test.mp4"')
+    expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
+  })
+
+  it('skips existing filename conflicts and uploads later files', async () => {
+    videosStore.videos.value = [{ id: 71, title: 'Existing', originalFilename: 'second.mp4', accountId: 0, categoryId: 0 }]
+    videosStore.uploadFile.mockResolvedValue({})
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const callsBeforeUpload = videosStore.getAllByAccount.mock.calls.length
+
+    const file1 = new File(['x'], 'first.mp4', { type: 'video/mp4' })
+    const file2 = new File(['y'], 'second.mp4', { type: 'video/mp4' })
+    const file3 = new File(['z'], 'third.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file1, file2, file3])
+    await flushPromises()
+
+    expect(videosStore.uploadFile).toHaveBeenCalledTimes(2)
+    expect(videosStore.uploadFile).toHaveBeenNthCalledWith(
+      1,
+      file1,
+      0,
+      '',
+      expect.objectContaining({ onUploadProgress: expect.any(Function), signal: expect.any(AbortSignal) })
+    )
+    expect(videosStore.uploadFile).toHaveBeenNthCalledWith(
+      2,
+      file3,
+      0,
+      '',
+      expect.objectContaining({ onUploadProgress: expect.any(Function), signal: expect.any(AbortSignal) })
+    )
+    expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload + 1)
+    expect(alertStore.error).toHaveBeenCalledWith('Загружено видеофайлов: 2. Не удалось загрузить: 1. В выбранном разделе уже есть видеофайл с именем "second.mp4"')
+  })
+
+  it('does not reject category filename when uploading uncategorized common file', async () => {
+    videosStore.videos.value = [{ id: 72, title: 'Existing', originalFilename: 'test.mp4', accountId: 0, categoryId: 4 }]
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(videosStore.uploadFile).toHaveBeenCalledWith(
+      file,
+      0,
+      '',
+      expect.objectContaining({
+        onUploadProgress: expect.any(Function),
+        signal: expect.any(AbortSignal)
+      })
+    )
+    expect(alertStore.success).toHaveBeenCalledWith('Загружено видеофайлов: 1')
+  })
+
   it('shows duplicate upload description conflict and closes upload progress', async () => {
     const duplicateMessage = 'В выбранном разделе уже есть видеофайл с описанием "test.mp4"'
-    videosStore.uploadFiles.mockRejectedValueOnce(createDuplicateVideoDescriptionError(duplicateMessage))
+    videosStore.uploadFile.mockRejectedValueOnce(createDuplicateVideoDescriptionError(duplicateMessage))
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
@@ -927,9 +1013,30 @@ describe('Videos_List.vue', () => {
     await uploadPromise
     await flushPromises()
 
-    expect(alertStore.error).toHaveBeenCalledWith(duplicateMessage)
+    expect(alertStore.error).toHaveBeenCalledWith(`Загружено видеофайлов: 0. Не удалось загрузить: 1. ${duplicateMessage}`)
     expect(alertStore.error).not.toHaveBeenCalledWith(expect.stringContaining('Не удалось загрузить видеофайлы'))
     expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
+  })
+
+  it('continues after per-file upload failure and summarizes partial result', async () => {
+    videosStore.uploadFile
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error('network error'))
+      .mockResolvedValueOnce({})
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const callsBeforeUpload = videosStore.getAllByAccount.mock.calls.length
+
+    const file1 = new File(['x'], 'first.mp4', { type: 'video/mp4' })
+    const file2 = new File(['y'], 'second.mp4', { type: 'video/mp4' })
+    const file3 = new File(['z'], 'third.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file1, file2, file3])
+    await flushPromises()
+
+    expect(videosStore.uploadFile).toHaveBeenCalledTimes(3)
+    expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload + 1)
+    expect(alertStore.error).toHaveBeenCalledWith('Загружено видеофайлов: 2. Не удалось загрузить: 1. "second.mp4": network error')
   })
 
   it('shows a refresh phase after upload completes while the list reloads', async () => {
@@ -942,7 +1049,7 @@ describe('Videos_List.vue', () => {
         resolveRefresh = () => resolve(videosStore.videos.value)
       })
     })
-    videosStore.uploadFiles.mockResolvedValue({})
+    videosStore.uploadFile.mockResolvedValue({})
 
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
@@ -966,7 +1073,7 @@ describe('Videos_List.vue', () => {
   it('cancels an in-progress upload without refreshing or showing an error', async () => {
     let rejectUpload
     let uploadSignal
-    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+    videosStore.uploadFile.mockImplementation((_file, _accountId, _title, options) => {
       uploadSignal = options.signal
       return new Promise((_resolve, reject) => {
         rejectUpload = reject
@@ -994,12 +1101,49 @@ describe('Videos_List.vue', () => {
     expect(rejectUpload).toEqual(expect.any(Function))
     expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
     expect(alertStore.error).not.toHaveBeenCalled()
+    expect(alertStore.success).not.toHaveBeenCalled()
     expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload)
+  })
+
+  it('refreshes and shows cancel summary when canceled after successful uploads', async () => {
+    let uploadSignal
+    videosStore.uploadFile
+      .mockResolvedValueOnce({})
+      .mockImplementationOnce((_file, _accountId, _title, options) => {
+        uploadSignal = options.signal
+        return new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            const error = new Error('Загрузка отменена')
+            error.name = 'AbortError'
+            reject(error)
+          })
+        })
+      })
+
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    const callsBeforeUpload = videosStore.getAllByAccount.mock.calls.length
+
+    const file1 = new File(['x'], 'first.mp4', { type: 'video/mp4' })
+    const file2 = new File(['y'], 'second.mp4', { type: 'video/mp4' })
+    const uploadPromise = wrapper.vm.uploadVideos([file1, file2])
+    await flushPromises()
+
+    expect(videosStore.uploadFile).toHaveBeenCalledTimes(2)
+
+    await wrapper.find('[data-test="cancel-upload-button"]').trigger('click')
+    await uploadPromise
+    await flushPromises()
+
+    expect(uploadSignal.aborted).toBe(true)
+    expect(videosStore.getAllByAccount.mock.calls.length).toBe(callsBeforeUpload + 1)
+    expect(alertStore.success).toHaveBeenCalledWith('Загружено видеофайлов: 1. Загрузка отменена.')
+    expect(alertStore.error).not.toHaveBeenCalled()
   })
 
   it('cancels an in-progress upload with Escape', async () => {
     let uploadSignal
-    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+    videosStore.uploadFile.mockImplementation((_file, _accountId, _title, options) => {
       uploadSignal = options.signal
       return new Promise((_resolve, reject) => {
         options.signal.addEventListener('abort', () => {
@@ -1024,6 +1168,7 @@ describe('Videos_List.vue', () => {
     expect(uploadSignal.aborted).toBe(true)
     expect(wrapper.find('[data-test="upload-progress"]').exists()).toBe(false)
     expect(alertStore.error).not.toHaveBeenCalled()
+    expect(alertStore.success).not.toHaveBeenCalled()
   })
 
   it('allows selecting multiple files in the hidden file input', async () => {
@@ -1258,14 +1403,14 @@ describe('Videos_List.vue', () => {
     await flushPromises()
 
     await wrapper.vm.uploadVideos([])
-    expect(videosStore.uploadFiles).not.toHaveBeenCalled()
+    expect(videosStore.uploadFile).not.toHaveBeenCalled()
 
     await wrapper.vm.uploadVideos(null)
-    expect(videosStore.uploadFiles).not.toHaveBeenCalled()
+    expect(videosStore.uploadFile).not.toHaveBeenCalled()
   })
 
   it('shows error on non-abort upload failure', async () => {
-    videosStore.uploadFiles.mockRejectedValueOnce(new Error('network error'))
+    videosStore.uploadFile.mockRejectedValueOnce(new Error('network error'))
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
@@ -1273,7 +1418,7 @@ describe('Videos_List.vue', () => {
     await wrapper.vm.uploadVideos([file])
     await flushPromises()
 
-    expect(alertStore.error).toHaveBeenCalledWith('Не удалось загрузить видеофайлы: network error')
+    expect(alertStore.error).toHaveBeenCalledWith('Загружено видеофайлов: 0. Не удалось загрузить: 1. "test.mp4": network error')
   })
 
   it('does not delete video when confirmation is cancelled', async () => {
@@ -1600,7 +1745,7 @@ describe('Videos_List.vue', () => {
 
   it('treats upload progress with undefined percentage as indeterminate', async () => {
     let onUploadProgress
-    videosStore.uploadFiles.mockImplementation((_files, _accountId, options) => {
+    videosStore.uploadFile.mockImplementation((_file, _accountId, _title, options) => {
       onUploadProgress = options.onUploadProgress
       return new Promise(() => {})
     })
@@ -1675,7 +1820,7 @@ describe('Videos_List.vue', () => {
   })
 
   it('uses err object directly when upload error has no message', async () => {
-    videosStore.uploadFiles.mockRejectedValueOnce(new Error())
+    videosStore.uploadFile.mockRejectedValueOnce(new Error())
     const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
     await flushPromises()
 
@@ -1683,7 +1828,7 @@ describe('Videos_List.vue', () => {
     await wrapper.vm.uploadVideos([file])
     await flushPromises()
 
-    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Не удалось загрузить видеофайлы'))
+    expect(alertStore.error).toHaveBeenCalledWith(expect.stringContaining('Загружено видеофайлов: 0. Не удалось загрузить: 1. "test.mp4":'))
   })
 
   it('uses err object directly when deleteSelectedVideos error has no message', async () => {

@@ -233,32 +233,7 @@ describe('videos.store', () => {
     expect(appendSpy).toHaveBeenCalledWith('AccountId', 99)
   })
 
-  it('uploadFiles posts to /videos/upload/batch with Files, Titles and AccountId', async () => {
-    const appendSpy = vi.fn()
-    const mockFormData = vi.fn(function () {
-      return {
-        append: appendSpy
-      }
-    })
-    global.FormData = mockFormData
-
-    fetchWrapper.postFile.mockResolvedValueOnce({})
-
-    const store = useVideosStore()
-    const file1 = new File(['one'], 'one.mp4', { type: 'video/mp4' })
-    const file2 = new File(['two'], 'two.mp4', { type: 'video/mp4' })
-
-    await store.uploadFiles([file1, file2], 0)
-
-    expect(fetchWrapper.postFile).toHaveBeenCalledWith(expect.stringContaining('/videos/upload/batch'), expect.any(Object))
-    expect(appendSpy).toHaveBeenCalledWith('Files', file1)
-    expect(appendSpy).toHaveBeenCalledWith('Titles', 'one.mp4')
-    expect(appendSpy).toHaveBeenCalledWith('Files', file2)
-    expect(appendSpy).toHaveBeenCalledWith('Titles', 'two.mp4')
-    expect(appendSpy).toHaveBeenCalledWith('AccountId', 0)
-  })
-
-  it('uploadFiles appends CategoryId only when provided in options', async () => {
+  it('uploadFile appends CategoryId only when provided in options', async () => {
     const appendSpy = vi.fn()
     const mockFormData = vi.fn(function () {
       return {
@@ -272,12 +247,12 @@ describe('videos.store', () => {
     const store = useVideosStore()
     const file = new File(['one'], 'one.mp4', { type: 'video/mp4' })
 
-    await store.uploadFiles([file], 0, { categoryId: 5 })
+    await store.uploadFile(file, 0, '', { categoryId: 5 })
 
     expect(appendSpy).toHaveBeenCalledWith('CategoryId', 5)
   })
 
-  it('uploadFiles forwards upload progress callback', async () => {
+  it('uploadFile forwards upload progress callback', async () => {
     const appendSpy = vi.fn()
     const mockFormData = vi.fn(function () {
       return {
@@ -293,10 +268,10 @@ describe('videos.store', () => {
     const onUploadProgress = vi.fn()
     const abortController = new AbortController()
 
-    await store.uploadFiles([file], 7, { onUploadProgress, signal: abortController.signal })
+    await store.uploadFile(file, 7, '', { onUploadProgress, signal: abortController.signal })
 
     expect(fetchWrapper.postFile).toHaveBeenCalledWith(
-      expect.stringContaining('/videos/upload/batch'),
+      expect.stringContaining('/videos/upload'),
       expect.any(Object),
       { onUploadProgress, signal: abortController.signal }
     )
@@ -305,11 +280,6 @@ describe('videos.store', () => {
   it('uploadFile throws when missing File (Russian message)', async () => {
     const store = useVideosStore()
     await expect(store.uploadFile(null, 1, 'X')).rejects.toThrow('Не выбран видеофайл')
-  })
-
-  it('uploadFiles throws when no files are selected', async () => {
-    const store = useVideosStore()
-    await expect(store.uploadFiles([], 1)).rejects.toThrow('Не выбран видеофайл')
   })
 
   it('uploadFile derives title from full file name when title empty', async () => {
