@@ -101,6 +101,28 @@ function createDuplicateVideoDescriptionError(message) {
   return error
 }
 
+function createUploadNetworkError(message = 'network error') {
+  const error = new Error(message)
+  error.status = 0
+  error.isNetworkError = true
+  return error
+}
+
+function createUploadTimeoutError(message = 'timeout') {
+  const error = new Error(message)
+  error.status = 0
+  error.isTimeout = true
+  return error
+}
+
+function createUploadStatusError(status, data = undefined) {
+  const error = new Error(data?.msg || `Ошибка ${status}`)
+  error.status = status
+  if (data) error.data = data
+  error.hasServerMessage = Boolean(data?.msg)
+  return error
+}
+
 const globalStubs = {
   VideoViewDialog: {
     name: 'VideoViewDialog',
@@ -1416,6 +1438,101 @@ describe('Videos_List.vue', () => {
     await flushPromises()
 
     expect(alertStore.error).toHaveBeenCalledWith('Загружено видеофайлов: 0. Не удалось загрузить: 1. "test.mp4": network error')
+  })
+
+  it('explains upload failure when no server response arrives', async () => {
+    videosStore.uploadFile.mockRejectedValueOnce(createUploadNetworkError())
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      'Загружено видеофайлов: 0. Не удалось загрузить: 1. "test.mp4": не удалось получить ответ сервера. Проверьте, загружен ли файл, и повторите загрузку при необходимости.'
+    )
+  })
+
+  it('explains upload timeout with unknown server state guidance', async () => {
+    videosStore.uploadFile.mockRejectedValueOnce(createUploadTimeoutError())
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      'Загружено видеофайлов: 0. Не удалось загрузить: 1. "test.mp4": сервер не ответил вовремя. Проверьте, загружен ли файл, и повторите загрузку при необходимости.'
+    )
+  })
+
+  it('uses structured server upload error message', async () => {
+    videosStore.uploadFile.mockRejectedValueOnce(createUploadStatusError(500, {
+      msg: 'Не удалось сохранить видеофайл "test.mp4" на сервере',
+      reason: 'videoStorageSaveFailed',
+      originalFilename: 'test.mp4'
+    }))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      'Загружено видеофайлов: 0. Не удалось загрузить: 1. "test.mp4": Не удалось сохранить видеофайл "test.mp4" на сервере'
+    )
+  })
+
+  it('shows upload HTTP status when server message is absent', async () => {
+    videosStore.uploadFile.mockRejectedValueOnce(createUploadStatusError(503, {
+      reason: 'videoUploadProcessingFailed'
+    }))
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith(
+      'Загружено видеофайлов: 0. Не удалось загрузить: 1. "test.mp4": сервер отклонил загрузку, код ответа 503'
+    )
+  })
+
+  it('shows upload refresh failure after successful upload', async () => {
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    alertStore.success.mockClear()
+    alertStore.error.mockClear()
+    videosStore.getAllByAccount.mockRejectedValueOnce(new Error('refresh failed'))
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(alertStore.error).toHaveBeenCalledWith('Загружено видеофайлов: 1. Не удалось обновить список видеофайлов: refresh failed')
+    expect(alertStore.error).not.toHaveBeenCalledWith('Не удалось загрузить информацию о видеофайлах: refresh failed')
+    expect(alertStore.success).not.toHaveBeenCalled()
+  })
+
+  it('reconciles unknown upload state when refreshed list contains the file', async () => {
+    videosStore.uploadFile.mockRejectedValueOnce(createUploadNetworkError())
+    const wrapper = mount(VideosList, { global: { stubs: globalStubs } })
+    await flushPromises()
+    videosStore.getAllByAccount.mockImplementationOnce(async () => {
+      videosStore.videos.value = [{ id: 88, title: 'test.mp4', originalFilename: 'test.mp4', accountId: 0, categoryId: 0 }]
+      return videosStore.videos.value
+    })
+
+    const file = new File(['x'], 'test.mp4', { type: 'video/mp4' })
+    await wrapper.vm.uploadVideos([file])
+    await flushPromises()
+
+    expect(alertStore.success).toHaveBeenCalledWith('Загружено видеофайлов: 1')
+    expect(alertStore.error).not.toHaveBeenCalled()
   })
 
   it('does not delete video when confirmation is cancelled', async () => {
