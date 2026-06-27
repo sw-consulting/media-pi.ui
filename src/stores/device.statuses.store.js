@@ -22,6 +22,7 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
     deviceId: item?.deviceId ?? item?.DeviceId ?? fallbackDeviceId,
     isOnline: item?.isOnline ?? item?.IsOnline ?? false,
     lastChecked: item?.lastChecked ?? item?.LastChecked ?? null,
+    serverLastChecked: item?.serverLastChecked ?? item?.ServerLastChecked ?? null,
     connectLatencyMs: item?.connectLatencyMs ?? item?.ConnectLatencyMs ?? null,
     totalLatencyMs: item?.totalLatencyMs ?? item?.TotalLatencyMs ?? null,
     softwareVersion: item?.softwareVersion ?? item?.SoftwareVersion ?? null,

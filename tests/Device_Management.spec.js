@@ -27,6 +27,7 @@ const deviceRef = ref({
     deviceId: 1, 
     isOnline: true, 
     lastChecked: '2025-12-13T10:30:00.000Z',
+    serverLastChecked: '2025-12-13T10:30:01.000Z',
     connectLatencyMs: 25
   }
 })
@@ -40,6 +41,7 @@ const getById = vi.fn(() => {
       deviceId: 1, 
       isOnline: true, 
       lastChecked: '2025-12-13T10:30:00.000Z',
+      serverLastChecked: '2025-12-13T10:30:01.000Z',
       connectLatencyMs: 25
     }
   }
@@ -50,6 +52,7 @@ const getDeviceStatusById = vi.fn(() => {
     deviceId: 1, 
     isOnline: true, 
     lastChecked: '2025-12-13T10:30:00.000Z',
+    serverLastChecked: '2025-12-13T10:30:01.000Z',
     connectLatencyMs: 25,
     softwareVersion: '1.2.3'
   }
@@ -175,6 +178,7 @@ describe('Device_Management.vue', () => {
         deviceId: 1, 
         isOnline: true, 
         lastChecked: '2025-12-13T10:30:00.000Z',
+        serverLastChecked: '2025-12-13T10:30:01.000Z',
         connectLatencyMs: 25
       }
     }
@@ -183,6 +187,7 @@ describe('Device_Management.vue', () => {
       deviceId: 1, 
       isOnline: true, 
       lastChecked: '2025-12-13T10:30:00.000Z',
+      serverLastChecked: '2025-12-13T10:30:01.000Z',
       connectLatencyMs: 25,
       softwareVersion: '1.2.3'
     }]
@@ -686,22 +691,53 @@ describe('Device_Management.vue', () => {
     const labels = deviceInfoGrid.findAll('.label')
     const values = deviceInfoGrid.findAll('.value')
 
-    expect(labels).toHaveLength(4)
-    expect(values).toHaveLength(4)
+    expect(labels).toHaveLength(5)
+    expect(values).toHaveLength(5)
 
     // Check each field
     expect(labels[0].text()).toBe('IP адрес')
     expect(values[0].text()).toBe('192.168.1.100')
 
-    expect(labels[1].text()).toBe('Версия агента')
-    expect(values[1].text()).toBe('1.2.3')
+    expect(labels[1].text()).toBe('Последняя проверка')
+    expect(values[1].text()).toContain('13.12.2025')
 
-    expect(labels[2].text()).toBe('Онлайн (задержка)')
-    expect(values[2].text()).toBe('Да (25 мс)')
-    expect(values[2].find('.text-success').exists()).toBe(true)
+    expect(labels[2].text()).toBe('Версия агента')
+    expect(values[2].text()).toBe('1.2.3')
     
-    expect(labels[3].text()).toBe('Последняя проверка')
+    expect(labels[3].text()).toBe('Время устройства')
     expect(values[3].text()).toContain('13.12.2025')
+
+    expect(labels[4].text()).toBe('Онлайн (задержка)')
+    expect(values[4].text()).toBe('Да (25 мс)')
+    expect(values[4].find('.text-success').exists()).toBe(true)
+  })
+
+  it('displays placeholder for missing device check time while keeping server time', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    statusesRef.value = [{
+      deviceId: 1,
+      isOnline: true,
+      lastChecked: null,
+      serverLastChecked: '2025-12-13T10:30:01.000Z',
+      connectLatencyMs: 25,
+      softwareVersion: '1.2.3'
+    }]
+
+    await wrapper.vm.$nextTick()
+
+    const values = wrapper.find('.device-info-grid').findAll('.value')
+    expect(values[3].text()).toBe('—')
+    expect(values[1].text()).toContain('13.12.2025')
   })
 
   it('allows readAllSettings button to be clicked when device is offline', async () => {
@@ -755,6 +791,7 @@ describe('Device_Management.vue', () => {
       deviceId: 1, 
       isOnline: true, 
       lastChecked: '2025-12-13T11:00:00.000Z',
+      serverLastChecked: '2025-12-13T11:00:01.000Z',
       connectLatencyMs: 30
     }
     statusesRef.value = [newStatus]
@@ -844,6 +881,7 @@ describe('Device_Management.vue', () => {
       deviceId: 1, 
       isOnline: true,
       lastChecked: '2025-12-13T12:00:00.000Z',
+      serverLastChecked: '2025-12-13T12:00:01.000Z',
       connectLatencyMs: 50,
       softwareVersion: '2.0.0'
     }]
@@ -852,8 +890,9 @@ describe('Device_Management.vue', () => {
 
     const values = wrapper.find('.device-info-grid').findAll('.value')
     expect(values[0].text()).toBe('192.168.1.200')
-    expect(values[1].text()).toBe('2.0.0')
-    expect(values[2].text()).toBe('Да (50 мс)')
+    expect(values[1].text()).toContain('13.12.2025')
+    expect(values[2].text()).toBe('2.0.0')
+    expect(values[4].text()).toBe('Да (50 мс)')
   })
 
   it('updates service statuses from live device status fields when provided', async () => {
