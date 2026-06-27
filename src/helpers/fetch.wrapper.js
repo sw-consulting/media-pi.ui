@@ -103,32 +103,16 @@ function request(method) {
             if (error.name === 'AbortError') {
                 throw createAbortError();
             } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-                throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
+                throw createNetworkError();
             } else {
-                throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
+                throw createUnexpectedError(error);
             }
         }
 
         // Process HTTP error responses (4xx, 5xx status codes)
         if (!response.ok) {
-            // Try to extract error message from server response
             const errorText = await response.text();
-            let errorMessage;
-            let errorObj;
-            try {
-                // Parse JSON error response if available
-                errorObj = JSON.parse(errorText);
-                errorMessage = errorObj.msg || `Ошибка ${response.status}`;
-            } catch {
-                // Fall back to raw text or generic status message
-                errorMessage = errorText || `Ошибка ${response.status}`;
-            }
-
-            // Create enhanced error object with status and data
-            const error = new Error(errorMessage);
-            error.status = response.status;
-            if (errorObj) error.data = errorObj;
-            throw error;
+            throw createHttpError(response.status, errorText);
         }
 
         // Process successful response through standard handler
@@ -188,27 +172,16 @@ function requestFile(method) {
             if (error.name === 'AbortError') {
                 throw createAbortError();
             } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-                throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
+                throw createNetworkError();
             } else {
-                throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
+                throw createUnexpectedError(error);
             }
         }
 
         // Process HTTP error responses
         if (!response.ok) {
             const errorText = await response.text();
-            let errorMessage;
-            let errorObj;
-            try {
-                errorObj = JSON.parse(errorText);
-                errorMessage = errorObj.msg || `Ошибка ${response.status}`;
-            } catch {
-                errorMessage = errorText || `Ошибка ${response.status}`;
-            }
-            const error = new Error(errorMessage);
-            error.status = response.status;
-            if (errorObj) error.data = errorObj;
-            throw error;
+            throw createHttpError(response.status, errorText);
         }
 
         return handleResponse(response);
@@ -285,11 +258,11 @@ function requestFileWithProgress(method, url, body, options) {
     }
 
     xhr.onerror = () => {
-      rejectOnce(new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.'))
+      rejectOnce(createNetworkError())
     }
 
     xhr.ontimeout = () => {
-      rejectOnce(new Error('Произошла непредвиденная ошибка при обращении к серверу: timeout'))
+      rejectOnce(createTimeoutError())
     }
 
     xhr.onabort = () => {
@@ -306,6 +279,24 @@ function createAbortError() {
   return error
 }
 
+function createNetworkError() {
+  const error = new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.')
+  error.status = 0
+  error.isNetworkError = true
+  return error
+}
+
+function createTimeoutError() {
+  const error = new Error('Произошла непредвиденная ошибка при обращении к серверу: timeout')
+  error.status = 0
+  error.isTimeout = true
+  return error
+}
+
+function createUnexpectedError(error) {
+  return new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message)
+}
+
 function createHttpError(status, errorText) {
   let errorMessage
   let errorObj
@@ -319,6 +310,7 @@ function createHttpError(status, errorText) {
   const error = new Error(errorMessage)
   error.status = status
   if (errorObj) error.data = errorObj
+  error.hasServerMessage = Boolean(errorObj?.msg || (!errorObj && errorText))
   return error
 }
 
@@ -393,29 +385,16 @@ function requestBlob(method) {
             if (error.name === 'AbortError') {
                 throw createAbortError();
             } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-                throw new Error('Не удалось соединиться с сервером. Пожалуйста, проверьте подключение к сети.');
+                throw createNetworkError();
             } else {
-                throw new Error('Произошла непредвиденная ошибка при обращении к серверу: ' + error.message );
+                throw createUnexpectedError(error);
             }
         }
 
         // Process HTTP error responses
         if (!response.ok) {
-            // Try to extract error message from server response
             const errorText = await response.text();
-            let errorMessage;
-            let errorObj;
-            try {
-                errorObj = JSON.parse(errorText);
-                errorMessage = errorObj.msg || `Ошибка ${response.status}`;
-            } catch {
-                errorMessage = errorText || `Ошибка ${response.status}`;
-            }
-
-            const error = new Error(errorMessage);
-            error.status = response.status;
-            if (errorObj) error.data = errorObj;
-            throw error;
+            throw createHttpError(response.status, errorText);
         }
 
         // Return raw response for binary data processing

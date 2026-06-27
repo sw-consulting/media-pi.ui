@@ -271,7 +271,31 @@ describe('fetchWrapper', () => {
     const request = fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress: vi.fn() })
     xhr.onerror()
 
-    await expect(request).rejects.toThrow('Не удалось соединиться')
+    await expect(request).rejects.toMatchObject({
+      message: expect.stringContaining('Не удалось соединиться'),
+      status: 0,
+      isNetworkError: true
+    })
+  })
+
+  it('marks timeout in postFile with progress', async () => {
+    const formData = new FormData()
+    const xhr = {
+      upload: {},
+      open: vi.fn(),
+      setRequestHeader: vi.fn(),
+      send: vi.fn()
+    }
+    global.window.XMLHttpRequest = vi.fn(function () { return xhr })
+
+    const request = fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress: vi.fn() })
+    xhr.ontimeout()
+
+    await expect(request).rejects.toMatchObject({
+      message: expect.stringContaining('timeout'),
+      status: 0,
+      isTimeout: true
+    })
   })
 
   it('aborts postFile with progress when signal is cancelled', async () => {
@@ -329,6 +353,30 @@ describe('fetchWrapper', () => {
       expect(error.status).toBe(413)
       expect(error.data).toEqual(errorBody)
     }
+  })
+
+  it('marks HTTP upload errors without server message', async () => {
+    const formData = new FormData()
+    const xhr = {
+      upload: {},
+      open: vi.fn(),
+      setRequestHeader: vi.fn(),
+      send: vi.fn(function () {
+        this.status = 503
+        this.statusText = 'Service Unavailable'
+        this.responseText = JSON.stringify({ reason: 'videoStorageSaveFailed' })
+        this.onload()
+      })
+    }
+    global.window.XMLHttpRequest = vi.fn(function () { return xhr })
+
+    await expect(fetchWrapper.postFile(`${baseUrl}/upload`, formData, { onUploadProgress: vi.fn() }))
+      .rejects.toMatchObject({
+        message: 'Ошибка 503',
+        status: 503,
+        data: { reason: 'videoStorageSaveFailed' },
+        hasServerMessage: false
+      })
   })
 
   // Test file download

@@ -99,6 +99,7 @@ const accessibleCategoryIds = ref(new Set())
 const accessInfoLoaded = ref(false)
 const scopeOptionsReady = ref(false)
 const loadedFixedScope = ref(null)
+const lastRefreshErrorMessage = ref('')
 const hasFixedScope = computed(() => props.fixedScope !== null && props.fixedScope !== undefined)
 const isPendingFixedScope = computed(() => props.pendingFixedScope && !hasFixedScope.value)
 const isScopeFixed = computed(() => hasFixedScope.value || props.pendingFixedScope)
@@ -297,10 +298,38 @@ function getUploadFileName(file) {
   return file?.name || 'видеофайл'
 }
 
+function getFallbackErrorMessage(err) {
+  return err?.message || err || 'неизвестная ошибка'
+}
+
+function isUploadTimeoutError(err) {
+  return err?.isTimeout === true
+}
+
+function isUploadNoServerResponseError(err) {
+  return err?.isNetworkError === true || (err?.status === 0 && !isUploadTimeoutError(err))
+}
+
+function isUploadResultUnknownError(err) {
+  return isUploadTimeoutError(err) || isUploadNoServerResponseError(err)
+}
+
+function isUploadHttpStatusWithoutMessage(err) {
+  return Number.isFinite(Number(err?.status)) && Number(err.status) > 0 && err?.hasServerMessage !== true && !err?.data?.msg
+}
+
 function getUploadErrorMessage(err) {
   if (isDuplicateOriginalFilenameError(err)) return getDuplicateOriginalFilenameMessage(err)
   if (isDuplicateVideoDescriptionError(err)) return getDuplicateVideoDescriptionMessage(err)
-  return err?.message || err
+  if (isUploadTimeoutError(err)) {
+    return 'сервер не ответил вовремя. Проверьте, загружен ли файл, и повторите загрузку при необходимости.'
+  }
+  if (isUploadNoServerResponseError(err)) {
+    return 'не удалось получить ответ сервера. Проверьте, загружен ли файл, и повторите загрузку при необходимости.'
+  }
+  if (err?.data?.msg) return err.data.msg
+  if (isUploadHttpStatusWithoutMessage(err)) return `сервер отклонил загрузку, код ответа ${err.status}`
+  return getFallbackErrorMessage(err)
 }
 
 function shouldShowUploadFailureFilename(err) {
@@ -371,6 +400,39 @@ function summarizeUploadResult(uploadedCount, failures, cancelled) {
     .join('; ')
   const cancelSuffix = cancelled ? '. Загрузка отменена.' : ''
   alertStore.error(`${summary}. Не удалось загрузить: ${failures.length}. ${failureDetails}${cancelSuffix}`)
+}
+
+function summarizeUploadRefreshFailure(uploadedCount, failures, cancelled, reason) {
+  const summaryParts = [`Загружено видеофайлов: ${uploadedCount}`]
+
+  if (failures.length) {
+    summaryParts.push(`Не удалось загрузить: ${failures.length}. ${failures.map(formatUploadFailure).join('; ')}`)
+  }
+  if (cancelled) {
+    summaryParts.push('Загрузка отменена')
+  }
+
+  summaryParts.push(`Не удалось обновить список видеофайлов: ${reason || 'неизвестная ошибка'}`)
+  alertStore.error(summaryParts.join('. '))
+}
+
+function removeConfirmedUnknownUploadFailures(failures, scope) {
+  const filenamesInScope = new Set(
+    (videos.value || [])
+      .filter(video => isVideoInUploadConflictScope(video, scope))
+      .map(video => video?.originalFilename)
+      .filter(Boolean)
+  )
+  let confirmedCount = 0
+
+  for (let index = failures.length - 1; index >= 0; index--) {
+    const failure = failures[index]
+    if (!failure?.resultUnknown || !filenamesInScope.has(failure.filename)) continue
+    failures.splice(index, 1)
+    confirmedCount++
+  }
+
+  return confirmedCount
 }
 
 function ensureSelection(options) {
@@ -473,8 +535,9 @@ async function refreshCommonVideos() {
   videos.value = uniqueAccessibleVideos(collected)
 }
 
-const refreshVideos = async () => {
+const refreshVideos = async (options = {}) => {
   const requestedScope = selectedScope.value
+  lastRefreshErrorMessage.value = ''
   try {
     if (requestedScope === undefined || requestedScope === null) {
       if (isScopeFixed.value) loadedFixedScope.value = null
@@ -496,7 +559,10 @@ const refreshVideos = async () => {
     if (isScopeFixed.value && selectedScope.value === requestedScope) loadedFixedScope.value = requestedScope
     return true
   } catch (err) {
-    alertStore.error('Не удалось загрузить информацию о видеофайлах: ' + (err?.message || err))
+    lastRefreshErrorMessage.value = getFallbackErrorMessage(err)
+    if (options.showError !== false) {
+      alertStore.error('Не удалось загрузить информацию о видеофайлах: ' + lastRefreshErrorMessage.value)
+    }
     return false
   }
 }
@@ -612,19 +678,26 @@ async function uploadVideos(files) {
         failures.push({
           filename: getUploadFileName(file),
           message: getUploadErrorMessage(err),
-          showFilename: shouldShowUploadFailureFilename(err)
+          showFilename: shouldShowUploadFailureFilename(err),
+          resultUnknown: isUploadResultUnknownError(err)
         })
       }
     }
 
-    if (uploadedCount > 0) {
+    const shouldRefreshAfterUpload = uploadedCount > 0 || failures.some(failure => failure.resultUnknown)
+    if (shouldRefreshAfterUpload) {
       uploadPhase.value = 'refreshing'
       uploadProgressIndeterminate.value = true
-      const refreshed = await refreshVideos()
+      const refreshed = await refreshVideos({ showError: false })
       if (refreshed) {
-        summarizeUploadResult(uploadedCount, failures, cancelled)
+        uploadedCount += removeConfirmedUnknownUploadFailures(failures, scope)
+      } else if (uploadedCount > 0) {
+        summarizeUploadRefreshFailure(uploadedCount, failures, cancelled, lastRefreshErrorMessage.value)
+        return
       }
-    } else if (failures.length && !cancelled) {
+    }
+
+    if (uploadedCount > 0 || (failures.length && !cancelled)) {
       summarizeUploadResult(uploadedCount, failures, cancelled)
     }
   } finally {
