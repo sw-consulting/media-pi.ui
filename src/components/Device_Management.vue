@@ -761,14 +761,8 @@ onBeforeUnmount(() => {
         <div class="label service-label">IP адрес</div>
         <div class="value">{{ deviceInfo.ipAddress }}</div>
 
-        <div class="label service-label">Последняя проверка</div>
-        <div class="value">{{ deviceInfo.serverLastChecked }}</div>
-
         <div class="label service-label">Версия агента</div>
         <div class="value">{{ deviceInfo.softwareVersion }}</div>
-
-        <div class="label service-label">Время устройства</div>
-        <div class="value">{{ deviceInfo.lastChecked }}</div>
 
         <div class="label service-label">Онлайн (задержка)</div>
         <div class="value">
@@ -776,6 +770,12 @@ onBeforeUnmount(() => {
             {{ deviceInfo.isOnline }}
           </span>
         </div>
+
+        <div class="label service-label">Время проверки (устройство)</div>
+        <div class="value">{{ deviceInfo.lastChecked }}</div>
+
+        <div class="label service-label">Время проверки (сервер)</div>
+        <div class="value">{{ deviceInfo.serverLastChecked }}</div>
 
       </div>
     </div>
