@@ -7,6 +7,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
 import DeviceManagement from '@/components/Device_Management.vue'
+import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
 vi.mock('@sw-consulting/tooling.ui.kit', () => ({
   ActionButton: { 
@@ -70,10 +71,10 @@ const configurationResponse = {
     playlist: ['00:00'],
     video: ['00:00'],
     rest: [{ start: '00:00', stop: '00:00' }],
-    photoReport: ['0:00:30', '0:30:00']
+    photoReport: ['00:00:30', '00:30:00']
   },
   audio: { output: 'hdmi' },
-  screenshot: { timers: ['0:00:30', '0:30:00'] }
+  screenshot: { timers: ['00:00:30', '00:30:00'] }
 }
 const getConfiguration = vi.fn(() => Promise.resolve(configurationResponse))
 const updateConfiguration = vi.fn(() => Promise.resolve())
@@ -343,7 +344,7 @@ describe('Device_Management.vue', () => {
       expect.objectContaining({
         audio: { output: 'hdmi' },
         playlist: { source: '', destination: '' },
-        screenshot: { timers: ['0:00:30', '0:30:00'] }
+        screenshot: { timers: ['00:00:30', '00:30:00'] }
       })
     )
     expect(alertSuccess).toHaveBeenCalledWith('Все настройки сохранены')
@@ -355,7 +356,7 @@ describe('Device_Management.vue', () => {
       playlist: { source: 'server-source', destination: '/srv/playlists' },
       schedule: configurationResponse.schedule,
       audio: { output: 'usb-dac' },
-      screenshot: { timers: ['3:00:00'] }
+      screenshot: { timers: ['03:00:00'] }
     })
 
     const wrapper = mount(DeviceManagement, {
@@ -373,7 +374,7 @@ describe('Device_Management.vue', () => {
       validate: vi.fn().mockResolvedValue({ valid: true }),
       values: {
         ...configurationResponse.schedule,
-        photoReport: ['3:00:00']
+        photoReport: ['03:00:00']
       }
     }
 
@@ -390,7 +391,7 @@ describe('Device_Management.vue', () => {
       expect.objectContaining({
         playlist: { source: 'server-source', destination: '/srv/playlists' },
         audio: { output: 'usb-dac' },
-        screenshot: { timers: ['3:00:00'] }
+        screenshot: { timers: ['03:00:00'] }
       })
     )
   })
@@ -419,13 +420,20 @@ describe('Device_Management.vue', () => {
     expect(wrapper.find('#playlist-destination').exists()).toBe(false)
     expect(wrapper.find('#audio-output').exists()).toBe(false)
     expect(wrapper.find('#screenshot-interval-minutes').exists()).toBe(false)
+
+    const photoTimerFieldArray = wrapper
+      .findAllComponents(FieldArrayWithButtons)
+      .find((component) => component.props('name') === 'photoReport')
+    expect(photoTimerFieldArray).toBeDefined()
+    expect(photoTimerFieldArray.props('fieldProps')).toEqual({ type: 'time', step: 1 })
+    expect(photoTimerFieldArray.props('placeholder')).toBe('HH:mm:ss')
   })
 
   it('normalizes photo report timers before save', async () => {
     vi.useRealTimers()
     getConfiguration.mockResolvedValueOnce({
       ...configurationResponse,
-      screenshot: { timers: ['3:00:00', '0:30:00', '', '00:00:30', '0:30:00', '2562048:00:00'] }
+      screenshot: { timers: ['03:00:00', '00:30:00', '', '00:00:30', '00:30:00', '0:00:30', '24:00:00'] }
     })
 
     const wrapper = mount(DeviceManagement, {
@@ -438,6 +446,8 @@ describe('Device_Management.vue', () => {
     })
 
     await flushPromises()
+
+    expect(wrapper.vm.scheduleFormValues.photoReport).toEqual(['00:00:30', '00:30:00', '03:00:00'])
 
     wrapper.vm.scheduleFormRef.value = {
       validate: vi.fn().mockResolvedValue({ valid: true }),
@@ -453,9 +463,29 @@ describe('Device_Management.vue', () => {
     expect(updateConfiguration).toHaveBeenCalledWith(
       1,
       expect.objectContaining({
-        screenshot: { timers: ['0:00:30', '0:30:00', '3:00:00'] }
+        screenshot: { timers: ['00:00:30', '00:30:00', '03:00:00'] }
       })
     )
+  })
+
+  it('uses immediate photo report as default when timers are empty', async () => {
+    getConfiguration.mockResolvedValueOnce({
+      ...configurationResponse,
+      screenshot: { timers: [] }
+    })
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.vm.scheduleFormValues.photoReport).toEqual(['00:00:00'])
   })
 
   it('handles configuration load error on readAll', async () => {
@@ -534,6 +564,18 @@ describe('Device_Management.vue', () => {
     })
 
     await flushPromises()
+    statusesRef.value = [{
+      deviceId: 1,
+      isOnline: true,
+      playbackServiceStatus: false,
+      playlistUploadServiceStatus: false,
+      videoUploadServiceStatus: false
+    }]
+    getServiceStatus.mockResolvedValueOnce({
+      playbackServiceStatus: true,
+      playlistUploadServiceStatus: false,
+      videoUploadServiceStatus: false
+    })
 
     // Trigger start playback
     await wrapper.find('[data-test="service-action-playback"]').trigger('click')
@@ -547,6 +589,7 @@ describe('Device_Management.vue', () => {
 
     // Verify service status is refreshed after operation
     expect(getServiceStatus).toHaveBeenCalledTimes(2)
+    expect(wrapper.findAll('.service-status')[1].text()).toBe('Запущено')
   })
 
   it('stops playback service successfully', async () => {

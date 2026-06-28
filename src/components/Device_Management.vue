@@ -142,8 +142,8 @@ const playlistSettings = ref({
 
 const defaultTimeValue = '00:00'
 const defaultPhotoTimerValue = '00:00:00'
-const maxPhotoTimerSeconds = 9223372036
-const photoTimerPattern = /^\d+:[0-5]\d:[0-5]\d$/
+const maxPhotoTimerSeconds = 86399
+const photoTimerPattern = /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/
 const createDefaultRestPair = () => ({ start: defaultTimeValue, stop: defaultTimeValue })
 const createDefaultScheduleValues = () => ({
   playlist: [defaultTimeValue],
@@ -168,7 +168,7 @@ const timeValueSchema = Yup.string()
   .matches(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Некорректный формат времени HH:mm')
 const photoTimerValueSchema = Yup.string()
   .trim()
-  .test('photo-timer-format', 'Некорректный формат длительности H:MM:SS', (value) => {
+  .test('photo-timer-format', 'Некорректный формат длительности HH:mm:ss', (value) => {
     const trimmed = typeof value === 'string' ? value.trim() : ''
     return trimmed === '' || parsePhotoTimerSeconds(trimmed) !== null
   })
@@ -236,7 +236,7 @@ const formatPhotoTimerSeconds = (totalSeconds) => {
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
-  return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 const normalizePhotoTimerPayload = (list) => {
@@ -589,8 +589,29 @@ const persistConfiguration = async ({
   }
 }
 
+const syncCurrentStatusServiceFields = (payload = {}) => {
+  if (!props.deviceId || !Array.isArray(statuses.value)) return
+  const serviceFields = serviceDescriptors.reduce((acc, descriptor) => {
+    const value = payload[descriptor.statusKey]
+    if (value === true || value === false) {
+      acc[descriptor.statusKey] = value
+    }
+    return acc
+  }, {})
+  if (!Object.keys(serviceFields).length) return
+
+  const index = statuses.value.findIndex((status) => status?.deviceId === props.deviceId)
+  if (index >= 0) {
+    statuses.value.splice(index, 1, { ...statuses.value[index], ...serviceFields })
+  } else {
+    statuses.value = [...statuses.value, { ...(currentStatus.value || {}), deviceId: props.deviceId, ...serviceFields }]
+  }
+}
+
 const applyServiceStatus = (payload = {}) => {
-  serviceStatus.value = { ...defaultServiceStatus, ...payload }
+  const nextStatus = { ...defaultServiceStatus, ...payload }
+  serviceStatus.value = nextStatus
+  syncCurrentStatusServiceFields(nextStatus)
 }
 
 const resetServiceStatus = () => {
@@ -950,7 +971,7 @@ onBeforeUnmount(() => {
               :hide-label="true"
               field-type="input"
               :field-props="timePhotoFieldProps"
-              placeholder="HH:mm:ss "
+              placeholder="HH:mm:ss"
               :default-value="defaultPhotoTimerValue"
               :has-error="hasErrorsForPrefix(scheduleErrors, 'photoReport')"
               :disabled="isDisabled || hasAnyOperationInProgress"
@@ -1061,7 +1082,7 @@ onBeforeUnmount(() => {
 
 .timers-grid {
   display: grid;
-  grid-template-columns: 0.4fr 0.4fr 0.6fr 0.4fr;
+  grid-template-columns: 0.4fr 0.4fr 0.6fr 0.6fr;
   gap: 0.2rem;
 }
 
