@@ -140,17 +140,16 @@ const playlistSettings = ref({
   destination: ''
 })
 
-// Screenshot settings state
-const screenshotSettings = ref({
-  intervalMinutes: 0
-})
-
 const defaultTimeValue = '00:00'
+const defaultPhotoTimerValue = '00:00:00'
+const maxPhotoTimerSeconds = 86399
+const photoTimerPattern = /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/
 const createDefaultRestPair = () => ({ start: defaultTimeValue, stop: defaultTimeValue })
 const createDefaultScheduleValues = () => ({
   playlist: [defaultTimeValue],
   video: [defaultTimeValue],
-  rest: [createDefaultRestPair()]
+  rest: [createDefaultRestPair()],
+  photoReport: [defaultPhotoTimerValue]
 })
 
 const scheduleFormValues = ref(createDefaultScheduleValues())
@@ -159,10 +158,20 @@ const timeFieldProps = Object.freeze({
   type: 'time',
   step: 60
 })
+const timePhotoFieldProps = Object.freeze({
+  type: 'time',
+  step: 1
+})
 const restDefaultValue = Object.freeze(createDefaultRestPair())
 const timeValueSchema = Yup.string()
   .required('Укажите время в формате HH:mm')
   .matches(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Некорректный формат времени HH:mm')
+const photoTimerValueSchema = Yup.string()
+  .trim()
+  .test('photo-timer-format', 'Некорректный формат длительности HH:mm:ss', (value) => {
+    const trimmed = typeof value === 'string' ? value.trim() : ''
+    return trimmed === '' || parsePhotoTimerSeconds(trimmed) !== null
+  })
 const scheduleValidationSchema = Yup.object({
   playlist: Yup.array().of(timeValueSchema).min(1, 'Добавьте время загрузки плей-листа'),
   video: Yup.array().of(timeValueSchema).min(1, 'Добавьте время воспроизведения видео'),
@@ -173,7 +182,8 @@ const scheduleValidationSchema = Yup.object({
         stop: timeValueSchema
       })
     )
-    .min(1, 'Добавьте период отдыха')
+    .min(1, 'Добавьте период отдыха'),
+  photoReport: Yup.array().of(photoTimerValueSchema)
 })
 
 const hasErrorsForPrefix = (errors = {}, prefix) => {
@@ -211,11 +221,53 @@ const normalizeRestList = (list) => {
   return [createDefaultRestPair()]
 }
 
+function parsePhotoTimerSeconds(value) {
+  if (typeof value !== 'string' || !photoTimerPattern.test(value.trim())) {
+    return null
+  }
+  const [hours, minutes, seconds] = value.trim().split(':').map(Number)
+  if (!Number.isSafeInteger(hours)) return null
+  const totalSeconds = (hours * 60 * 60) + (minutes * 60) + seconds
+  if (!Number.isSafeInteger(totalSeconds) || totalSeconds > maxPhotoTimerSeconds) return null
+  return totalSeconds
+}
+
+const formatPhotoTimerSeconds = (totalSeconds) => {
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+const normalizePhotoTimerPayload = (list) => {
+  if (!Array.isArray(list)) return []
+
+  const unique = new Map()
+  list.forEach((item) => {
+    if (typeof item !== 'string') return
+    const value = item.trim()
+    if (!value) return
+    const totalSeconds = parsePhotoTimerSeconds(value)
+    if (totalSeconds === null) return
+    unique.set(totalSeconds, formatPhotoTimerSeconds(totalSeconds))
+  })
+
+  return [...unique.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, value]) => value)
+}
+
+const normalizePhotoTimerList = (list) => {
+  const normalized = normalizePhotoTimerPayload(list)
+  return normalized.length ? normalized : [defaultPhotoTimerValue]
+}
+
 const applyScheduleValues = (values) => {
   const normalized = {
     playlist: normalizeTimeList(values?.playlist),
     video: normalizeTimeList(values?.video),
-    rest: normalizeRestList(values?.rest)
+    rest: normalizeRestList(values?.rest),
+    photoReport: normalizePhotoTimerList(values?.photoReport)
   }
   scheduleFormValues.value = normalized
   if (scheduleFormRef.value) {
@@ -227,14 +279,11 @@ const createDefaultConfiguration = () => ({
   playlist: { source: '', destination: '' },
   schedule: createDefaultScheduleValues(),
   audio: { output: 'hdmi' },
-  screenshot: { intervalMinutes: 0 }
+  screenshot: { timers: [] }
 })
 
 const normalizeConfiguration = (config = {}) => {
-  const screenshotIntervalRaw = Number(config?.screenshot?.intervalMinutes)
-  const screenshotIntervalMinutes = Number.isInteger(screenshotIntervalRaw) && screenshotIntervalRaw >= 0
-    ? screenshotIntervalRaw
-    : 0
+  const photoReportTimers = normalizePhotoTimerList(config?.screenshot?.timers)
 
   return {
     playlist: {
@@ -244,7 +293,8 @@ const normalizeConfiguration = (config = {}) => {
     schedule: {
       playlist: normalizeTimeList(config?.schedule?.playlist),
       video: normalizeTimeList(config?.schedule?.video),
-      rest: normalizeRestList(config?.schedule?.rest)
+      rest: normalizeRestList(config?.schedule?.rest),
+      photoReport: photoReportTimers
     },
     audio: {
       output: typeof config?.audio?.output === 'string' && config.audio.output.trim()
@@ -252,7 +302,7 @@ const normalizeConfiguration = (config = {}) => {
         : 'hdmi'
     },
     screenshot: {
-      intervalMinutes: screenshotIntervalMinutes
+      timers: normalizePhotoTimerPayload(config?.screenshot?.timers)
     }
   }
 }
@@ -264,7 +314,6 @@ const applyConfiguration = (configuration) => {
   applyScheduleValues(normalized.schedule)
 
   audioSettings.value.output = normalized.audio.output
-  screenshotSettings.value.intervalMinutes = normalized.screenshot.intervalMinutes
 }
 
 const buildSchedulePayload = (values) => ({
@@ -283,9 +332,7 @@ const buildConfigurationPayload = (scheduleValuesOverride) => ({
     output: audioSettings.value.output || 'hdmi'
   },
   screenshot: {
-    intervalMinutes: Number.isInteger(Number(screenshotSettings.value.intervalMinutes))
-      ? Math.max(0, Number(screenshotSettings.value.intervalMinutes))
-      : 0
+    timers: normalizePhotoTimerPayload(scheduleValuesOverride?.photoReport ?? scheduleFormValues.value.photoReport)
   }
 })
 
@@ -388,7 +435,6 @@ async function initializeDevice() {
     resetServiceStatus()
     // Set default audio value silently when device is offline
     audioSettings.value.output = 'hdmi'
-    screenshotSettings.value.intervalMinutes = 0
     playlistSettings.value.source = ''
     playlistSettings.value.destination = ''
     applyScheduleValues(createDefaultScheduleValues())
@@ -414,6 +460,7 @@ const deviceInfo = computed(() => {
     softwareVersion: status?.softwareVersion || '—',
     isOnline: status?.isOnline ? `Да (${status?.connectLatencyMs ?? '—'} мс)` : 'Нет',
     lastChecked: fmtDate(status?.lastChecked),
+    serverLastChecked: fmtDate(status?.serverLastChecked),
     connectLatencyMs: status?.connectLatencyMs ?? '—'
   }
 })
@@ -525,13 +572,13 @@ const persistConfiguration = async ({
 
   const payload = buildConfigurationPayload(scheduleValues)
 
-  // Sync normalized screenshot value back to state so UI stays in sync with what is saved
-  screenshotSettings.value.intervalMinutes = payload.screenshot.intervalMinutes
-
   try {
     await devicesStore.updateConfiguration(props.deviceId, payload)
     // always apply schedule values from saved payload so internal state reflects saved data
-    applyScheduleValues(payload.schedule)
+    applyScheduleValues({
+      ...payload.schedule,
+      photoReport: payload.screenshot.timers
+    })
     if (successMessage) {
       alertStore.success(successMessage)
     }
@@ -542,8 +589,29 @@ const persistConfiguration = async ({
   }
 }
 
+const syncCurrentStatusServiceFields = (payload = {}) => {
+  if (!props.deviceId || !Array.isArray(statuses.value)) return
+  const serviceFields = serviceDescriptors.reduce((acc, descriptor) => {
+    const value = payload[descriptor.statusKey]
+    if (value === true || value === false) {
+      acc[descriptor.statusKey] = value
+    }
+    return acc
+  }, {})
+  if (!Object.keys(serviceFields).length) return
+
+  const index = statuses.value.findIndex((status) => status?.deviceId === props.deviceId)
+  if (index >= 0) {
+    statuses.value.splice(index, 1, { ...statuses.value[index], ...serviceFields })
+  } else {
+    statuses.value = [...statuses.value, { ...(currentStatus.value || {}), deviceId: props.deviceId, ...serviceFields }]
+  }
+}
+
 const applyServiceStatus = (payload = {}) => {
-  serviceStatus.value = { ...defaultServiceStatus, ...payload }
+  const nextStatus = { ...defaultServiceStatus, ...payload }
+  serviceStatus.value = nextStatus
+  syncCurrentStatusServiceFields(nextStatus)
 }
 
 const resetServiceStatus = () => {
@@ -771,7 +839,11 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="label service-label">Последняя проверка</div>
+        <div class="value">{{ deviceInfo.serverLastChecked }}</div>
+
+        <div class="label service-label">Время устройства</div>
         <div class="value">{{ deviceInfo.lastChecked }}</div>
+
 
       </div>
     </div>
@@ -891,27 +963,22 @@ onBeforeUnmount(() => {
               </template>
             </FieldArrayWithButtons>
           </div>
+          <div class="timers-column">
+            <div class="timer-column-title">Фотоотчёт</div>
+            <FieldArrayWithButtons
+              name="photoReport"
+              label=""
+              :hide-label="true"
+              field-type="input"
+              :field-props="timePhotoFieldProps"
+              placeholder="HH:mm:ss"
+              :default-value="defaultPhotoTimerValue"
+              :has-error="hasErrorsForPrefix(scheduleErrors, 'photoReport')"
+              :disabled="isDisabled || hasAnyOperationInProgress"
+            />
+          </div>
         </div>
       </Form>
-    </div>
-
-    <!-- Other Settings Section -->
-    <div class="form-group mt-4 form-group-add">
-      <h2 class="secondary-heading">Другие настройки</h2>
-      <div class="other-settings-grid">
-        <div class="other-settings-cell label other-settings-label">Период фотографирования (мин)</div>
-        <div class="other-settings-cell">
-          <input
-            id="screenshot-interval-minutes"
-            v-model.number="screenshotSettings.intervalMinutes"
-            type="number"
-            min="0"
-            step="1"
-            class="form-control input"
-            :disabled="isDisabled || hasAnyOperationInProgress"
-          />
-        </div>
-      </div>
     </div>
 
     <!-- System Management Section -->
@@ -967,7 +1034,7 @@ onBeforeUnmount(() => {
 
 .form-compact {
   overflow-x: auto;
-  max-width: 1200px;  
+  max-width: 1400px;  
 }
 
 .header-with-actions {
@@ -975,39 +1042,34 @@ onBeforeUnmount(() => {
 }
 
 .secondary-heading {
-  width: 25%;
+  width: 20%;
 }
 
 .form-group-add {
   padding: 1rem;
   border: 1px solid  #536373;
   border-radius: 8px;
-  min-width: 1200px;
-  width: 1200px;
+  min-width: 1400px;
+  width: 1400px;
 }
 
 .device-info-grid {
   display: grid;
-  grid-template-columns: repeat(2, 200px 1fr);
-  gap: 0.5rem 1rem;
+  grid-template-columns: repeat(3, 160px minmax(0, 1fr));
+  gap: 1rem 2rem;
   align-items: center;
 }
 
 .service-grid {
   display: grid;
-  grid-template-columns: repeat(2, 200px 1fr auto);
-  gap: 0.7rem 0.5rem;
+  grid-template-columns: repeat(3, 140px minmax(0, 1fr) auto);
+  gap: 1rem 2rem;
 }
 
 .service-cell {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-}
-
-/* Add left margin to the first cell of the second column group */
-.service-cell:nth-child(6n + 4) {
-  margin-left: 2rem;
 }
 
 .service-label {
@@ -1020,8 +1082,8 @@ onBeforeUnmount(() => {
 
 .timers-grid {
   display: grid;
-  grid-template-columns: 0.5fr 0.5fr 0.7fr;
-  gap: 1rem;
+  grid-template-columns: 0.4fr 0.4fr 0.6fr 0.6fr;
+  gap: 0.2rem;
 }
 
 .playlist-grid {
@@ -1040,25 +1102,6 @@ onBeforeUnmount(() => {
   width: 120px;
 }
 
-.other-settings-grid {
-  display: grid;
-  grid-template-columns: max-content 52px;
-  gap: 1rem;
-  align-items: center;
-  width: fit-content;
-}
-
-.other-settings-cell {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.other-settings-label {
-  width: auto;
-  white-space: nowrap;
-}
-
 .timers-column {
   border: 1px solid  #536373;
   border-radius: 8px;
@@ -1072,16 +1115,12 @@ onBeforeUnmount(() => {
   }
 
   .service-grid {
-    grid-template-columns: 200px 1fr auto;
-  }
-
-  .service-cell:nth-child(6n + 4) {
-    margin-left: 0;
+    grid-template-columns: 140px 1fr auto;
   }
 
   .device-info-grid {
     display: grid;
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: 160px 1fr;
     gap: 0.5rem 1rem;
     align-items: center;
     padding: 1rem 0;
@@ -1097,11 +1136,6 @@ onBeforeUnmount(() => {
 
   .timers-grid {
     grid-template-columns: 0.7fr;
-  }
-
-  .other-settings-grid {
-    grid-template-columns: 1fr;
-    width: 100%;
   }
 
   .form-group-add {

@@ -7,6 +7,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
 import DeviceManagement from '@/components/Device_Management.vue'
+import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 
 vi.mock('@sw-consulting/tooling.ui.kit', () => ({
   ActionButton: { 
@@ -27,6 +28,7 @@ const deviceRef = ref({
     deviceId: 1, 
     isOnline: true, 
     lastChecked: '2025-12-13T10:30:00.000Z',
+    serverLastChecked: '2025-12-13T10:30:01.000Z',
     connectLatencyMs: 25
   }
 })
@@ -40,6 +42,7 @@ const getById = vi.fn(() => {
       deviceId: 1, 
       isOnline: true, 
       lastChecked: '2025-12-13T10:30:00.000Z',
+      serverLastChecked: '2025-12-13T10:30:01.000Z',
       connectLatencyMs: 25
     }
   }
@@ -50,6 +53,7 @@ const getDeviceStatusById = vi.fn(() => {
     deviceId: 1, 
     isOnline: true, 
     lastChecked: '2025-12-13T10:30:00.000Z',
+    serverLastChecked: '2025-12-13T10:30:01.000Z',
     connectLatencyMs: 25,
     softwareVersion: '1.2.3'
   }
@@ -66,10 +70,11 @@ const configurationResponse = {
   schedule: {
     playlist: ['00:00'],
     video: ['00:00'],
-    rest: [{ start: '00:00', stop: '00:00' }]
+    rest: [{ start: '00:00', stop: '00:00' }],
+    photoReport: ['00:00:30', '00:30:00']
   },
   audio: { output: 'hdmi' },
-  screenshot: { intervalMinutes: 15 }
+  screenshot: { timers: ['00:00:30', '00:30:00'] }
 }
 const getConfiguration = vi.fn(() => Promise.resolve(configurationResponse))
 const updateConfiguration = vi.fn(() => Promise.resolve())
@@ -89,6 +94,21 @@ const alertSuccess = vi.fn()
 const alertClear = vi.fn()
 const routerGo = vi.fn()
 const routerPush = vi.fn()
+
+const getDeviceInfoFields = (wrapper) => {
+  const grid = wrapper.find('.device-info-grid')
+  const labels = grid.findAll('.label')
+  const values = grid.findAll('.value')
+
+  return labels.map((label, index) => ({
+    label: label.text(),
+    value: values[index]
+  }))
+}
+
+const getDeviceInfoFieldsByLabel = (wrapper) => Object.fromEntries(
+  getDeviceInfoFields(wrapper).map(({ label, value }) => [label, value])
+)
 
 vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
@@ -175,6 +195,7 @@ describe('Device_Management.vue', () => {
         deviceId: 1, 
         isOnline: true, 
         lastChecked: '2025-12-13T10:30:00.000Z',
+        serverLastChecked: '2025-12-13T10:30:01.000Z',
         connectLatencyMs: 25
       }
     }
@@ -183,6 +204,7 @@ describe('Device_Management.vue', () => {
       deviceId: 1, 
       isOnline: true, 
       lastChecked: '2025-12-13T10:30:00.000Z',
+      serverLastChecked: '2025-12-13T10:30:01.000Z',
       connectLatencyMs: 25,
       softwareVersion: '1.2.3'
     }]
@@ -322,7 +344,7 @@ describe('Device_Management.vue', () => {
       expect.objectContaining({
         audio: { output: 'hdmi' },
         playlist: { source: '', destination: '' },
-        screenshot: { intervalMinutes: 15 }
+        screenshot: { timers: ['00:00:30', '00:30:00'] }
       })
     )
     expect(alertSuccess).toHaveBeenCalledWith('Все настройки сохранены')
@@ -334,7 +356,7 @@ describe('Device_Management.vue', () => {
       playlist: { source: 'server-source', destination: '/srv/playlists' },
       schedule: configurationResponse.schedule,
       audio: { output: 'usb-dac' },
-      screenshot: { intervalMinutes: 20 }
+      screenshot: { timers: ['03:00:00'] }
     })
 
     const wrapper = mount(DeviceManagement, {
@@ -350,7 +372,10 @@ describe('Device_Management.vue', () => {
 
     wrapper.vm.scheduleFormRef.value = {
       validate: vi.fn().mockResolvedValue({ valid: true }),
-      values: configurationResponse.schedule
+      values: {
+        ...configurationResponse.schedule,
+        photoReport: ['03:00:00']
+      }
     }
 
     await wrapper.vm.persistConfiguration({
@@ -365,12 +390,13 @@ describe('Device_Management.vue', () => {
       1,
       expect.objectContaining({
         playlist: { source: 'server-source', destination: '/srv/playlists' },
-        audio: { output: 'usb-dac' }
+        audio: { output: 'usb-dac' },
+        screenshot: { timers: ['03:00:00'] }
       })
     )
   })
 
-  it('renders screenshot interval field in other settings', async () => {
+  it('renders photo report timers in timers row and removes other settings', async () => {
     const wrapper = mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
@@ -382,19 +408,33 @@ describe('Device_Management.vue', () => {
 
     await flushPromises()
 
-    const labels = wrapper.findAll('.other-settings-grid .other-settings-label').map((label) => label.text())
-    const screenshotInput = wrapper.find('#screenshot-interval-minutes')
+    const timerTitles = wrapper.findAll('.timer-column-title').map((title) => title.text())
 
-    expect(labels).toContain('Период фотографирования (мин)')
-    expect(labels).not.toContain('Частота фотографий (мин)')
+    expect(timerTitles).toEqual([
+      'Загрузка плей-листа',
+      'Загрузка видео',
+      'Время отдыха',
+      'Фотоотчёт'
+    ])
+    expect(wrapper.text()).not.toContain('Другие настройки')
     expect(wrapper.find('#playlist-destination').exists()).toBe(false)
     expect(wrapper.find('#audio-output').exists()).toBe(false)
-    expect(screenshotInput.exists()).toBe(true)
-    expect(screenshotInput.element.value).toBe('15')
+    expect(wrapper.find('#screenshot-interval-minutes').exists()).toBe(false)
+
+    const photoTimerFieldArray = wrapper
+      .findAllComponents(FieldArrayWithButtons)
+      .find((component) => component.props('name') === 'photoReport')
+    expect(photoTimerFieldArray).toBeDefined()
+    expect(photoTimerFieldArray.props('fieldProps')).toEqual({ type: 'time', step: 1 })
+    expect(photoTimerFieldArray.props('placeholder')).toBe('HH:mm:ss')
   })
 
-  it('normalizes invalid screenshot interval to 0 before save', async () => {
+  it('normalizes photo report timers before save', async () => {
     vi.useRealTimers()
+    getConfiguration.mockResolvedValueOnce({
+      ...configurationResponse,
+      screenshot: { timers: ['03:00:00', '00:30:00', '', '00:00:30', '00:30:00', '0:00:30', '24:00:00'] }
+    })
 
     const wrapper = mount(DeviceManagement, {
       props: { deviceId: 1 },
@@ -407,13 +447,11 @@ describe('Device_Management.vue', () => {
 
     await flushPromises()
 
-    // Simulate user entering an invalid (negative) value into the field after mount
-    const screenshotInput = wrapper.find('#screenshot-interval-minutes')
-    await screenshotInput.setValue(-5)
+    expect(wrapper.vm.scheduleFormValues.photoReport).toEqual(['00:00:30', '00:30:00', '03:00:00'])
 
     wrapper.vm.scheduleFormRef.value = {
       validate: vi.fn().mockResolvedValue({ valid: true }),
-      values: configurationResponse.schedule
+      values: wrapper.vm.scheduleFormValues
     }
 
     await wrapper.vm.persistConfiguration({
@@ -425,12 +463,29 @@ describe('Device_Management.vue', () => {
     expect(updateConfiguration).toHaveBeenCalledWith(
       1,
       expect.objectContaining({
-        screenshot: { intervalMinutes: 0 }
+        screenshot: { timers: ['00:00:30', '00:30:00', '03:00:00'] }
       })
     )
+  })
 
-    // Verify UI is also normalized to 0 after save (not left displaying the invalid value)
-    expect(Number(wrapper.find('#screenshot-interval-minutes').element.value)).toBe(0)
+  it('uses immediate photo report as default when timers are empty', async () => {
+    getConfiguration.mockResolvedValueOnce({
+      ...configurationResponse,
+      screenshot: { timers: [] }
+    })
+
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.vm.scheduleFormValues.photoReport).toEqual(['00:00:00'])
   })
 
   it('handles configuration load error on readAll', async () => {
@@ -509,6 +564,18 @@ describe('Device_Management.vue', () => {
     })
 
     await flushPromises()
+    statusesRef.value = [{
+      deviceId: 1,
+      isOnline: true,
+      playbackServiceStatus: false,
+      playlistUploadServiceStatus: false,
+      videoUploadServiceStatus: false
+    }]
+    getServiceStatus.mockResolvedValueOnce({
+      playbackServiceStatus: true,
+      playlistUploadServiceStatus: false,
+      videoUploadServiceStatus: false
+    })
 
     // Trigger start playback
     await wrapper.find('[data-test="service-action-playback"]').trigger('click')
@@ -522,6 +589,7 @@ describe('Device_Management.vue', () => {
 
     // Verify service status is refreshed after operation
     expect(getServiceStatus).toHaveBeenCalledTimes(2)
+    expect(wrapper.findAll('.service-status')[1].text()).toBe('Запущено')
   })
 
   it('stops playback service successfully', async () => {
@@ -683,25 +751,53 @@ describe('Device_Management.vue', () => {
     const deviceInfoGrid = wrapper.find('.device-info-grid')
     expect(deviceInfoGrid.exists()).toBe(true)
 
-    const labels = deviceInfoGrid.findAll('.label')
-    const values = deviceInfoGrid.findAll('.value')
+    const fields = getDeviceInfoFields(wrapper)
+    const fieldsByLabel = getDeviceInfoFieldsByLabel(wrapper)
 
-    expect(labels).toHaveLength(4)
-    expect(values).toHaveLength(4)
+    expect(fields).toHaveLength(5)
+    expect(deviceInfoGrid.findAll('.value')).toHaveLength(5)
 
-    // Check each field
-    expect(labels[0].text()).toBe('IP адрес')
-    expect(values[0].text()).toBe('192.168.1.100')
+    expect(fields.map(({ label }) => label)).toEqual([
+      'IP адрес',
+      'Версия агента',
+      'Онлайн (задержка)',
+      'Последняя проверка',
+      'Время устройства'
+    ])
+    expect(fieldsByLabel['IP адрес'].text()).toBe('192.168.1.100')
+    expect(fieldsByLabel['Версия агента'].text()).toBe('1.2.3')
+    expect(fieldsByLabel['Онлайн (задержка)'].text()).toBe('Да (25 мс)')
+    expect(fieldsByLabel['Онлайн (задержка)'].find('.text-success').exists()).toBe(true)
+    expect(fieldsByLabel['Последняя проверка'].text()).toContain('13.12.2025')
+    expect(fieldsByLabel['Время устройства'].text()).toContain('13.12.2025')
+  })
 
-    expect(labels[1].text()).toBe('Версия агента')
-    expect(values[1].text()).toBe('1.2.3')
+  it('displays placeholder for missing device check time while keeping server time', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
 
-    expect(labels[2].text()).toBe('Онлайн (задержка)')
-    expect(values[2].text()).toBe('Да (25 мс)')
-    expect(values[2].find('.text-success').exists()).toBe(true)
-    
-    expect(labels[3].text()).toBe('Последняя проверка')
-    expect(values[3].text()).toContain('13.12.2025')
+    await flushPromises()
+
+    statusesRef.value = [{
+      deviceId: 1,
+      isOnline: true,
+      lastChecked: null,
+      serverLastChecked: '2025-12-13T10:30:01.000Z',
+      connectLatencyMs: 25,
+      softwareVersion: '1.2.3'
+    }]
+
+    await wrapper.vm.$nextTick()
+
+    const fieldsByLabel = getDeviceInfoFieldsByLabel(wrapper)
+    expect(fieldsByLabel['Время устройства'].text()).toBe('—')
+    expect(fieldsByLabel['Последняя проверка'].text()).toContain('13.12.2025')
   })
 
   it('allows readAllSettings button to be clicked when device is offline', async () => {
@@ -755,6 +851,7 @@ describe('Device_Management.vue', () => {
       deviceId: 1, 
       isOnline: true, 
       lastChecked: '2025-12-13T11:00:00.000Z',
+      serverLastChecked: '2025-12-13T11:00:01.000Z',
       connectLatencyMs: 30
     }
     statusesRef.value = [newStatus]
@@ -844,16 +941,18 @@ describe('Device_Management.vue', () => {
       deviceId: 1, 
       isOnline: true,
       lastChecked: '2025-12-13T12:00:00.000Z',
+      serverLastChecked: '2025-12-13T12:00:01.000Z',
       connectLatencyMs: 50,
       softwareVersion: '2.0.0'
     }]
 
     await wrapper.vm.$nextTick()
 
-    const values = wrapper.find('.device-info-grid').findAll('.value')
-    expect(values[0].text()).toBe('192.168.1.200')
-    expect(values[1].text()).toBe('2.0.0')
-    expect(values[2].text()).toBe('Да (50 мс)')
+    const fieldsByLabel = getDeviceInfoFieldsByLabel(wrapper)
+    expect(fieldsByLabel['IP адрес'].text()).toBe('192.168.1.200')
+    expect(fieldsByLabel['Последняя проверка'].text()).toContain('13.12.2025')
+    expect(fieldsByLabel['Версия агента'].text()).toBe('2.0.0')
+    expect(fieldsByLabel['Онлайн (задержка)'].text()).toBe('Да (50 мс)')
   })
 
   it('updates service statuses from live device status fields when provided', async () => {
