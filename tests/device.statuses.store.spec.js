@@ -23,14 +23,15 @@ vi.mock('@/stores/auth.store.js', () => ({
 const RealAbortController = global.AbortController
 
 const mockStatuses = [
-  { deviceId: 1, ipAddress: '192.168.1.10', isOnline: true, lastChecked: '2025-01-01T00:00:00Z', connectLatencyMs: 10, totalLatencyMs: 20 },
-  { deviceId: 2, ipAddress: '192.168.1.11', isOnline: false, lastChecked: '2025-01-01T00:00:00Z', connectLatencyMs: 30, totalLatencyMs: 40 }
+  { deviceId: 1, ipAddress: '192.168.1.10', isOnline: true, lastChecked: '2025-01-01T00:00:00Z', serverLastChecked: '2025-01-01T00:00:01Z', connectLatencyMs: 10, totalLatencyMs: 20 },
+  { deviceId: 2, ipAddress: '192.168.1.11', isOnline: false, lastChecked: '2025-01-01T00:00:00Z', serverLastChecked: '2025-01-01T00:00:02Z', connectLatencyMs: 30, totalLatencyMs: 40 }
 ]
 
 const normalizedMockStatus = {
   deviceId: 1,
   isOnline: true,
   lastChecked: '2025-01-01T00:00:00Z',
+  serverLastChecked: '2025-01-01T00:00:01Z',
   connectLatencyMs: 10,
   totalLatencyMs: 20,
   softwareVersion: null,
@@ -45,6 +46,7 @@ const normalizedMockStatuses = [
     deviceId: 2,
     isOnline: false,
     lastChecked: '2025-01-01T00:00:00Z',
+    serverLastChecked: '2025-01-01T00:00:02Z',
     connectLatencyMs: 30,
     totalLatencyMs: 40,
     softwareVersion: null,
@@ -81,6 +83,7 @@ describe('device.statuses.store', () => {
     const snapshot = {
       isOnline: true,
       lastChecked: '2025-01-01T00:00:00Z',
+      serverLastChecked: '2025-01-01T00:00:01Z',
       connectLatencyMs: 10,
       totalLatencyMs: 20,
       playbackServiceStatus: true,
@@ -102,6 +105,7 @@ describe('device.statuses.store', () => {
       DeviceId: 1,
       IsOnline: true,
       LastChecked: '2025-01-01T00:00:00Z',
+      ServerLastChecked: '2025-01-01T00:00:01Z',
       ConnectLatencyMs: 10,
       TotalLatencyMs: 20,
       SoftwareVersion: '1.2.3',
@@ -117,6 +121,7 @@ describe('device.statuses.store', () => {
       deviceId: 1,
       isOnline: true,
       lastChecked: '2025-01-01T00:00:00Z',
+      serverLastChecked: '2025-01-01T00:00:01Z',
       connectLatencyMs: 10,
       totalLatencyMs: 20,
       softwareVersion: '1.2.3',
