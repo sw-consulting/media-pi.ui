@@ -69,10 +69,11 @@ const configurationResponse = {
   schedule: {
     playlist: ['00:00'],
     video: ['00:00'],
-    rest: [{ start: '00:00', stop: '00:00' }]
+    rest: [{ start: '00:00', stop: '00:00' }],
+    photoReport: ['0:00:30', '0:30:00']
   },
   audio: { output: 'hdmi' },
-  screenshot: { intervalMinutes: 15 }
+  screenshot: { timers: ['0:00:30', '0:30:00'] }
 }
 const getConfiguration = vi.fn(() => Promise.resolve(configurationResponse))
 const updateConfiguration = vi.fn(() => Promise.resolve())
@@ -327,7 +328,7 @@ describe('Device_Management.vue', () => {
       expect.objectContaining({
         audio: { output: 'hdmi' },
         playlist: { source: '', destination: '' },
-        screenshot: { intervalMinutes: 15 }
+        screenshot: { timers: ['0:00:30', '0:30:00'] }
       })
     )
     expect(alertSuccess).toHaveBeenCalledWith('Все настройки сохранены')
@@ -339,7 +340,7 @@ describe('Device_Management.vue', () => {
       playlist: { source: 'server-source', destination: '/srv/playlists' },
       schedule: configurationResponse.schedule,
       audio: { output: 'usb-dac' },
-      screenshot: { intervalMinutes: 20 }
+      screenshot: { timers: ['3:00:00'] }
     })
 
     const wrapper = mount(DeviceManagement, {
@@ -355,7 +356,10 @@ describe('Device_Management.vue', () => {
 
     wrapper.vm.scheduleFormRef.value = {
       validate: vi.fn().mockResolvedValue({ valid: true }),
-      values: configurationResponse.schedule
+      values: {
+        ...configurationResponse.schedule,
+        photoReport: ['3:00:00']
+      }
     }
 
     await wrapper.vm.persistConfiguration({
@@ -370,12 +374,13 @@ describe('Device_Management.vue', () => {
       1,
       expect.objectContaining({
         playlist: { source: 'server-source', destination: '/srv/playlists' },
-        audio: { output: 'usb-dac' }
+        audio: { output: 'usb-dac' },
+        screenshot: { timers: ['3:00:00'] }
       })
     )
   })
 
-  it('renders screenshot interval field in other settings', async () => {
+  it('renders photo report timers in timers row and removes other settings', async () => {
     const wrapper = mount(DeviceManagement, {
       props: { deviceId: 1 },
       global: {
@@ -387,19 +392,26 @@ describe('Device_Management.vue', () => {
 
     await flushPromises()
 
-    const labels = wrapper.findAll('.other-settings-grid .other-settings-label').map((label) => label.text())
-    const screenshotInput = wrapper.find('#screenshot-interval-minutes')
+    const timerTitles = wrapper.findAll('.timer-column-title').map((title) => title.text())
 
-    expect(labels).toContain('Период фотографирования (мин)')
-    expect(labels).not.toContain('Частота фотографий (мин)')
+    expect(timerTitles).toEqual([
+      'Загрузка плей-листа',
+      'Загрузка видео',
+      'Время отдыха',
+      'Фотоотчёт'
+    ])
+    expect(wrapper.text()).not.toContain('Другие настройки')
     expect(wrapper.find('#playlist-destination').exists()).toBe(false)
     expect(wrapper.find('#audio-output').exists()).toBe(false)
-    expect(screenshotInput.exists()).toBe(true)
-    expect(screenshotInput.element.value).toBe('15')
+    expect(wrapper.find('#screenshot-interval-minutes').exists()).toBe(false)
   })
 
-  it('normalizes invalid screenshot interval to 0 before save', async () => {
+  it('normalizes photo report timers before save', async () => {
     vi.useRealTimers()
+    getConfiguration.mockResolvedValueOnce({
+      ...configurationResponse,
+      screenshot: { timers: ['3:00:00', '0:30:00', '', '00:00:30', '0:30:00', '2562048:00:00'] }
+    })
 
     const wrapper = mount(DeviceManagement, {
       props: { deviceId: 1 },
@@ -411,14 +423,10 @@ describe('Device_Management.vue', () => {
     })
 
     await flushPromises()
-
-    // Simulate user entering an invalid (negative) value into the field after mount
-    const screenshotInput = wrapper.find('#screenshot-interval-minutes')
-    await screenshotInput.setValue(-5)
 
     wrapper.vm.scheduleFormRef.value = {
       validate: vi.fn().mockResolvedValue({ valid: true }),
-      values: configurationResponse.schedule
+      values: wrapper.vm.scheduleFormValues
     }
 
     await wrapper.vm.persistConfiguration({
@@ -430,12 +438,9 @@ describe('Device_Management.vue', () => {
     expect(updateConfiguration).toHaveBeenCalledWith(
       1,
       expect.objectContaining({
-        screenshot: { intervalMinutes: 0 }
+        screenshot: { timers: ['0:00:30', '0:30:00', '3:00:00'] }
       })
     )
-
-    // Verify UI is also normalized to 0 after save (not left displaying the invalid value)
-    expect(Number(wrapper.find('#screenshot-interval-minutes').element.value)).toBe(0)
   })
 
   it('handles configuration load error on readAll', async () => {
