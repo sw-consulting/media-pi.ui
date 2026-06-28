@@ -94,6 +94,21 @@ const alertClear = vi.fn()
 const routerGo = vi.fn()
 const routerPush = vi.fn()
 
+const getDeviceInfoFields = (wrapper) => {
+  const grid = wrapper.find('.device-info-grid')
+  const labels = grid.findAll('.label')
+  const values = grid.findAll('.value')
+
+  return labels.map((label, index) => ({
+    label: label.text(),
+    value: values[index]
+  }))
+}
+
+const getDeviceInfoFieldsByLabel = (wrapper) => Object.fromEntries(
+  getDeviceInfoFields(wrapper).map(({ label, value }) => [label, value])
+)
+
 vi.mock('pinia', async () => {
   const actual = await vi.importActual('pinia')
   return {
@@ -693,28 +708,25 @@ describe('Device_Management.vue', () => {
     const deviceInfoGrid = wrapper.find('.device-info-grid')
     expect(deviceInfoGrid.exists()).toBe(true)
 
-    const labels = deviceInfoGrid.findAll('.label')
-    const values = deviceInfoGrid.findAll('.value')
+    const fields = getDeviceInfoFields(wrapper)
+    const fieldsByLabel = getDeviceInfoFieldsByLabel(wrapper)
 
-    expect(labels).toHaveLength(5)
-    expect(values).toHaveLength(5)
+    expect(fields).toHaveLength(5)
+    expect(deviceInfoGrid.findAll('.value')).toHaveLength(5)
 
-    // Check each field
-    expect(labels[0].text()).toBe('IP адрес')
-    expect(values[0].text()).toBe('192.168.1.100')
-
-    expect(labels[1].text()).toBe('Последняя проверка')
-    expect(values[1].text()).toContain('13.12.2025')
-
-    expect(labels[2].text()).toBe('Версия агента')
-    expect(values[2].text()).toBe('1.2.3')
-    
-    expect(labels[3].text()).toBe('Время устройства')
-    expect(values[3].text()).toContain('13.12.2025')
-
-    expect(labels[4].text()).toBe('Онлайн (задержка)')
-    expect(values[4].text()).toBe('Да (25 мс)')
-    expect(values[4].find('.text-success').exists()).toBe(true)
+    expect(fields.map(({ label }) => label)).toEqual([
+      'IP адрес',
+      'Версия агента',
+      'Онлайн (задержка)',
+      'Последняя проверка',
+      'Время устройства'
+    ])
+    expect(fieldsByLabel['IP адрес'].text()).toBe('192.168.1.100')
+    expect(fieldsByLabel['Версия агента'].text()).toBe('1.2.3')
+    expect(fieldsByLabel['Онлайн (задержка)'].text()).toBe('Да (25 мс)')
+    expect(fieldsByLabel['Онлайн (задержка)'].find('.text-success').exists()).toBe(true)
+    expect(fieldsByLabel['Последняя проверка'].text()).toContain('13.12.2025')
+    expect(fieldsByLabel['Время устройства'].text()).toContain('13.12.2025')
   })
 
   it('displays placeholder for missing device check time while keeping server time', async () => {
@@ -740,9 +752,9 @@ describe('Device_Management.vue', () => {
 
     await wrapper.vm.$nextTick()
 
-    const values = wrapper.find('.device-info-grid').findAll('.value')
-    expect(values[3].text()).toBe('—')
-    expect(values[1].text()).toContain('13.12.2025')
+    const fieldsByLabel = getDeviceInfoFieldsByLabel(wrapper)
+    expect(fieldsByLabel['Время устройства'].text()).toBe('—')
+    expect(fieldsByLabel['Последняя проверка'].text()).toContain('13.12.2025')
   })
 
   it('allows readAllSettings button to be clicked when device is offline', async () => {
@@ -893,11 +905,11 @@ describe('Device_Management.vue', () => {
 
     await wrapper.vm.$nextTick()
 
-    const values = wrapper.find('.device-info-grid').findAll('.value')
-    expect(values[0].text()).toBe('192.168.1.200')
-    expect(values[1].text()).toContain('13.12.2025')
-    expect(values[2].text()).toBe('2.0.0')
-    expect(values[4].text()).toBe('Да (50 мс)')
+    const fieldsByLabel = getDeviceInfoFieldsByLabel(wrapper)
+    expect(fieldsByLabel['IP адрес'].text()).toBe('192.168.1.200')
+    expect(fieldsByLabel['Последняя проверка'].text()).toContain('13.12.2025')
+    expect(fieldsByLabel['Версия агента'].text()).toBe('2.0.0')
+    expect(fieldsByLabel['Онлайн (задержка)'].text()).toBe('Да (50 мс)')
   })
 
   it('updates service statuses from live device status fields when provided', async () => {
