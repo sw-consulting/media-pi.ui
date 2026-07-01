@@ -78,11 +78,13 @@ const configurationResponse = {
 }
 const getConfiguration = vi.fn(() => Promise.resolve(configurationResponse))
 const updateConfiguration = vi.fn(() => Promise.resolve())
-const getServiceStatus = vi.fn(() => Promise.resolve({
+const defaultServiceStatusResponse = () => ({
   playbackServiceStatus: false,
   playlistUploadServiceStatus: false,
-  videoUploadServiceStatus: false
-}))
+  videoUploadServiceStatus: false,
+  playlistActivation: null
+})
+const getServiceStatus = vi.fn(() => Promise.resolve(defaultServiceStatusResponse()))
 const startPlayback = vi.fn(() => Promise.resolve())
 const stopPlayback = vi.fn(() => Promise.resolve())
 const startPlaylistUpload = vi.fn(() => Promise.resolve())
@@ -185,6 +187,7 @@ describe('Device_Management.vue', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
+    getServiceStatus.mockResolvedValue(defaultServiceStatusResponse())
     
     // Reset device and status data to default
     deviceRef.value = {
@@ -635,6 +638,19 @@ describe('Device_Management.vue', () => {
     })
 
     await flushPromises()
+    getServiceStatus.mockResolvedValueOnce({
+      playbackServiceStatus: true,
+      playlistUploadServiceStatus: false,
+      videoUploadServiceStatus: false,
+      playlistActivation: {
+        state: 'succeeded',
+        phase: 'playbackRestart',
+        trigger: 'manual',
+        startedAt: '2026-07-01T10:00:00+03:00',
+        finishedAt: '2026-07-01T10:00:05+03:00',
+        error: null
+      }
+    })
 
     // Trigger start upload
     await wrapper.find('[data-test="service-action-playlistUpload"]').trigger('click')
@@ -643,11 +659,123 @@ describe('Device_Management.vue', () => {
     expect(startPlaylistUpload).toHaveBeenCalledTimes(1)
     expect(startPlaylistUpload).toHaveBeenCalledWith(1)
 
-    await vi.runAllTimersAsync()
     await flushPromises()
 
-    // Verify service status is refreshed after operation
     expect(getServiceStatus).toHaveBeenCalledTimes(2)
+    expect(alertSuccess).toHaveBeenCalledWith('Плейлист загружен, воспроизведение запущено')
+  })
+
+  it('reports playlist activation failure after upload starts', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+    getServiceStatus.mockResolvedValueOnce({
+      playbackServiceStatus: false,
+      playlistUploadServiceStatus: false,
+      videoUploadServiceStatus: false,
+      playlistActivation: {
+        state: 'failed',
+        phase: 'playbackRestart',
+        trigger: 'manual',
+        startedAt: '2026-07-01T10:00:00+03:00',
+        finishedAt: '2026-07-01T10:00:05+03:00',
+        error: 'restart failed'
+      }
+    })
+
+    await wrapper.find('[data-test="service-action-playlistUpload"]').trigger('click')
+    await flushPromises()
+
+    expect(startPlaylistUpload).toHaveBeenCalledTimes(1)
+    expect(getServiceStatus).toHaveBeenCalledTimes(2)
+    expect(alertError).toHaveBeenCalledWith('Не удалось завершить запуск плейлиста: restart failed')
+    expect(alertSuccess).not.toHaveBeenCalledWith('Плейлист загружен, воспроизведение запущено')
+  })
+
+  it('keeps playlist row two-state and spins playback during playback restart phase', async () => {
+    const wrapper = mount(DeviceManagement, {
+      props: { deviceId: 1 },
+      global: {
+        stubs: {
+          'font-awesome-icon': { template: '<i />' }
+        }
+      }
+    })
+
+    await flushPromises()
+    const startedAt = '2026-07-01T10:00:00+03:00'
+    getServiceStatus
+      .mockResolvedValueOnce({
+        playbackServiceStatus: false,
+        playlistUploadServiceStatus: false,
+        videoUploadServiceStatus: false,
+        playlistActivation: {
+          state: 'running',
+          phase: 'playlistSync',
+          trigger: 'manual',
+          startedAt,
+          finishedAt: null,
+          error: null
+        }
+      })
+      .mockResolvedValueOnce({
+        playbackServiceStatus: false,
+        playlistUploadServiceStatus: false,
+        videoUploadServiceStatus: false,
+        playlistActivation: {
+          state: 'running',
+          phase: 'playbackRestart',
+          trigger: 'manual',
+          startedAt,
+          finishedAt: null,
+          error: null
+        }
+      })
+      .mockResolvedValueOnce({
+        playbackServiceStatus: true,
+        playlistUploadServiceStatus: false,
+        videoUploadServiceStatus: false,
+        playlistActivation: {
+          state: 'succeeded',
+          phase: 'playbackRestart',
+          trigger: 'manual',
+          startedAt,
+          finishedAt: '2026-07-01T10:00:05+03:00',
+          error: null
+        }
+      })
+
+    await wrapper.find('[data-test="service-action-playlistUpload"]').trigger('click')
+    await flushPromises()
+
+    const playlistStatus = wrapper.findAll('.service-status')[0]
+    expect(playlistStatus.text()).toBe('Запущена')
+    expect(playlistStatus.classes()).toContain('text-success')
+    expect(wrapper.find('[data-test="service-action-playback"]').classes()).not.toContain('fa-spin')
+    expect(alertSuccess).not.toHaveBeenCalledWith('Загрузка плейлиста')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await flushPromises()
+
+    expect(wrapper.findAll('.service-status')[0].text()).toBe('Запущена')
+    expect(wrapper.findAll('.service-status')[0].classes()).toContain('text-success')
+    expect(wrapper.find('[data-test="service-action-playback"]').classes()).toContain('fa-spin')
+    expect(alertSuccess).not.toHaveBeenCalledWith('Запуск воспроизведения')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await flushPromises()
+
+    expect(getServiceStatus).toHaveBeenCalledTimes(4)
+    expect(alertSuccess).toHaveBeenCalledWith('Плейлист загружен, воспроизведение запущено')
+    expect(alertSuccess).not.toHaveBeenCalledWith('Загрузка плейлиста')
+    expect(alertSuccess).not.toHaveBeenCalledWith('Запуск воспроизведения')
   })
 
   it('stops playlist upload service successfully', async () => {
