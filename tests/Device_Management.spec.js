@@ -417,7 +417,7 @@ describe('Device_Management.vue', () => {
       'Загрузка плей-листа',
       'Загрузка видео',
       'Время отдыха',
-      'Фотоотчёт'
+      'Таймер фотоотчёта'
     ])
     expect(wrapper.text()).not.toContain('Другие настройки')
     expect(wrapper.find('#playlist-destination').exists()).toBe(false)

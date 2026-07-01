@@ -1059,7 +1059,7 @@ onBeforeUnmount(() => {
             </FieldArrayWithButtons>
           </div>
           <div class="timers-column">
-            <div class="timer-column-title">Фотоотчёт</div>
+            <div class="timer-column-title">Таймер фотоотчёта</div>
             <FieldArrayWithButtons
               name="photoReport"
               label=""
