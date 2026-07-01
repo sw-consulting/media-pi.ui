@@ -293,3 +293,55 @@ export function canManageDevice(user, device) {
   return canManageAccountById(user, device.accountId)
 }
 
+/**
+ * Checks if a user can view screenshots for a device.
+ *
+ * Viewing screenshots follows the same rules as device management:
+ * - Unassigned devices: Administrators and Engineers
+ * - Assigned devices: Account-based permissions (canManageAccountById)
+ *
+ * @param {Object} user - User object with roles and accountIds
+ * @param {Object} device - Device object with optional accountId
+ * @returns {boolean} True if user can view screenshots for the device
+ */
+export function canViewScreenshot(user, device) {
+  return canManageDevice(user, device)
+}
+
+/**
+ * Checks if a user can create screenshots for a device.
+ *
+ * Creating screenshots follows the same rules as device management:
+ * - Unassigned devices: Administrators and Engineers
+ * - Assigned devices: Account-based permissions (canManageAccountById)
+ *
+ * @param {Object} user - User object with roles and accountIds
+ * @param {Object} device - Device object with optional accountId
+ * @returns {boolean} True if user can create screenshots for the device
+ */
+export function canCreateScreenshot(user, device) {
+  return canManageDevice(user, device)
+}
+
+/**
+ * Checks if a user can delete screenshots for a device.
+ *
+ * Deletion is more restrictive than view/create:
+ * - Administrators can delete screenshots for any device
+ * - Engineers can delete screenshots only for unassigned devices
+ *
+ * @param {Object} user - User object with roles and accountIds
+ * @param {Object} device - Device object with optional accountId
+ * @returns {boolean} True if user can delete screenshots for the device
+ */
+export function canDeleteScreenshot(user, device) {
+  if (!user || !device) {
+    return false
+  }
+
+  if (isAdministrator(user)) {
+    return true
+  }
+
+  return !device.accountId && isEngineer(user)
+}

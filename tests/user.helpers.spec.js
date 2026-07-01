@@ -11,7 +11,10 @@ import {
   canManageAccountById,
   canManageAccount,
   canManageDeviceGroup,
-  canManageDevice
+  canManageDevice,
+  canViewScreenshot,
+  canCreateScreenshot,
+  canDeleteScreenshot
 } from '@/helpers/user.helpers.js'
 
 // Mock the roles store - only mocking what getRoleName actually uses
@@ -209,6 +212,58 @@ describe('User Role Helpers', () => {
       expect(canManageDevice(engineerUser, deviceWithUndefinedAccount)).toBe(true)
       expect(canManageDevice(managerUser, deviceWithNullAccount)).toBe(false)
       expect(canManageDevice(managerUser, deviceWithUndefinedAccount)).toBe(false)
+    })
+  })
+
+  describe('screenshot permissions', () => {
+    const adminUser = { roles: [UserRoleConstants.SystemAdministrator], accountIds: [] }
+    const managerUser = { roles: [UserRoleConstants.AccountManager], accountIds: [1] }
+    const engineerUser = { roles: [UserRoleConstants.InstallationEngineer], accountIds: [] }
+    const multiRoleUser = { roles: [UserRoleConstants.AccountManager, UserRoleConstants.InstallationEngineer], accountIds: [1] }
+    const noRoleUser = { roles: [], accountIds: [] }
+    const unassignedDevice = { id: 10, accountId: null }
+    const managerDevice = { id: 11, accountId: 1 }
+    const otherAccountDevice = { id: 12, accountId: 2 }
+
+    it('allows administrators to view, create, and delete screenshots for any device', () => {
+      expect(canViewScreenshot(adminUser, unassignedDevice)).toBe(true)
+      expect(canCreateScreenshot(adminUser, managerDevice)).toBe(true)
+      expect(canDeleteScreenshot(adminUser, otherAccountDevice)).toBe(true)
+    })
+
+    it('allows account managers to view and create screenshots only for assigned account devices', () => {
+      expect(canViewScreenshot(managerUser, managerDevice)).toBe(true)
+      expect(canCreateScreenshot(managerUser, managerDevice)).toBe(true)
+      expect(canDeleteScreenshot(managerUser, managerDevice)).toBe(false)
+
+      expect(canViewScreenshot(managerUser, unassignedDevice)).toBe(false)
+      expect(canCreateScreenshot(managerUser, otherAccountDevice)).toBe(false)
+    })
+
+    it('allows installation engineers full screenshot rights only for unassigned devices', () => {
+      expect(canViewScreenshot(engineerUser, unassignedDevice)).toBe(true)
+      expect(canCreateScreenshot(engineerUser, unassignedDevice)).toBe(true)
+      expect(canDeleteScreenshot(engineerUser, unassignedDevice)).toBe(true)
+
+      expect(canViewScreenshot(engineerUser, managerDevice)).toBe(false)
+      expect(canCreateScreenshot(engineerUser, managerDevice)).toBe(false)
+      expect(canDeleteScreenshot(engineerUser, managerDevice)).toBe(false)
+    })
+
+    it('keeps multi-role manager and engineer delete blocked on linked devices', () => {
+      expect(canViewScreenshot(multiRoleUser, managerDevice)).toBe(true)
+      expect(canCreateScreenshot(multiRoleUser, managerDevice)).toBe(true)
+      expect(canDeleteScreenshot(multiRoleUser, managerDevice)).toBe(false)
+      expect(canDeleteScreenshot(multiRoleUser, unassignedDevice)).toBe(true)
+    })
+
+    it('denies screenshot permissions for users without roles and invalid inputs', () => {
+      expect(canViewScreenshot(noRoleUser, unassignedDevice)).toBe(false)
+      expect(canCreateScreenshot(noRoleUser, managerDevice)).toBe(false)
+      expect(canDeleteScreenshot(noRoleUser, unassignedDevice)).toBe(false)
+      expect(canViewScreenshot(null, unassignedDevice)).toBe(false)
+      expect(canCreateScreenshot(adminUser, null)).toBe(false)
+      expect(canDeleteScreenshot(adminUser, undefined)).toBe(false)
     })
   })
 
