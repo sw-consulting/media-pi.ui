@@ -13,6 +13,11 @@ import { useDeviceStatusesStore } from '@/stores/device.statuses.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { timeouts } from '@/helpers/config.js'
 import { formatRuDateTime } from '@/helpers/date.format.js'
+import {
+  isPlaylistActivationRunning,
+  isPlaylistActivationTerminal,
+  normalizePlaylistActivation
+} from '@/helpers/playlist.activation.js'
 import FieldArrayWithButtons from '@/components/FieldArrayWithButtons.vue'
 import { ActionButton } from '@sw-consulting/tooling.ui.kit'
 import AlertOutput from '@/components/AlertOutput.vue'
@@ -37,10 +42,13 @@ const defaultServiceStatus = Object.freeze({
   videoUploadServiceStatus: false,
   playlistUploadServiceStatus: false,
   playbackServiceStatus: false,
+  playlistActivation: null
 })
 const serviceStatus = ref({ ...defaultServiceStatus })
 
 const defaultServiceOperationTimeout = 3000
+const playlistActivationPollIntervalMs = 1000
+const playlistActivationPollTimeoutMs = 90000
 
 const serviceDescriptors = Object.freeze([
   {
@@ -55,8 +63,9 @@ const serviceDescriptors = Object.freeze([
     stopOperationKey: 'stopPlaylistUploadService',
     startHandler: devicesStore.startPlaylistUpload,
     stopHandler: devicesStore.stopPlaylistUpload,
+    startCompletion: 'playlistActivation',
     successMessages: {
-      start: 'Выполнен запуск службы загрузки плейлистов',
+      start: 'Плейлист загружен, воспроизведение запущено',
       stop: 'Выполнена остановка службы загрузки плейлистов'
     }
   },
@@ -470,14 +479,16 @@ const serviceOperationConfigs = serviceDescriptors.reduce((acc, descriptor) => {
     acc[descriptor.startOperationKey] = {
       handler: descriptor.startHandler,
       timeout: descriptor.timeout ?? defaultServiceOperationTimeout,
-      successMessage: descriptor.successMessages?.start
+      successMessage: descriptor.successMessages?.start,
+      completion: descriptor.startCompletion ?? null
     }
   }
   if (descriptor.stopOperationKey) {
     acc[descriptor.stopOperationKey] = {
       handler: descriptor.stopHandler,
       timeout: descriptor.timeout ?? defaultServiceOperationTimeout,
-      successMessage: descriptor.successMessages?.stop
+      successMessage: descriptor.successMessages?.stop,
+      completion: descriptor.stopCompletion ?? null
     }
   }
   return acc
@@ -486,7 +497,7 @@ const serviceOperationConfigs = serviceDescriptors.reduce((acc, descriptor) => {
 const createServiceActionRunner = (operationKey) => async () => {
   const config = serviceOperationConfigs[operationKey]
   if (!config) return
-  await runServiceOperation(operationKey, config.handler, config.timeout, config.successMessage)
+  await runServiceOperation(operationKey, config)
 }
 
 const serviceActionRunners = Object.fromEntries(
@@ -495,13 +506,20 @@ const serviceActionRunners = Object.fromEntries(
 
 const serviceStatusFromCurrentStatus = computed(() => {
   const status = currentStatus.value || {}
-  return serviceDescriptors.reduce((acc, descriptor) => {
+  const serviceFields = serviceDescriptors.reduce((acc, descriptor) => {
     const value = status[descriptor.statusKey]
     if (value === true || value === false) {
       acc[descriptor.statusKey] = value
     }
     return acc
   }, {})
+  const hasPlaylistActivation = Object.prototype.hasOwnProperty.call(status, 'playlistActivation') ||
+    Object.prototype.hasOwnProperty.call(status, 'PlaylistActivation')
+  if (hasPlaylistActivation) {
+    const playlistActivation = normalizePlaylistActivation(status.playlistActivation ?? status.PlaylistActivation)
+    serviceFields.playlistActivation = playlistActivation
+  }
+  return serviceFields
 })
 
 const effectiveServiceStatus = computed(() => ({
@@ -513,14 +531,40 @@ const effectiveServiceStatus = computed(() => ({
 const serviceRows = computed(() => {
   const status = effectiveServiceStatus.value
   return serviceDescriptors.map((descriptor) => {
-    const isActive = Boolean(status[descriptor.statusKey])
+    let isActive = Boolean(status[descriptor.statusKey])
+    let statusLabel = isActive ? descriptor.activeLabel : descriptor.inactiveLabel
+    let statusClass = isActive ? 'text-success' : 'text-danger'
+    let isBusy = false
+    let busyTooltip = null
+    if (descriptor.key === 'playlistUpload' && isPlaylistActivationRunning(status.playlistActivation)) {
+      isActive = true
+      statusLabel = descriptor.activeLabel
+      statusClass = 'text-success'
+    }
+    if (
+      descriptor.key === 'playback' &&
+      isPlaylistActivationRunning(status.playlistActivation) &&
+      status.playlistActivation.phase === 'playbackRestart'
+    ) {
+      isBusy = true
+      busyTooltip = 'Запускается...'
+    }
     const hasActions = Boolean(descriptor.startOperationKey && descriptor.stopOperationKey)
     const operationKey = isActive ? descriptor.stopOperationKey : descriptor.startOperationKey
+    const isStarting = Boolean(descriptor.startOperationKey && operationInProgress.value[descriptor.startOperationKey])
+    const isStopping = Boolean(descriptor.stopOperationKey && operationInProgress.value[descriptor.stopOperationKey])
+    isBusy = isBusy || isStarting || isStopping
+    if (!busyTooltip && (isStarting || isStopping)) {
+      busyTooltip = isStopping ? 'Останавливается...' : 'Запускается...'
+    }
     return {
       key: descriptor.key,
       label: descriptor.label,
       isActive,
-      statusLabel: isActive ? descriptor.activeLabel : descriptor.inactiveLabel,
+      isBusy,
+      statusLabel,
+      statusClass,
+      busyTooltip: busyTooltip ?? (isActive ? 'Останавливается...' : 'Запускается...'),
       actionLabel: hasActions ? (isActive ? descriptor.stopLabel : descriptor.startLabel) : null,
       action: hasActions ? serviceActionRunners[operationKey] : null,
       operationKey
@@ -598,6 +642,12 @@ const syncCurrentStatusServiceFields = (payload = {}) => {
     }
     return acc
   }, {})
+  const hasPlaylistActivation = Object.prototype.hasOwnProperty.call(payload, 'playlistActivation') ||
+    Object.prototype.hasOwnProperty.call(payload, 'PlaylistActivation')
+  if (hasPlaylistActivation) {
+    const playlistActivation = normalizePlaylistActivation(payload.playlistActivation ?? payload.PlaylistActivation)
+    serviceFields.playlistActivation = playlistActivation
+  }
   if (!Object.keys(serviceFields).length) return
 
   const index = statuses.value.findIndex((status) => status?.deviceId === props.deviceId)
@@ -609,7 +659,11 @@ const syncCurrentStatusServiceFields = (payload = {}) => {
 }
 
 const applyServiceStatus = (payload = {}) => {
-  const nextStatus = { ...defaultServiceStatus, ...payload }
+  const nextStatus = {
+    ...defaultServiceStatus,
+    ...payload,
+    playlistActivation: normalizePlaylistActivation(payload.playlistActivation ?? payload.PlaylistActivation)
+  }
   serviceStatus.value = nextStatus
   syncCurrentStatusServiceFields(nextStatus)
 }
@@ -658,17 +712,63 @@ const runWithDevice = async (handler) => {
   }
 }
 
-const runServiceOperation = async (key, handler, timeout, successMessage) => {
+const pollPlaylistActivationCompletion = async (deviceIdAtStart, previousStartedAt, successMessage) => {
+  const deadline = Date.now() + playlistActivationPollTimeoutMs
+  let observedCurrentActivation = false
+
+  while (componentActive.value && props.deviceId === deviceIdAtStart && Date.now() <= deadline) {
+    let result
+    try {
+      result = await devicesStore.getServiceStatus(deviceIdAtStart)
+    } catch (err) {
+      alertStore.error('Не удалось получить статус сервисов: ' + (err?.message || 'Неизвестная ошибка'))
+      return
+    }
+
+    applyServiceStatus(result)
+    const activation = serviceStatus.value.playlistActivation
+    if (activation?.startedAt && activation.startedAt !== previousStartedAt) {
+      observedCurrentActivation = true
+    }
+
+    if (observedCurrentActivation && isPlaylistActivationTerminal(activation)) {
+      if (activation.state === 'succeeded') {
+        alertStore.success(successMessage)
+      } else if (activation.state === 'failed') {
+        const reason = activation.error ? `: ${activation.error}` : ''
+        alertStore.error(`Не удалось завершить запуск плейлиста${reason}`)
+      } else {
+        alertStore.error('Запуск плейлиста отменён')
+      }
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, playlistActivationPollIntervalMs))
+  }
+
+  if (componentActive.value && props.deviceId === deviceIdAtStart) {
+    alertStore.error('Не удалось подтвердить завершение запуска плейлиста')
+  }
+}
+
+const runServiceOperation = async (key, config) => {
   if (!serviceOperationConfigs[key]) return
   resetSystemOperationTimer(key)
   operationInProgress.value[key] = true
-  const success = await runWithDevice(handler)
+  const previousPlaylistStartedAt = serviceStatus.value?.playlistActivation?.startedAt ?? null
+  const success = await runWithDevice(config.handler)
   if (!success) {
     operationInProgress.value[key] = false
     return
   }
 
   const deviceIdAtStart = props.deviceId
+  if (config.completion === 'playlistActivation') {
+    await pollPlaylistActivationCompletion(deviceIdAtStart, previousPlaylistStartedAt, config.successMessage)
+    operationInProgress.value[key] = false
+    return
+  }
+
   systemOperationTimers.value[key] = setTimeout(async () => {
     if (!componentActive.value || props.deviceId !== deviceIdAtStart) {
       operationInProgress.value[key] = false
@@ -679,10 +779,10 @@ const runServiceOperation = async (key, handler, timeout, successMessage) => {
     systemOperationTimers.value[key] = null
 
     // Show completion message based on operation type
-    if (successMessage) {
-      alertStore.success(successMessage)
+    if (config.successMessage) {
+      alertStore.success(config.successMessage)
     }
-  }, timeout)
+  }, config.timeout)
 }
 
 const runSystemOperation = async (key, handler, timeout) => {
@@ -856,7 +956,7 @@ onBeforeUnmount(() => {
           <div class="service-cell label service-label">{{ row.label }}</div>
           <div
             class="service-cell service-status"
-            :class="row.isActive ? 'text-success' : 'text-danger'"
+            :class="row.statusClass"
           >
             {{ row.statusLabel }}
           </div>
@@ -864,23 +964,23 @@ onBeforeUnmount(() => {
             <ActionButton
               v-if="row.action"
               :icon="
-                operationInProgress[row.operationKey]
+                row.isBusy
                   ? 'fa-solid fa-spinner'
                   : row.isActive
                     ? 'fa-solid fa-stop'
                     : 'fa-solid fa-play'
               "
               iconSize="1x"
-              :tooltipText="operationInProgress[row.operationKey]
-                ? (row.isActive ? 'Останавливается...' : 'Запускается...')
+              :tooltipText="row.isBusy
+                ? row.busyTooltip
                 : row.actionLabel"
               :item="{}"
-              :class="{ 'fa-spin': operationInProgress[row.operationKey] }"
+              :class="{ 'fa-spin': row.isBusy }"
               :data-test="`service-action-${row.key}`"
               :disabled="
                 isDisabled ||
                 hasAnyOperationInProgress ||
-                operationInProgress[row.operationKey] ||
+                row.isBusy ||
                 operationInProgress.serviceStatus
               "
               @click="row.action"
