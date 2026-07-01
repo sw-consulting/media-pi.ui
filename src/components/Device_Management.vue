@@ -714,7 +714,7 @@ const pollPlaylistActivationCompletion = async (deviceIdAtStart, previousStarted
   while (componentActive.value && props.deviceId === deviceIdAtStart && Date.now() <= deadline) {
     let result
     try {
-      result = await devicesStore.getServiceStatus(props.deviceId)
+      result = await devicesStore.getServiceStatus(deviceIdAtStart)
     } catch (err) {
       alertStore.error('Не удалось получить статус сервисов: ' + (err?.message || 'Неизвестная ошибка'))
       return
