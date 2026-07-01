@@ -177,7 +177,7 @@ describe('Playlists_List.vue', () => {
     expect(wrapper.text()).toContain('1:05')
   })
 
-  it('renders updated playlist timestamp column', async () => {
+  it('renders created and updated playlist timestamps in one column', async () => {
     playlistsStore.playlists.value = [{
       id: 2,
       updatedAt: '2026-06-24T12:15:30',
@@ -187,11 +187,13 @@ describe('Playlists_List.vue', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-test="table-header-updatedAtSortKey"]').text()).toBe('Создан/Изменён')
+    expect(wrapper.text()).toContain('23.06.2026')
+    expect(wrapper.text()).toContain('10:00:00')
     expect(wrapper.text()).toContain('24.06.2026')
     expect(wrapper.text()).toContain('12:15:30')
   })
 
-  it('falls back to created timestamp when updatedAt is missing', async () => {
+  it('keeps created timestamp visible when updatedAt is missing', async () => {
     playlistsStore.playlists.value = [{
       id: 3,
       updatedAt: null,
@@ -202,16 +204,26 @@ describe('Playlists_List.vue', () => {
 
     expect(wrapper.text()).toContain('23.06.2026')
     expect(wrapper.text()).toContain('10:05:40')
+    expect(wrapper.text()).toContain('—')
   })
 
-  it('matches playlist search against formatted timestamp', async () => {
+  it('matches playlist search against formatted created and updated timestamps', async () => {
     const wrapper = mount(PlaylistsList, { global: { stubs: globalStubs } })
     await flushPromises()
 
+    expect(wrapper.vm.filterPlaylists(null, '23.06.2026', {
+      raw: {
+        title: 'Playlist',
+        filename: 'playlist.m3u',
+        createdAt: '2026-06-23T10:00:00',
+        updatedAt: '2026-06-24T12:15:30'
+      }
+    })).toBe(true)
     expect(wrapper.vm.filterPlaylists(null, '24.06.2026', {
       raw: {
         title: 'Playlist',
         filename: 'playlist.m3u',
+        createdAt: '2026-06-23T10:00:00',
         updatedAt: '2026-06-24T12:15:30'
       }
     })).toBe(true)

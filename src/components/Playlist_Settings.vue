@@ -20,6 +20,7 @@ import { showFormValidationErrors } from '@/helpers/form.validation.alert.js'
 import { createAccountOptions } from '@/helpers/account.options.js'
 import { compareMediaInfo, createFileSizeSearchTokens, formatDuration, formatFileSize } from '@/helpers/media.format.js'
 import { itemsPerPageOptions } from '@/helpers/items.per.page.js'
+import { formatRuDateTime } from '@/helpers/date.format.js'
 import { getVideoCategoryTitle } from '@/helpers/video.scope.helpers.js'
 import {
   duplicatePlaylistDescriptionFallbackMessage,
@@ -59,7 +60,9 @@ const { videoPreview } = storeToRefs(videosStore)
 const playlist = ref({
   title: '',
   filename: '',
-  accountId: props.accountId ?? null
+  accountId: props.accountId ?? null,
+  createdAt: null,
+  updatedAt: null
 })
 
 function generatePlaylistFilename() {
@@ -256,6 +259,8 @@ const someVisiblePlaylistItemsSelected = computed(() => (
 const playlistButtonText = computed(() => (props.register ? 'Создать' : 'Сохранить'))
 const playlistTitleText = computed(() => (props.register ? 'Новый плейлист' : 'Настройки плейлиста' ))
 const formKey = computed(() => `${props.register ? 'create' : 'edit'}-${playlist.value.accountId ?? 'none'}`)
+const createdAtText = computed(() => formatRuDateTime(playlist.value.createdAt))
+const updatedAtText = computed(() => formatRuDateTime(playlist.value.updatedAt))
 const faCheckDouble = 'fa-solid fa-check-double'
 const faXmark = 'fa-solid fa-xmark'
 
@@ -296,7 +301,9 @@ if (!props.register) {
     playlist.value = {
       title: loadedPlaylist.title || '',
       filename: loadedPlaylist.filename || '',
-      accountId: loadedPlaylist.accountId ?? null
+      accountId: loadedPlaylist.accountId ?? null,
+      createdAt: loadedPlaylist.createdAt ?? null,
+      updatedAt: loadedPlaylist.updatedAt ?? null
     }
     playlistItems.value = normalizePlaylistItems(loadedPlaylist.items)
   } catch (err) {
@@ -728,6 +735,13 @@ function onInvalidSubmit(context) {
         />
       </div>
 
+      <div v-if="!props.register" class="form-group">
+        <label class="label-1">Создан / изменён:</label>
+        <div class="form-control input-1 playlist-readonly-value playlist-timestamps-inline" data-test="playlist-timestamps">
+          <span data-test="playlist-created-updated-at">{{ createdAtText }} / {{ updatedAtText }}</span>
+        </div>
+      </div>
+
       <div class="playlist-columns">
         <div class="playlist-column">
           <div class="playlist-column-header header-with-actions">
@@ -1120,6 +1134,18 @@ function onInvalidSubmit(context) {
   flex-wrap: wrap;
   color: var(--primary-color-dark);
 }
+
+.playlist-readonly-value {
+  background-color: #f8f9fa;
+}
+
+.playlist-timestamps-inline {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 
 @media (max-width: 1100px) {
   .playlist-columns {
