@@ -1570,6 +1570,24 @@ describe('Playlist_Settings.vue', () => {
     expect(wrapper.find('[data-test="form"]').exists()).toBe(true)
   })
 
+  it('shows read-only created and updated timestamps on one line below title in edit mode', async () => {
+    playlistsStore.playlist = {
+      id: 9,
+      title: 'Existing',
+      filename: 'existing.m3u',
+      accountId: 1,
+      createdAt: '2026-06-23T10:00:00',
+      updatedAt: '2026-06-24T12:15:30',
+      items: []
+    }
+
+    const wrapper = mountSettings({ register: false, id: 9 })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="playlist-timestamps"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="playlist-created-updated-at"]').text()).toContain('23.06.2026, 10:00:00 / 24.06.2026, 12:15:30')
+  })
+
   it('error objects without message property use the error itself as the message', async () => {
     videosStore.getAllByAccount = vi.fn().mockRejectedValue({ code: 'ERR_NETWORK' })
     mountSettings({ accountId: 1 })

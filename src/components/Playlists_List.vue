@@ -46,7 +46,7 @@ const selectWidth = computed(() => estimateSelectWidth(accountOptions.value))
 const isBusy = computed(() => loading.value || accountsLoading.value)
 const playlistItems = computed(() => (playlists.value || []).map(playlist => ({
   ...playlist,
-  updatedAtSortKey: getPlaylistTimestamp(playlist)
+  updatedAtSortKey: getPlaylistSortTimestamp(playlist)
 })))
 
 function ensureSelection(options) {
@@ -99,6 +99,7 @@ function filterPlaylists(value, query, item) {
   return [
     rawPlaylist.title,
     rawPlaylist.filename,
+    formatPlaylistCreatedAt(rawPlaylist),
     formatPlaylistUpdatedAt(rawPlaylist),
     ...createFileSizeSearchTokens(rawPlaylist.totalFileSizeBytes),
     rawPlaylist.totalDurationSeconds,
@@ -106,12 +107,16 @@ function filterPlaylists(value, query, item) {
   ].some(field => (field || '').toString().toLocaleLowerCase().includes(q))
 }
 
-function getPlaylistTimestamp(item) {
+function getPlaylistSortTimestamp(item) {
   return item?.updatedAt || item?.createdAt || null
 }
 
+function formatPlaylistCreatedAt(item) {
+  return formatRuDateTime(item?.createdAt)
+}
+
 function formatPlaylistUpdatedAt(item) {
-  return formatRuDateTime(getPlaylistTimestamp(item))
+  return formatRuDateTime(item?.updatedAt)
 }
 
 function createPlaylist() {
@@ -203,7 +208,10 @@ async function deletePlaylist(item) {
           {{ formatFileSize(item.totalFileSizeBytes) }}
         </template>
         <template v-slot:[`item.updatedAtSortKey`]="{ item }">
-          {{ formatPlaylistUpdatedAt(item) }}
+          <div class="playlist-timestamps-cell">
+            <div>{{ formatPlaylistCreatedAt(item) }}</div>
+            <div>{{ formatPlaylistUpdatedAt(item) }}</div>
+          </div>
         </template>
         <template v-slot:[`item.totalDurationSeconds`]="{ item }">
           {{ formatDuration(item.totalDurationSeconds) }}
@@ -232,3 +240,13 @@ async function deletePlaylist(item) {
     </v-card>
   </div>
 </template>
+
+<style scoped>
+.playlist-timestamps-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+</style>
