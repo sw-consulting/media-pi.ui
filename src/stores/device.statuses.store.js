@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { fetchWrapper } from '@/helpers/fetch.wrapper.js'
 import { apiUrl, enableLog } from '@/helpers/config.js'
+import { normalizePlaylistActivation } from '@/helpers/playlist.activation.js'
 import { useAuthStore } from '@/stores/auth.store.js'
 
 const baseUrl = `${apiUrl}/devicestatuses`
@@ -28,7 +29,8 @@ export const useDeviceStatusesStore = defineStore('deviceStatuses', () => {
     softwareVersion: item?.softwareVersion ?? item?.SoftwareVersion ?? null,
     playbackServiceStatus: item?.playbackServiceStatus ?? item?.PlaybackServiceStatus ?? null,
     playlistUploadServiceStatus: item?.playlistUploadServiceStatus ?? item?.PlaylistUploadServiceStatus ?? null,
-    videoUploadServiceStatus: item?.videoUploadServiceStatus ?? item?.VideoUploadServiceStatus ?? null
+    videoUploadServiceStatus: item?.videoUploadServiceStatus ?? item?.VideoUploadServiceStatus ?? null,
+    playlistActivation: normalizePlaylistActivation(item?.playlistActivation ?? item?.PlaylistActivation)
   })
 
   const updateLocal = (item, fallbackDeviceId = null) => {
