@@ -37,7 +37,8 @@ const normalizedMockStatus = {
   softwareVersion: null,
   playbackServiceStatus: null,
   playlistUploadServiceStatus: null,
-  videoUploadServiceStatus: null
+  videoUploadServiceStatus: null,
+  playlistActivation: null
 }
 
 const normalizedMockStatuses = [
@@ -52,7 +53,8 @@ const normalizedMockStatuses = [
     softwareVersion: null,
     playbackServiceStatus: null,
     playlistUploadServiceStatus: null,
-    videoUploadServiceStatus: null
+    videoUploadServiceStatus: null,
+    playlistActivation: null
   }
 ]
 
@@ -95,7 +97,7 @@ describe('device.statuses.store', () => {
 
     const result = await store.getById(1)
 
-    const expected = { ...snapshot, deviceId: 1, softwareVersion: null }
+    const expected = { ...snapshot, deviceId: 1, softwareVersion: null, playlistActivation: null }
     expect(store.statuses).toEqual([expected])
     expect(result).toEqual(expected)
   })
@@ -111,7 +113,15 @@ describe('device.statuses.store', () => {
       SoftwareVersion: '1.2.3',
       PlaybackServiceStatus: true,
       PlaylistUploadServiceStatus: false,
-      VideoUploadServiceStatus: null
+      VideoUploadServiceStatus: null,
+      PlaylistActivation: {
+        State: 'failed',
+        Phase: 'playbackRestart',
+        Trigger: 'manual',
+        StartedAt: '2026-07-01T10:00:00+03:00',
+        FinishedAt: '2026-07-01T10:00:05+03:00',
+        Error: 'restart failed'
+      }
     })
     const store = useDeviceStatusesStore()
 
@@ -127,7 +137,15 @@ describe('device.statuses.store', () => {
       softwareVersion: '1.2.3',
       playbackServiceStatus: true,
       playlistUploadServiceStatus: false,
-      videoUploadServiceStatus: null
+      videoUploadServiceStatus: null,
+      playlistActivation: {
+        state: 'failed',
+        phase: 'playbackRestart',
+        trigger: 'manual',
+        startedAt: '2026-07-01T10:00:00+03:00',
+        finishedAt: '2026-07-01T10:00:05+03:00',
+        error: 'restart failed'
+      }
     }
     expect(store.statuses).toEqual([expected])
     expect(result).toEqual(expected)
