@@ -9,6 +9,7 @@ import { reactive, ref } from 'vue'
 import ScreenshotsList from '@/components/Screenshots_List.vue'
 
 const authStore = reactive({
+  user: { roles: [1], accountIds: [] },
   screenshots_page: 1,
   screenshots_per_page: 100,
   screenshots_sort_by: [{ key: 'id', order: 'asc' }]
@@ -21,10 +22,11 @@ const totalCountRef = ref(0)
 const deviceRef = ref({ id: 7, name: 'Device 7' })
 const deviceLoadingRef = ref(false)
 const alertRef = ref(null)
+let deviceAccountId = null
 
 const getAllByDevice = vi.fn(async () => screenshotsRef.value)
 const getDeviceById = vi.fn(async (id) => {
-  deviceRef.value = { id, name: `Device ${id}` }
+  deviceRef.value = { id, name: `Device ${id}`, accountId: deviceAccountId }
   return deviceRef.value
 })
 const createScreenshot = vi.fn(async () => {
@@ -148,13 +150,15 @@ describe('Screenshots_List.vue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    authStore.user = { roles: [1], accountIds: [] }
     authStore.screenshots_page = 1
     authStore.screenshots_per_page = 100
     authStore.screenshots_sort_by = [{ key: 'id', order: 'asc' }]
+    deviceAccountId = null
     screenshotsRef.value = [{ id: 5, originalFilename: 'shot.jpg', fileSizeBytes: 128, timeCreated: '2026-04-15T10:00:00Z' }]
     screenshotRef.value = null
     screenshotsLoadingRef.value = false
-    deviceRef.value = { id: 7, name: 'Device 7' }
+    deviceRef.value = { id: 7, name: 'Device 7', accountId: null }
     deviceLoadingRef.value = false
     totalCountRef.value = 1
     alertRef.value = null
@@ -181,6 +185,90 @@ describe('Screenshots_List.vue', () => {
 
     expect(getDeviceById).toHaveBeenCalledWith(7)
     expect(wrapper.get('h1.primary-heading').text()).toContain('Фотографии устройства Device 7')
+  })
+
+  it('allows account manager to open and take photos for an assigned account device but hides delete', async () => {
+    authStore.user = { roles: [11], accountIds: [42] }
+    deviceAccountId = 42
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="open-photo-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="take-photo-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="delete-photo-button"]').exists()).toBe(false)
+
+    await wrapper.find('[data-test="take-photo-button"]').trigger('click')
+    await flushPromises()
+    expect(createScreenshot).toHaveBeenCalledWith(7)
+  })
+
+  it('hides photo actions for account manager on an unassigned device', async () => {
+    authStore.user = { roles: [11], accountIds: [42] }
+    deviceAccountId = null
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="open-photo-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="take-photo-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="delete-photo-button"]').exists()).toBe(false)
+  })
+
+  it('allows installation engineer to open, take, and delete photos for an unassigned device', async () => {
+    authStore.user = { roles: [21], accountIds: [] }
+    deviceAccountId = null
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="open-photo-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="take-photo-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="delete-photo-button"]').exists()).toBe(true)
+  })
+
+  it('hides photo actions for installation engineer on an assigned device', async () => {
+    authStore.user = { roles: [21], accountIds: [] }
+    deviceAccountId = 42
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="open-photo-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="take-photo-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="delete-photo-button"]').exists()).toBe(false)
+  })
+
+  it('allows multi-role manager and engineer to open and take assigned-device photos but hides delete', async () => {
+    authStore.user = { roles: [11, 21], accountIds: [42] }
+    deviceAccountId = 42
+
+    const wrapper = mount(ScreenshotsList, {
+      props: { deviceId: 7 },
+      global: { stubs: globalStubs }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="open-photo-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="take-photo-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="delete-photo-button"]').exists()).toBe(false)
   })
 
   it('applies date filters', async () => {

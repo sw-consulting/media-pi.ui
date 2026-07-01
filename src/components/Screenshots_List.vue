@@ -13,6 +13,11 @@ import { useAuthStore } from '@/stores/auth.store.js'
 import { useAlertStore } from '@/stores/alert.store.js'
 import { useConfirmation } from '@/helpers/confirmation.js'
 import { formatFileSize } from '@/helpers/media.format.js'
+import {
+  canCreateScreenshot,
+  canDeleteScreenshot,
+  canViewScreenshot
+} from '@/helpers/user.helpers.js'
 import AlertOutput from '@/components/AlertOutput.vue'
 import ScreenshotViewDialog from '@/components/Screenshot_View_Dialog.vue'
 
@@ -57,6 +62,9 @@ const deviceTitle = computed(() => {
   if (device.value.id === props.deviceId && device.value.name) return device.value.name
   return props.deviceId
 })
+const canOpenPhotos = computed(() => canViewScreenshot(authStore.user, device.value))
+const canTakePhotos = computed(() => canCreateScreenshot(authStore.user, device.value))
+const canDeletePhotos = computed(() => canDeleteScreenshot(authStore.user, device.value))
 
 function formatDate(value) {
   if (!value) return '—'
@@ -93,6 +101,8 @@ async function loadDevice() {
 }
 
 async function openPhoto(item) {
+  if (!canOpenPhotos.value) return
+
   try {
     await screenshotsStore.open(item.id)
     screenshotDialogTakenAt.value = item.timeCreated || null
@@ -124,6 +134,8 @@ watch(screenshotDialogOpen, (isOpen) => {
   }
 })
 async function takePhoto() {
+  if (!canTakePhotos.value) return
+
   try {
     await screenshotsStore.create(props.deviceId)
     screenshotDialogTakenAt.value = new Date()
@@ -135,6 +147,8 @@ async function takePhoto() {
 }
 
 async function deletePhoto(item) {
+  if (!canDeletePhotos.value) return
+
   const confirmed = await confirmDelete(item.originalFilename || `фотография #${item.id}`, 'фотографию')
   if (!confirmed) return
 
@@ -211,6 +225,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="header-actions header-actions-group">
           <ActionButton
+            v-if="canTakePhotos"
             data-test="take-photo-button"
             :item="{}"
             iconSize="2x"
@@ -296,6 +311,7 @@ onBeforeUnmount(() => {
         <template #[`item.actions`]="{ item }">
           <div class="actions-container">
             <ActionButton
+              v-if="canOpenPhotos"
               data-test="open-photo-button"
               :item="item"
               icon="fa-solid fa-image"
@@ -304,6 +320,7 @@ onBeforeUnmount(() => {
               @click="openPhoto(item)"
             />
             <ActionButton
+              v-if="canDeletePhotos"
               data-test="delete-photo-button"
               :item="item"
               icon="fa-solid fa-trash-can"
